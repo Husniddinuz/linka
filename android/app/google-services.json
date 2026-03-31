@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "198487965280",
+    "project_id": "linka1",
+    "storage_bucket": "linka1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:198487965280:android:3f89dff5eed06be74dcd05",
+        "android_client_info": {
+          "package_name": "com.mukhammadisakhon.linka"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBJmYjC6y74W-8-05Wr37dPKQODUeEa1dI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
