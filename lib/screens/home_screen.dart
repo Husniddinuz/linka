@@ -1,3 +1,4 @@
+import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../widgets/cached_avatar.dart';
@@ -8,6 +9,7 @@ import 'tutors_screen.dart';
 import 'speaking_training_screen.dart';
 import 'my_profile_screen.dart';
 import 'story_upload_screen.dart';
+import 'podcast_player_screen.dart';
 import 'story_viewer_screen.dart';
 
 // ─── Data models ───────────────────────────────────────────────────────────────
@@ -116,9 +118,23 @@ class _Movie {
 }
 
 class _Podcast {
+  final int id;
   final String title;
-  final String duration;
-  const _Podcast(this.title, this.duration);
+  final String? audioUrl;
+
+  const _Podcast({
+    required this.id,
+    required this.title,
+    this.audioUrl,
+  });
+
+  factory _Podcast.fromJson(Map<String, dynamic> json) {
+    return _Podcast(
+      id: json['id'] as int,
+      title: json['title'] as String? ?? '',
+      audioUrl: json['audio_url'] as String?,
+    );
+  }
 }
 
 class _Article {
@@ -149,6 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadViewedStories();
     _loadStoryTutors();
     _loadTodaysLessons();
+    _loadPodcasts();
   }
 
   Future<void> _loadProfile() async {
@@ -184,6 +201,20 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _viewedStories.add(tutorId));
   }
 
+  Future<void> _loadPodcasts() async {
+    try {
+      final list = await ApiService.getList('/content/podcasts/');
+      if (!mounted) return;
+      setState(() {
+        _podcasts = list
+            .map((e) => _Podcast.fromJson(e as Map<String, dynamic>))
+            .toList();
+      });
+    } catch (e) {
+      dev.log('Podcasts error: $e');
+    }
+  }
+
   Future<void> _loadTodaysLessons() async {
     try {
       final result = await ApiService.get('/bookings/my/?status=confirmed');
@@ -213,11 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _Movie('Joker', 'assets/images/movies/joker.png'),
   ];
 
-  static const _podcasts = [
-    _Podcast('Want to be happy?\nBe grateful!', '2:30'),
-    _Podcast('The benefits of a\nbilingual brain.', '5:14'),
-    _Podcast('BBC Learning\nEnglish', '3:47'),
-  ];
+  List<_Podcast> _podcasts = [];
 
   static const _articles = [
     _Article('10 Tips to Improve\nYour English'),
@@ -854,7 +881,18 @@ class _PodcastCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PodcastPlayerScreen(
+            podcastId: podcast.id,
+            initialTitle: podcast.title,
+            initialAudioUrl: podcast.audioUrl,
+          ),
+        ),
+      ),
+      child: Container(
       width: 240,
       margin: const EdgeInsets.symmetric(horizontal: 6),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
@@ -881,33 +919,20 @@ class _PodcastCard extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  podcast.title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF272942),
-                    height: 1.3,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  podcast.duration,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFFAAAAAA),
-                  ),
-                ),
-              ],
+            child: Text(
+              podcast.title,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF272942),
+                height: 1.3,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
+      ),
       ),
     );
   }

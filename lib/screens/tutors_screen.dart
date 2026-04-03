@@ -23,8 +23,6 @@ class _TutorCard {
   });
 
   factory _TutorCard.fromJson(Map<String, dynamic> json) {
-    final firstName = json['first_name'] as String? ?? '';
-    final lastName = json['last_name'] as String? ?? '';
     // experience can be int or descriptive string — extract leading number
     int exp = 0;
     final rawExp = json['experience'];
@@ -36,7 +34,7 @@ class _TutorCard {
     }
     return _TutorCard(
       id: json['id'] as int? ?? 0,
-      name: '$firstName $lastName'.trim(),
+      name: json['tutor_name'] as String? ?? '',
       image: json['profile_image'] as String?,
       experience: exp,
       score: (json['ielts_score'] as num?)?.toDouble() ?? 0,
