@@ -8,10 +8,14 @@ import '../widgets/app_notify.dart';
 import '../widgets/skeleton.dart';
 import 'profile_setup_screen.dart';
 import 'plus_subscription_screen.dart';
+import 'saved_tutors_screen.dart';
 import 'role_selection_screen.dart';
+import 'faq_screen.dart';
+import 'notifications_screen.dart';
 
 class MyProfileScreen extends StatefulWidget {
-  const MyProfileScreen({super.key});
+  final VoidCallback? onNavigateToLessons;
+  const MyProfileScreen({super.key, this.onNavigateToLessons});
 
   @override
   State<MyProfileScreen> createState() => _MyProfileScreenState();
@@ -153,7 +157,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                         _MenuRow(
                           icon: 'assets/images/buttons/my-lessons.svg',
                           label: 'My lessons',
-                          onTap: () {},
+                          onTap: () => widget.onNavigateToLessons?.call(),
                         ),
                         const _Divider(),
                         _MenuRow(
@@ -165,7 +169,9 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                         _MenuRow(
                           icon: 'assets/images/buttons/saved-tutors.svg',
                           label: 'Saved tutors',
-                          onTap: () {},
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const SavedTutorsScreen()),
+                          ),
                         ),
                         const _Divider(),
                         _MenuRow(
@@ -181,19 +187,23 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                         _MenuRow(
                           icon: 'assets/images/buttons/notifications.svg',
                           label: 'Notifications',
-                          onTap: () {},
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                          ),
                         ),
                         const _Divider(),
-                        _MenuRow(
-                          icon: 'assets/images/buttons/help_outline_20.svg',
-                          label: 'Help center',
-                          onTap: () {},
-                        ),
-                        const _Divider(),
+                        // _MenuRow(
+                        //   icon: 'assets/images/buttons/help_outline_20.svg',
+                        //   label: 'Help center',
+                        //   onTap: () {},
+                        // ),
+                        // const _Divider(),
                         _MenuRow(
                           icon: 'assets/images/buttons/faqs.svg',
                           label: 'FAQs',
-                          onTap: () {},
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const FaqScreen()),
+                          ),
                         ),
                         const _Divider(),
                         _MenuRow(

@@ -15,6 +15,8 @@ class TutorProfileScreen extends StatefulWidget {
 class _TutorProfileScreenState extends State<TutorProfileScreen> {
   Map<String, dynamic>? _tutor;
   bool _loading = true;
+  bool _isBookmarked = false;
+  bool _bookmarkLoading = false;
 
   @override
   void initState() {
@@ -28,12 +30,27 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
       if (!mounted) return;
       setState(() {
         _tutor = result;
+        _isBookmarked = result['is_bookmarked'] as bool? ?? false;
         _loading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
     }
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (_bookmarkLoading) return;
+    setState(() => _bookmarkLoading = true);
+    try {
+      if (_isBookmarked) {
+        await ApiService.delete('/student/saved-tutors/${widget.tutorId}/');
+      } else {
+        await ApiService.post('/student/saved-tutors/', {'tutor_id': widget.tutorId});
+      }
+      if (mounted) setState(() => _isBookmarked = !_isBookmarked);
+    } catch (_) {}
+    if (mounted) setState(() => _bookmarkLoading = false);
   }
 
   String _formatAmount(int amount) {
@@ -121,7 +138,10 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _AppBar(),
+                        _AppBar(
+                          isBookmarked: _isBookmarked,
+                          onBookmarkTap: _toggleBookmark,
+                        ),
                         _TutorInfoCard(
                           name: name,
                           imageUrl: imageUrl,
@@ -210,6 +230,14 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
 // ─── App bar ───────────────────────────────────────────────────────────────────
 
 class _AppBar extends StatelessWidget {
+  final bool isBookmarked;
+  final VoidCallback onBookmarkTap;
+
+  const _AppBar({
+    required this.isBookmarked,
+    required this.onBookmarkTap,
+  });
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -227,10 +255,13 @@ class _AppBar extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            const Icon(
-              Icons.bookmark_border_rounded,
-              size: 26,
-              color: Color(0xFF9E9E9E),
+            GestureDetector(
+              onTap: onBookmarkTap,
+              child: Icon(
+                isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                size: 26,
+                color: isBookmarked ? const Color(0xFF272942) : const Color(0xFF9E9E9E),
+              ),
             ),
           ],
         ),

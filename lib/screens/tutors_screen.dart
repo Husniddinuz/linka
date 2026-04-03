@@ -81,6 +81,7 @@ class TutorsScreen extends StatefulWidget {
 
 class _TutorsScreenState extends State<TutorsScreen> {
   bool _showSearch = false;
+  bool _showSaved = false;
   final _searchController = TextEditingController();
   final _recentSearches = [
     'Sardor Qodirov',
@@ -89,9 +90,13 @@ class _TutorsScreenState extends State<TutorsScreen> {
   ];
 
   List<_TutorCard> _tutors = [];
+  List<_TutorCard> _savedTutors = [];
   bool _loading = true;
+  bool _loadingSaved = false;
   String? _error;
   _TutorFilters _filters = const _TutorFilters();
+
+  Set<int> _savedTutorIds = {};
 
   @override
   void initState() {
@@ -105,14 +110,32 @@ class _TutorsScreenState extends State<TutorsScreen> {
       _error = null;
     });
     try {
-      final list = await ApiService.getList(
-        '/tutors/${_filters.toQueryString()}',
-      );
+      // Fetch tutors and saved tutors in parallel
+      final results = await Future.wait([
+        ApiService.getList('/tutors/${_filters.toQueryString()}'),
+        ApiService.get('/student/saved-tutors/').catchError((_) => <String, dynamic>{}),
+      ]);
       if (!mounted) return;
+      final list = results[0] as List<dynamic>;
+      final savedResponse = results[1] as Map<String, dynamic>;
+      final savedList = savedResponse['data'] as List<dynamic>? ?? [];
+      _savedTutorIds = savedList
+          .map((e) => (e as Map<String, dynamic>)['id'] as int? ?? 0)
+          .toSet();
+
       setState(() {
-        _tutors = list
-            .map((e) => _TutorCard.fromJson(e as Map<String, dynamic>))
-            .toList();
+        _tutors = list.map((e) {
+          final json = e as Map<String, dynamic>;
+          final card = _TutorCard.fromJson(json);
+          return _TutorCard(
+            id: card.id,
+            name: card.name,
+            image: card.image,
+            experience: card.experience,
+            score: card.score,
+            isBookmarked: _savedTutorIds.contains(card.id),
+          );
+        }).toList();
         _loading = false;
       });
     } catch (e) {
@@ -122,6 +145,60 @@ class _TutorsScreenState extends State<TutorsScreen> {
         _loading = false;
         _error = e.toString();
       });
+    }
+  }
+
+  Future<void> _loadSavedTutors() async {
+    setState(() => _loadingSaved = true);
+    try {
+      final response = await ApiService.get('/student/saved-tutors/');
+      final list = response['data'] as List<dynamic>? ?? [];
+      if (!mounted) return;
+      setState(() {
+        _savedTutors = list
+            .map((e) => _TutorCard.fromJson(e as Map<String, dynamic>))
+            .toList();
+        _loadingSaved = false;
+      });
+    } catch (e) {
+      dev.log('SAVED TUTORS ERROR: $e');
+      if (!mounted) return;
+      setState(() => _loadingSaved = false);
+    }
+  }
+
+  Future<void> _toggleBookmark(_TutorCard tutor) async {
+    try {
+      if (tutor.isBookmarked) {
+        await ApiService.delete('/student/saved-tutors/${tutor.id}/');
+      } else {
+        await ApiService.post('/student/saved-tutors/', {'tutor_id': tutor.id});
+      }
+      // Update in main list and saved IDs
+      setState(() {
+        if (tutor.isBookmarked) {
+          _savedTutorIds.remove(tutor.id);
+        } else {
+          _savedTutorIds.add(tutor.id);
+        }
+        _tutors = _tutors.map((t) {
+          if (t.id == tutor.id) {
+            return _TutorCard(
+              id: t.id,
+              name: t.name,
+              image: t.image,
+              experience: t.experience,
+              score: t.score,
+              isBookmarked: !t.isBookmarked,
+            );
+          }
+          return t;
+        }).toList();
+      });
+      // Refresh saved list if showing
+      if (_showSaved) _loadSavedTutors();
+    } catch (e) {
+      dev.log('BOOKMARK ERROR: $e');
     }
   }
 
@@ -152,6 +229,18 @@ class _TutorsScreenState extends State<TutorsScreen> {
           _searchController.clear();
         }),
         onRemove: (i) => setState(() => _recentSearches.removeAt(i)),
+      );
+    }
+
+    if (_showSaved) {
+      return _SavedTutorsView(
+        tutors: _savedTutors,
+        loading: _loadingSaved,
+        onClose: () => setState(() => _showSaved = false),
+        onToggleBookmark: _toggleBookmark,
+        onTutorTap: (id) => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => TutorProfileScreen(tutorId: id)),
+        ),
       );
     }
 
@@ -217,11 +306,17 @@ class _TutorsScreenState extends State<TutorsScreen> {
 
                   const SizedBox(width: 12),
 
-                  // Bookmark button
-                  SvgPicture.asset(
-                    'assets/images/icons/bookmark_outline_16.svg',
-                    width: 26,
-                    height: 26,
+                  // Bookmark button — open saved tutors
+                  GestureDetector(
+                    onTap: () {
+                      _loadSavedTutors();
+                      setState(() => _showSaved = true);
+                    },
+                    child: SvgPicture.asset(
+                      'assets/images/icons/bookmark_outline_16.svg',
+                      width: 26,
+                      height: 26,
+                    ),
                   ),
                 ],
               ),
@@ -310,7 +405,10 @@ class _TutorsScreenState extends State<TutorsScreen> {
                                 TutorProfileScreen(tutorId: _tutors[i].id),
                           ),
                         ),
-                        child: _TutorGridCard(tutor: _tutors[i]),
+                        child: _TutorGridCard(
+                          tutor: _tutors[i],
+                          onBookmark: () => _toggleBookmark(_tutors[i]),
+                        ),
                       ),
                     ),
             ),
@@ -325,7 +423,8 @@ class _TutorsScreenState extends State<TutorsScreen> {
 
 class _TutorGridCard extends StatelessWidget {
   final _TutorCard tutor;
-  const _TutorGridCard({required this.tutor});
+  final VoidCallback? onBookmark;
+  const _TutorGridCard({required this.tutor, this.onBookmark});
 
   @override
   Widget build(BuildContext context) {
@@ -437,12 +536,15 @@ class _TutorGridCard extends StatelessWidget {
                     const Spacer(),
 
                     // Bookmark icon
-                    SvgPicture.asset(
-                      tutor.isBookmarked
-                          ? 'assets/images/icons/bookmarked.svg'
-                          : 'assets/images/icons/bookmark_on_card.svg',
-                      width: 18,
-                      height: 20,
+                    GestureDetector(
+                      onTap: onBookmark,
+                      child: SvgPicture.asset(
+                        tutor.isBookmarked
+                            ? 'assets/images/icons/bookmarked.svg'
+                            : 'assets/images/icons/bookmark_on_card.svg',
+                        width: 18,
+                        height: 20,
+                      ),
                     ),
                   ],
                 ),
@@ -961,6 +1063,122 @@ class _FilterSheetState extends State<_FilterSheet> {
             fontWeight: FontWeight.w500,
             color: selected ? Colors.white : const Color(0xFF2B2B2B),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Saved tutors view ─────────────────────────────────────────────────────────
+
+class _SavedTutorsView extends StatelessWidget {
+  final List<_TutorCard> tutors;
+  final bool loading;
+  final VoidCallback onClose;
+  final void Function(_TutorCard) onToggleBookmark;
+  final void Function(int) onTutorTap;
+
+  const _SavedTutorsView({
+    required this.tutors,
+    required this.loading,
+    required this.onClose,
+    required this.onToggleBookmark,
+    required this.onTutorTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: onClose,
+                    child: const Icon(
+                      Icons.chevron_left_rounded,
+                      size: 30,
+                      color: Color(0xFF272942),
+                    ),
+                  ),
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        'Saved tutors',
+                        style: TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF272942),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 30),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Content
+            Expanded(
+              child: loading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: Color(0xFF272942)),
+                    )
+                  : tutors.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SvgPicture.asset(
+                                'assets/images/icons/bookmark_outline_16.svg',
+                                width: 40,
+                                height: 40,
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'No saved tutors yet',
+                                style: TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFFAAAAAA),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : GridView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: () {
+                              final cardWidth =
+                                  (MediaQuery.of(context).size.width - 52) / 2;
+                              final imageHeight = cardWidth * 2 / 3;
+                              return cardWidth / (imageHeight + 100);
+                            }(),
+                          ),
+                          itemCount: tutors.length,
+                          itemBuilder: (_, i) => GestureDetector(
+                            onTap: () => onTutorTap(tutors[i].id),
+                            child: _TutorGridCard(
+                              tutor: tutors[i],
+                              onBookmark: () => onToggleBookmark(tutors[i]),
+                            ),
+                          ),
+                        ),
+            ),
+          ],
         ),
       ),
     );

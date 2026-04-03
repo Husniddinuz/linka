@@ -217,6 +217,95 @@ class ApiService {
     throw ApiException(errorMsg, statusCode: response.statusCode);
   }
 
+  /// Makes an authenticated PATCH request. Throws [ApiException] on failure.
+  static Future<Map<String, dynamic>> patch(
+    String path, [
+    Map<String, dynamic> body = const {},
+  ]) async {
+    final encodedBody = jsonEncode(body);
+    _logRequest('PATCH', path, body: encodedBody);
+    var token = await TokenService.getAccessToken();
+    var response = await http.patch(
+      Uri.parse('$_baseUrl$path'),
+      headers: _headers(token),
+      body: encodedBody,
+    );
+
+    if (response.statusCode == 401) {
+      final newToken = await _tryRefreshToken();
+      if (newToken != null) {
+        response = await http.patch(
+          Uri.parse('$_baseUrl$path'),
+          headers: _headers(newToken),
+          body: encodedBody,
+        );
+      }
+    }
+
+    _logResponse('PATCH', path, response.statusCode, response.body);
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return data;
+    }
+
+    String errorMsg = 'Request failed (${response.statusCode})';
+    if (data.containsKey('message')) {
+      errorMsg = data['message'].toString();
+    } else if (data.containsKey('detail')) {
+      errorMsg = data['detail'].toString();
+    } else {
+      final errors = <String>[];
+      for (final entry in data.entries) {
+        if (entry.value is List) {
+          errors.add((entry.value as List).join(', '));
+        }
+      }
+      if (errors.isNotEmpty) errorMsg = errors.join('\n');
+    }
+
+    throw ApiException(errorMsg, statusCode: response.statusCode);
+  }
+
+  /// Makes an authenticated DELETE request. Throws [ApiException] on failure.
+  static Future<void> delete(String path) async {
+    _logRequest('DELETE', path);
+    var token = await TokenService.getAccessToken();
+    var response = await http.delete(
+      Uri.parse('$_baseUrl$path'),
+      headers: _headers(token),
+    );
+
+    if (response.statusCode == 401) {
+      final newToken = await _tryRefreshToken();
+      if (newToken != null) {
+        response = await http.delete(
+          Uri.parse('$_baseUrl$path'),
+          headers: _headers(newToken),
+        );
+      }
+    }
+
+    _logResponse('DELETE', path, response.statusCode, response.body);
+
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    }
+
+    String errorMsg = 'Request failed (${response.statusCode})';
+    if (response.body.isNotEmpty) {
+      try {
+        final data = jsonDecode(response.body);
+        if (data is Map) {
+          errorMsg = data['message']?.toString() ??
+              data['detail']?.toString() ??
+              errorMsg;
+        }
+      } catch (_) {}
+    }
+    throw ApiException(errorMsg, statusCode: response.statusCode);
+  }
+
   /// Makes an authenticated multipart POST request for file uploads.
   /// [files] is a map of field name → File. [fields] are additional text fields.
   static Future<Map<String, dynamic>> postMultipart(

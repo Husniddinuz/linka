@@ -10,6 +10,9 @@ import 'speaking_training_screen.dart';
 import 'my_profile_screen.dart';
 import 'story_upload_screen.dart';
 import 'podcast_player_screen.dart';
+import 'podcasts_list_screen.dart';
+import 'articles_list_screen.dart';
+import 'article_detail_screen.dart';
 import 'story_viewer_screen.dart';
 
 // ─── Data models ───────────────────────────────────────────────────────────────
@@ -121,11 +124,13 @@ class _Podcast {
   final int id;
   final String title;
   final String? audioUrl;
+  final int? durationSeconds;
 
   const _Podcast({
     required this.id,
     required this.title,
     this.audioUrl,
+    this.durationSeconds,
   });
 
   factory _Podcast.fromJson(Map<String, dynamic> json) {
@@ -133,13 +138,32 @@ class _Podcast {
       id: json['id'] as int,
       title: json['title'] as String? ?? '',
       audioUrl: json['audio_url'] as String?,
+      durationSeconds: json['duration'] as int?,
     );
+  }
+
+  String get formattedDuration {
+    if (durationSeconds == null || durationSeconds == 0) return '';
+    final m = durationSeconds! ~/ 60;
+    final s = durationSeconds! % 60;
+    if (m > 0 && s > 0) return '$m min $s sec';
+    if (m > 0) return '$m min';
+    return '$s sec';
   }
 }
 
 class _Article {
+  final int id;
   final String title;
-  const _Article(this.title);
+
+  const _Article({required this.id, required this.title});
+
+  factory _Article.fromJson(Map<String, dynamic> json) {
+    return _Article(
+      id: json['id'] as int,
+      title: json['title'] as String? ?? '',
+    );
+  }
 }
 
 // ─── Screen ────────────────────────────────────────────────────────────────────
@@ -166,6 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadStoryTutors();
     _loadTodaysLessons();
     _loadPodcasts();
+    _loadArticles();
   }
 
   Future<void> _loadProfile() async {
@@ -215,6 +240,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _loadArticles() async {
+    try {
+      final list = await ApiService.getList('/content/articles/');
+      if (!mounted) return;
+      setState(() {
+        _articles = list
+            .map((e) => _Article.fromJson(e as Map<String, dynamic>))
+            .toList();
+      });
+    } catch (e) {
+      dev.log('Articles error: $e');
+    }
+  }
+
   Future<void> _loadTodaysLessons() async {
     try {
       final result = await ApiService.get('/bookings/my/?status=confirmed');
@@ -246,11 +285,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<_Podcast> _podcasts = [];
 
-  static const _articles = [
-    _Article('10 Tips to Improve\nYour English'),
-    _Article('How to Sound Like\na Native Speaker'),
-    _Article('Common English\nMistakes to Avoid'),
-  ];
+  List<_Article> _articles = [];
 
   @override
   Widget build(BuildContext context) {
@@ -340,7 +375,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 28),
 
                         // Articles section
-                        _SectionHeader(title: 'ARTICLES'),
+                        _SectionHeader(
+                          title: 'ARTICLES',
+                          onSeeAll: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ArticlesListScreen()),
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         _ArticlesSection(articles: _articles),
 
@@ -354,7 +395,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const LessonsScreen(),
           const TutorsScreen(),
-          const MyProfileScreen(),
+          MyProfileScreen(
+            onNavigateToLessons: () => setState(() => _selectedTab = 1),
+          ),
         ],
       ),
       bottomNavigationBar: _BottomNav(
@@ -929,16 +972,33 @@ class _PodcastCard extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              podcast.title,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF272942),
-                height: 1.3,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  podcast.title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF272942),
+                    height: 1.3,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (podcast.formattedDuration.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    podcast.formattedDuration,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                      color: Color(0xFF6C6C6C),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
@@ -974,61 +1034,69 @@ class _ArticleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 140,
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF6F6F6),
-        borderRadius: BorderRadius.circular(14),
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ArticleDetailScreen(articleId: article.id),
+        ),
       ),
-      clipBehavior: Clip.hardEdge,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            children: [
-              Image.asset(
-                'assets/images/article.png',
-                width: double.infinity,
-                height: 110,
-                fit: BoxFit.cover,
-                cacheWidth: 280,
-                cacheHeight: 220,
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 16,
-                    color: Color(0xFF272942),
+      child: Container(
+        width: 140,
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF6F6F6),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                Image.asset(
+                  'assets/images/article.png',
+                  width: double.infinity,
+                  height: 110,
+                  fit: BoxFit.cover,
+                  cacheWidth: 280,
+                  cacheHeight: 220,
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: SvgPicture.asset(
+                      'assets/images/icons/bookmark_outline_16.svg',
+                      width: 14,
+                      height: 14,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Text(
-              article.title,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF272942),
-                height: 1.3,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+              ],
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(
+                article.title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF272942),
+                  height: 1.3,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

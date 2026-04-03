@@ -1,15 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-
-// ─── Data model ─────────────────────────────────────────────────────────────────
-
-class _LessonItem {
-  final String tutorName;
-  final String image;
-  final String timeRange;
-  final String duration;
-  const _LessonItem(this.tutorName, this.image, this.timeRange, this.duration);
-}
+import '../services/api_service.dart';
 
 // ─── Screen ─────────────────────────────────────────────────────────────────────
 
@@ -21,35 +12,135 @@ class LessonsScreen extends StatefulWidget {
 }
 
 class _LessonsScreenState extends State<LessonsScreen> {
-  DateTime _focusedMonth = DateTime(2026, 3);
-  int _selectedDay = 15;
+  DateTime _focusedMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  int _selectedDay = DateTime.now().day;
 
-  // Days that have lessons per month (year-month -> days)
-  static final _lessonDaysByMonth = {
-    '2026-2': {17, 19, 26},
-    '2026-3': {3, 10, 15, 22},
-  };
+  // Calendar data from API
+  Set<int> _busyDays = {};
+  List<Map<String, dynamic>> _bookings = [];
+  bool _loadingBookings = true;
 
-  // Mock lessons for selected day
-  static const _lessons = [
-    _LessonItem('Azizbek', 'assets/images/tutors/azizbek.png', '21:00 - 0:00', '20 min'),
-    _LessonItem('Azizbek', 'assets/images/tutors/azizbek.png', '0:00 - 0:30', '30 min'),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchCalendar();
+    _fetchBookings();
+  }
+
+  Future<void> _fetchCalendar() async {
+    try {
+      final data = await ApiService.get(
+        '/bookings/calendar/?year=${_focusedMonth.year}&month=${_focusedMonth.month}',
+      );
+      final days = <int>{};
+      if (data['busy_days'] is List) {
+        for (final d in data['busy_days'] as List) {
+          days.add(d is int ? d : int.tryParse(d.toString()) ?? 0);
+        }
+      }
+      if (mounted) setState(() => _busyDays = days);
+    } on ApiException {
+      if (mounted) setState(() => _busyDays = {});
+    }
+  }
+
+  Future<void> _fetchBookings() async {
+    setState(() => _loadingBookings = true);
+    try {
+      final list = await ApiService.getList('/bookings/my/');
+      if (mounted) {
+        setState(() {
+          _bookings = list.cast<Map<String, dynamic>>();
+          _loadingBookings = false;
+        });
+      }
+    } on ApiException {
+      if (mounted) setState(() { _bookings = []; _loadingBookings = false; });
+    }
+  }
+
+  List<Map<String, dynamic>> get _selectedDayBookings {
+    final selectedDate = DateTime(_focusedMonth.year, _focusedMonth.month, _selectedDay);
+    return _bookings.where((b) {
+      final startStr = b['start_time']?.toString() ?? b['date']?.toString() ?? '';
+      if (startStr.isEmpty) return false;
+      final parsed = DateTime.tryParse(startStr);
+      if (parsed == null) return false;
+      final local = parsed.toLocal();
+      return local.year == selectedDate.year &&
+          local.month == selectedDate.month &&
+          local.day == selectedDate.day;
+    }).toList();
+  }
 
   void _prevMonth() {
     setState(() {
       _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month - 1);
+      _selectedDay = 1;
     });
+    _fetchCalendar();
+    _fetchBookings();
   }
 
   void _nextMonth() {
     setState(() {
       _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month + 1);
+      _selectedDay = 1;
     });
+    _fetchCalendar();
+    _fetchBookings();
+  }
+
+  Future<void> _cancelBooking(int bookingId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Lesson'),
+        content: const Text('Are you sure you want to cancel this lesson?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Yes, cancel')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    try {
+      await ApiService.patch('/bookings/$bookingId/cancel/');
+      _fetchCalendar();
+      _fetchBookings();
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
+  Future<void> _joinLesson(int bookingId) async {
+    try {
+      final data = await ApiService.post('/bookings/$bookingId/join/', {});
+      final roomUrl = data['room_url']?.toString() ?? '';
+      final token = data['token']?.toString() ?? '';
+      if (roomUrl.isEmpty || token.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not get room info')),
+          );
+        }
+        return;
+      }
+      // TODO: Navigate to video call screen with roomUrl and token
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final dayBookings = _selectedDayBookings;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F7),
       body: SafeArea(
@@ -83,7 +174,7 @@ class _LessonsScreenState extends State<LessonsScreen> {
                       child: _CalendarCard(
                         focusedMonth: _focusedMonth,
                         selectedDay: _selectedDay,
-                        lessonDays: _lessonDaysByMonth['${_focusedMonth.year}-${_focusedMonth.month}'] ?? {},
+                        lessonDays: _busyDays,
                         onPrevMonth: _prevMonth,
                         onNextMonth: _nextMonth,
                         onDayTap: (day) => setState(() => _selectedDay = day),
@@ -111,14 +202,35 @@ class _LessonsScreenState extends State<LessonsScreen> {
 
                           const SizedBox(height: 16),
 
-                          // Lesson cards or no classes
-                          if ((_lessonDaysByMonth['${_focusedMonth.year}-${_focusedMonth.month}'] ?? {}).contains(_selectedDay))
-                            ..._lessons.asMap().entries.map((e) {
+                          // Loading / Lesson cards / No classes
+                          if (_loadingBookings)
+                            const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(32),
+                                child: CircularProgressIndicator(color: Color(0xFF272942)),
+                              ),
+                            )
+                          else if (dayBookings.isNotEmpty)
+                            ...dayBookings.asMap().entries.map((e) {
+                              final booking = e.value;
                               final now = DateTime.now();
-                              final isToday = _focusedMonth.month == now.month && _focusedMonth.year == now.year && _selectedDay == now.day;
+                              final isToday = _focusedMonth.month == now.month &&
+                                  _focusedMonth.year == now.year &&
+                                  _selectedDay == now.day;
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
-                                child: _LessonCard(lesson: e.value, showStartButton: isToday && e.key == 0),
+                                child: _LessonCard(
+                                  booking: booking,
+                                  showStartButton: isToday,
+                                  onStart: () {
+                                    final id = booking['id'];
+                                    if (id != null) _joinLesson(id is int ? id : int.parse(id.toString()));
+                                  },
+                                  onCancel: () {
+                                    final id = booking['id'];
+                                    if (id != null) _cancelBooking(id is int ? id : int.parse(id.toString()));
+                                  },
+                                ),
                               );
                             })
                           else
@@ -347,165 +459,265 @@ class _DateHeader extends StatelessWidget {
 // ─── Lesson card ────────────────────────────────────────────────────────────────
 
 class _LessonCard extends StatelessWidget {
-  final _LessonItem lesson;
+  final Map<String, dynamic> booking;
   final bool showStartButton;
-  const _LessonCard({required this.lesson, this.showStartButton = false});
+  final VoidCallback onStart;
+  final VoidCallback onCancel;
+  const _LessonCard({
+    required this.booking,
+    this.showStartButton = false,
+    required this.onStart,
+    required this.onCancel,
+  });
+
+  String _formatTime(String? isoString) {
+    if (isoString == null) return '--:--';
+    final dt = DateTime.tryParse(isoString)?.toLocal();
+    if (dt == null) return '--:--';
+    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatDuration(String? startStr, String? endStr) {
+    if (startStr == null || endStr == null) return '';
+    final start = DateTime.tryParse(startStr);
+    final end = DateTime.tryParse(endStr);
+    if (start == null || end == null) return '';
+    final diff = end.difference(start);
+    if (diff.inHours > 0) return '${diff.inHours} h ${diff.inMinutes % 60} min';
+    return '${diff.inMinutes} min';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF6F6F6),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 82,
-                height: 82,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F0F4),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.asset(
-                    lesson.image,
-                    width: 82,
-                    height: 82,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Container(
+    final tutor = booking['tutor'] as Map<String, dynamic>? ?? {};
+    final tutorName = tutor['first_name']?.toString() ?? booking['tutor_first_name']?.toString() ?? 'Tutor';
+    final tutorImage = tutor['profile_image']?.toString() ?? booking['tutor_profile_image']?.toString();
+    final startTime = booking['start_time']?.toString();
+    final endTime = booking['end_time']?.toString();
+    final status = booking['status']?.toString() ?? '';
+    final isCancelled = status == 'cancelled';
+
+    return Opacity(
+      opacity: isCancelled ? 0.5 : 1.0,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF6F6F6),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 82,
                   height: 82,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: const Color(0xFFE8F0F4),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              lesson.tutorName,
-                              style: const TextStyle(
-                                fontFamily: 'SF Pro',
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF272942),
-                                height: 1.0,
-                                letterSpacing: 0,
-                              ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: tutorImage != null && tutorImage.isNotEmpty
+                        ? Image.network(
+                            tutorImage,
+                            width: 82,
+                            height: 82,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => SvgPicture.asset(
+                              'assets/images/branding/blank-avatar.svg',
+                              width: 82,
+                              height: 82,
                             ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                SvgPicture.asset(
-                                  'assets/images/icons/recent_outline_20.svg',
-                                  width: 15,
-                                  height: 15,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  lesson.timeRange,
-                                  style: const TextStyle(
-                                    fontFamily: 'SF Pro',
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF6C6C6C),
-                                    height: 1.0,
-                                    letterSpacing: 0,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 3),
-                            Row(
-                              children: [
-                                SvgPicture.asset(
-                                  'assets/images/icons/tabler_hourglass-high.svg',
-                                  width: 15,
-                                  height: 15,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  lesson.duration,
-                                  style: const TextStyle(
-                                    fontFamily: 'SF Pro',
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF6C6C6C),
-                                    height: 1.0,
-                                    letterSpacing: 0,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: List.generate(
-                            3,
-                            (i) => Padding(
-                              padding: EdgeInsets.only(top: i == 0 ? 0 : 3),
-                              child: Container(
-                                width: 4,
-                                height: 4,
-                                decoration: const BoxDecoration(
+                          )
+                        : SvgPicture.asset(
+                            'assets/images/branding/blank-avatar.svg',
+                            width: 82,
+                            height: 82,
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Container(
+                    height: 82,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                tutorName,
+                                style: const TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
                                   color: Color(0xFF272942),
-                                  shape: BoxShape.circle,
+                                  height: 1.0,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  SvgPicture.asset(
+                                    'assets/images/icons/recent_outline_20.svg',
+                                    width: 15,
+                                    height: 15,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    '${_formatTime(startTime)} - ${_formatTime(endTime)}',
+                                    style: const TextStyle(
+                                      fontFamily: 'SF Pro',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF6C6C6C),
+                                      height: 1.0,
+                                      letterSpacing: 0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Row(
+                                children: [
+                                  SvgPicture.asset(
+                                    'assets/images/icons/tabler_hourglass-high.svg',
+                                    width: 15,
+                                    height: 15,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    _formatDuration(startTime, endTime),
+                                    style: const TextStyle(
+                                      fontFamily: 'SF Pro',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF6C6C6C),
+                                      height: 1.0,
+                                      letterSpacing: 0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (!isCancelled)
+                          GestureDetector(
+                            onTap: () => _showOptions(context),
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: List.generate(
+                                  3,
+                                  (i) => Padding(
+                                    padding: EdgeInsets.only(top: i == 0 ? 0 : 3),
+                                    child: Container(
+                                      width: 4,
+                                      height: 4,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF272942),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (showStartButton && !isCancelled) ...[
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: onStart,
+                child: Container(
+                  width: double.infinity,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF272942),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Start the lesson',
+                      style: TextStyle(
+                        fontFamily: 'SF Pro',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        height: 1.0,
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ],
-          ),
-          if (showStartButton) ...[
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              height: 46,
-              decoration: BoxDecoration(
-                color: const Color(0xFF272942),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Center(
-                child: Text(
-                  'Start the lesson',
-                  style: TextStyle(
-                    fontFamily: 'SF Pro',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                    height: 1.0,
+            if (isCancelled) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEEEEE),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Center(
+                  child: Text(
+                    'Cancelled',
+                    style: TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFFAAAAAA),
+                      height: 1.0,
+                    ),
                   ),
                 ),
               ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.cancel_outlined, color: Colors.red),
+              title: const Text('Cancel lesson'),
+              onTap: () {
+                Navigator.pop(ctx);
+                onCancel();
+              },
             ),
           ],
-        ],
+        ),
       ),
     );
   }
