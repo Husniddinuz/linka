@@ -327,7 +327,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 28),
 
                         // Podcasts section
-                        _SectionHeader(title: 'PODCASTS'),
+                        _SectionHeader(
+                          title: 'PODCASTS',
+                          onSeeAll: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const PodcastsListScreen()),
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         _PodcastsSection(podcasts: _podcasts),
 
@@ -746,7 +752,8 @@ class _LessonCard extends StatelessWidget {
 
 class _SectionHeader extends StatelessWidget {
   final String title;
-  const _SectionHeader({required this.title});
+  final VoidCallback? onSeeAll;
+  const _SectionHeader({required this.title, this.onSeeAll});
 
   @override
   Widget build(BuildContext context) {
@@ -766,15 +773,18 @@ class _SectionHeader extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          const Text(
-            'See all',
-            style: TextStyle(
-              fontFamily: 'SF Pro',
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFFB9BCBE),
-              height: 1.0,
-              letterSpacing: 0,
+          GestureDetector(
+            onTap: onSeeAll,
+            child: const Text(
+              'See all',
+              style: TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFFB9BCBE),
+                height: 1.0,
+                letterSpacing: 0,
+              ),
             ),
           ),
         ],

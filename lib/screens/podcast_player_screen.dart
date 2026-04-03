@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:just_audio/just_audio.dart';
 import '../services/api_service.dart';
@@ -24,7 +25,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
 
   bool _loading = true;
   String _title = '';
-  String? _image;
+
   Duration _totalDuration = Duration.zero;
   Duration _position = Duration.zero;
   bool _playing = false;
@@ -49,7 +50,6 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
         if (!mounted) return;
         final podcast = data['data'] as Map<String, dynamic>? ?? data;
         _title = podcast['title'] as String? ?? '';
-        _image = podcast['image'] as String?;
         audioUrl = podcast['audio_url'] as String?;
       }
 
@@ -181,7 +181,9 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
       backgroundColor: const Color(0xFF272942),
       body: SafeArea(
         child: _loading
@@ -195,7 +197,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                       children: [
                         IconButton(
                           onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.chevron_left, color: Color(0xFFF5C542), size: 28),
+                          icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
                         ),
                         const Expanded(
                           child: Text(
@@ -210,10 +212,13 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                         ),
                         IconButton(
                           onPressed: _toggleMute,
-                          icon: Icon(
-                            _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                            color: Colors.white,
-                            size: 24,
+                          icon: SvgPicture.asset(
+                            _muted
+                                ? 'assets/images/buttons/volume-off.svg'
+                                : 'assets/images/buttons/volume-on.svg',
+                            width: 24,
+                            height: 24,
+                            colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
                           ),
                         ),
                       ],
@@ -236,22 +241,16 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                               Container(
                                 width: 150,
                                 height: 150,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.15),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFBEBEC6),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Center(
-                                  child: _image != null
-                                      ? ClipOval(
-                                          child: Image.network(
-                                            _image!,
-                                            width: 120,
-                                            height: 120,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) => _defaultIcon(),
-                                          ),
-                                        )
-                                      : _defaultIcon(),
+                                  child: SvgPicture.asset(
+                                    'assets/images/buttons/podcast-black.svg',
+                                    width: 60,
+                                    height: 60,
+                                  ),
                                 ),
                               ),
                               // Umbrella SVG above the circle
@@ -291,24 +290,42 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        // Sleep timer
-                        IconButton(
-                          onPressed: _showSleepTimer,
-                          icon: Icon(
-                            Icons.nightlight_round,
-                            color: _sleepLabel != 'Off'
-                                ? const Color(0xFFF5C542)
-                                : Colors.white.withValues(alpha: 0.7),
-                            size: 26,
+                        // Moon (left)
+                        GestureDetector(
+                          onTap: _showSleepTimer,
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: SvgPicture.asset(
+                              'assets/images/buttons/moon.svg',
+                              width: 18,
+                              height: 18,
+                              colorFilter: ColorFilter.mode(
+                                _sleepLabel != 'Off'
+                                    ? const Color(0xFFF5C542)
+                                    : Colors.white.withValues(alpha: 0.7),
+                                BlendMode.srcIn,
+                              ),
+                            ),
                           ),
                         ),
-                        // Rewind 15s
+                        const Spacer(),
+                        // Rewind
                         IconButton(
                           onPressed: _seekBackward,
-                          icon: Icon(Icons.replay, color: Colors.white.withValues(alpha: 0.7), size: 28),
+                          icon: SvgPicture.asset(
+                            'assets/images/branding/video-back.svg',
+                            width: 28,
+                            height: 28,
+                          ),
                         ),
+                        const SizedBox(width: 12),
                         // Play / Pause
                         GestureDetector(
                           onTap: _togglePlay,
@@ -326,25 +343,33 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                             ),
                           ),
                         ),
-                        // Forward 15s
+                        const SizedBox(width: 12),
+                        // Forward
                         IconButton(
                           onPressed: _seekForward,
-                          icon: Icon(Icons.forward, color: Colors.white.withValues(alpha: 0.7), size: 28),
+                          icon: SvgPicture.asset(
+                            'assets/images/branding/video-front.svg',
+                            width: 28,
+                            height: 28,
+                          ),
                         ),
-                        // Speed
+                        const Spacer(),
+                        // Speed (right)
                         GestureDetector(
                           onTap: _cycleSpeed,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            width: 40,
+                            height: 40,
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(12),
+                              shape: BoxShape.circle,
                             ),
+                            alignment: Alignment.center,
                             child: Text(
                               _speed == 1.0 ? '1x' : _speed == 1.5 ? '1.5x' : '2x',
                               style: TextStyle(
                                 color: _speed != 1.0 ? const Color(0xFFF5C542) : Colors.white,
-                                fontSize: 14,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -409,15 +434,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                 ],
               ),
       ),
-    );
-  }
-
-  Widget _defaultIcon() {
-    return SvgPicture.asset(
-      'assets/images/icons/podcast.svg',
-      width: 60,
-      height: 60,
-      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+    ),
     );
   }
 }
