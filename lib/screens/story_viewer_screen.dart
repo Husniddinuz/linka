@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
-import 'availability_screen.dart';
 import 'tutor_profile_screen.dart';
-import '../services/api_service.dart';
 import 'home_screen.dart';
 
 class StoryViewerScreen extends StatefulWidget {
@@ -69,42 +67,11 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
 
   void _onBookClass() {
     Navigator.of(context).pop();
-    _loadTutorAndOpenAvailability();
-  }
-
-  Future<void> _loadTutorAndOpenAvailability() async {
-    try {
-      final t = await ApiService.get('/tutors/${widget.tutorId}/');
-      if (!mounted) return;
-      final rawExp = t['experience'];
-      final expStr = rawExp is int
-          ? '+$rawExp yrs'
-          : rawExp is String
-              ? '+${RegExp(r'(\d+)').firstMatch(rawExp)?.group(1) ?? '0'} yrs'
-              : '+0 yrs';
-
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => AvailabilityScreen(
-            tutorId: widget.tutorId,
-            tutorName: '${t['first_name'] ?? ''} ${t['last_name'] ?? ''}'.trim(),
-            tutorImage: t['profile_image'] as String? ?? '',
-            experience: expStr,
-            ieltsScore: (t['ielts_score'] as num?)?.toDouble() ?? 0,
-            lessonPrices: (t['lesson_prices'] as List<dynamic>? ?? [])
-                .map((p) => p as Map<String, dynamic>)
-                .toList(),
-          ),
-        ),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => TutorProfileScreen(tutorId: widget.tutorId),
-        ),
-      );
-    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TutorProfileScreen(tutorId: widget.tutorId),
+      ),
+    );
   }
 
   @override

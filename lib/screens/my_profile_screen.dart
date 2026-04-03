@@ -12,6 +12,7 @@ import 'saved_tutors_screen.dart';
 import 'role_selection_screen.dart';
 import 'faq_screen.dart';
 import 'notifications_screen.dart';
+import 'saved_articles_screen.dart';
 
 class MyProfileScreen extends StatefulWidget {
   final VoidCallback? onNavigateToLessons;
@@ -177,7 +178,9 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                         _MenuRow(
                           icon: 'assets/images/buttons/saved-articles.svg',
                           label: 'Saved articles',
-                          onTap: () {},
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const SavedArticlesScreen()),
+                          ),
                         ),
                       ],
                     ),

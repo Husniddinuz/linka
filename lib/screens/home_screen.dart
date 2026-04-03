@@ -54,7 +54,7 @@ List<_TutorWithStories> _groupStories(List<dynamic> raw) {
     map.putIfAbsent(
       key,
       () => _TutorWithStories(
-        tutorId: '${j['id'] ?? 0}',
+        tutorId: '${j['tutor_id'] ?? j['tutor'] ?? 0}',
         name: '$firstName\n$lastName'.trim(),
         image: j['tutor_profile_image'] as String?,
         stories: [],
@@ -178,6 +178,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
   String? _profileImage;
+  String _userRole = 'student';
   Set<String> _viewedStories = {};
   List<_TutorWithStories> _storyTutors = [];
   List<_Lesson> _todaysLessons = [];
@@ -200,6 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final data = result['data'] as Map<String, dynamic>?;
       setState(() {
         _profileImage = data?['profile_image'] as String?;
+        _userRole = data?['role'] as String? ?? 'student';
       });
     } catch (_) {}
   }
@@ -298,7 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _Header(profileImage: _profileImage),
+                _Header(profileImage: _profileImage, isTutor: _userRole == 'tutor'),
                 Expanded(
                   child: SingleChildScrollView(
                     child: Column(
@@ -412,7 +414,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class _Header extends StatelessWidget {
   final String? profileImage;
-  const _Header({this.profileImage});
+  final bool isTutor;
+  const _Header({this.profileImage, this.isTutor = false});
 
   @override
   Widget build(BuildContext context) {
@@ -435,20 +438,21 @@ class _Header extends StatelessWidget {
             ),
           ),
 
-          // Add story button
-          GestureDetector(
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const StoryUploadScreen()),
-            ),
-            child: const Padding(
-              padding: EdgeInsets.only(right: 12),
-              child: Icon(
-                Icons.add_circle_outline_rounded,
-                color: Color(0xFF272942),
-                size: 28,
+          // Add story button (tutors only)
+          if (isTutor)
+            GestureDetector(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const StoryUploadScreen()),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.only(right: 12),
+                child: Icon(
+                  Icons.add_circle_outline_rounded,
+                  color: Color(0xFF272942),
+                  size: 28,
+                ),
               ),
             ),
-          ),
 
           // Bell with red dot
           SvgPicture.asset(

@@ -25,9 +25,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       final data = await ApiService.get('/notifications/preferences/');
       setState(() {
-        _lessonReminder = data['lesson_reminder'] ?? true;
-        _recommendedTutors = data['recommended_tutors'] ?? true;
-        _newFeatures = data['new_features'] ?? true;
+        _lessonReminder = data['notify_lesson_reminder'] ?? true;
+        _recommendedTutors = data['notify_recommended_tutors'] ?? true;
+        _newFeatures = data['notify_new_features'] ?? true;
         _loading = false;
       });
     } catch (_) {
@@ -82,7 +82,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     value: _lessonReminder,
                     onChanged: (v) {
                       setState(() => _lessonReminder = v);
-                      _update('lesson_reminder', v);
+                      _update('notify_lesson_reminder', v);
                     },
                   ),
                   const Divider(height: 1, indent: 16, endIndent: 16, color: Color(0xFFEEEEEE)),
@@ -91,7 +91,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     value: _recommendedTutors,
                     onChanged: (v) {
                       setState(() => _recommendedTutors = v);
-                      _update('recommended_tutors', v);
+                      _update('notify_recommended_tutors', v);
                     },
                   ),
                   const Divider(height: 1, indent: 16, endIndent: 16, color: Color(0xFFEEEEEE)),
@@ -100,7 +100,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     value: _newFeatures,
                     onChanged: (v) {
                       setState(() => _newFeatures = v);
-                      _update('new_features', v);
+                      _update('notify_new_features', v);
                     },
                   ),
                 ],

@@ -1,7 +1,9 @@
+import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
 import 'article_detail_screen.dart';
+import 'saved_articles_screen.dart';
 
 class ArticlesListScreen extends StatefulWidget {
   const ArticlesListScreen({super.key});
@@ -13,6 +15,7 @@ class ArticlesListScreen extends StatefulWidget {
 class _ArticlesListScreenState extends State<ArticlesListScreen> {
   List<Map<String, dynamic>> _articles = [];
   List<Map<String, dynamic>> _filtered = [];
+  Set<int> _savedArticleIds = {};
   bool _loading = true;
   final _searchController = TextEditingController();
 
@@ -30,8 +33,17 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
 
   Future<void> _loadArticles() async {
     try {
-      final list = await ApiService.getList('/content/articles/');
+      final results = await Future.wait([
+        ApiService.getList('/content/articles/'),
+        ApiService.get('/student/saved-articles/').catchError((_) => <String, dynamic>{}),
+      ]);
       if (!mounted) return;
+      final list = results[0] as List<dynamic>;
+      final savedResponse = results[1] as Map<String, dynamic>;
+      final savedList = savedResponse['data'] as List<dynamic>? ?? [];
+      _savedArticleIds = savedList
+          .map((e) => (e as Map<String, dynamic>)['id'] as int? ?? 0)
+          .toSet();
       setState(() {
         _articles = list.cast<Map<String, dynamic>>();
         _filtered = _articles;
@@ -40,6 +52,20 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _toggleBookmark(int articleId) async {
+    try {
+      if (_savedArticleIds.contains(articleId)) {
+        await ApiService.delete('/student/saved-articles/$articleId/');
+        setState(() => _savedArticleIds.remove(articleId));
+      } else {
+        await ApiService.post('/student/saved-articles/', {'article_id': articleId});
+        setState(() => _savedArticleIds.add(articleId));
+      }
+    } catch (e) {
+      dev.log('ARTICLE BOOKMARK ERROR: $e');
     }
   }
 
@@ -79,7 +105,10 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
         centerTitle: true,
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SavedArticlesScreen()),
+            ),
             icon: SvgPicture.asset(
               'assets/images/icons/bookmark_outline_16.svg',
               width: 20,
@@ -138,6 +167,7 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
                             final article = _filtered[i];
                             final title = article['title'] as String? ?? '';
                             final id = article['id'] as int;
+                            final isSaved = _savedArticleIds.contains(id);
 
                             return GestureDetector(
                               onTap: () => Navigator.push(
@@ -168,18 +198,23 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
                                           Positioned(
                                             top: 8,
                                             right: 8,
-                                            child: Container(
-                                              width: 28,
-                                              height: 28,
-                                              decoration: const BoxDecoration(
-                                                color: Colors.white,
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: Center(
-                                                child: SvgPicture.asset(
-                                                  'assets/images/icons/bookmark_outline_16.svg',
-                                                  width: 14,
-                                                  height: 14,
+                                            child: GestureDetector(
+                                              onTap: () => _toggleBookmark(id),
+                                              child: Container(
+                                                width: 28,
+                                                height: 28,
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.white,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Center(
+                                                  child: SvgPicture.asset(
+                                                    isSaved
+                                                        ? 'assets/images/icons/bookmarked.svg'
+                                                        : 'assets/images/icons/bookmark_outline_16.svg',
+                                                    width: 14,
+                                                    height: 14,
+                                                  ),
                                                 ),
                                               ),
                                             ),
