@@ -12,6 +12,7 @@ import 'story_upload_screen.dart';
 import 'podcast_player_screen.dart';
 import 'podcasts_list_screen.dart';
 import 'movies_list_screen.dart';
+import 'movie_player_screen.dart';
 import 'articles_list_screen.dart';
 import 'article_detail_screen.dart';
 import 'story_viewer_screen.dart';
@@ -953,7 +954,19 @@ class _MovieCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MoviePlayerScreen(
+            movieId: movie.id,
+            initialTitle: movie.title,
+            initialPlaybackUrl: movie.playbackUrl,
+            initialPosterUrl: movie.posterUrl,
+          ),
+        ),
+      ),
+      child: Container(
       width: 140,
       margin: const EdgeInsets.symmetric(horizontal: 6),
       padding: const EdgeInsets.all(8),
@@ -1005,6 +1018,7 @@ class _MovieCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

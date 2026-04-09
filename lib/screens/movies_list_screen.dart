@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'movie_player_screen.dart';
 
 class MoviesListScreen extends StatefulWidget {
   const MoviesListScreen({super.key});
@@ -81,11 +82,25 @@ class _MoviesListScreenState extends State<MoviesListScreen> {
                   itemCount: _movies.length,
                   itemBuilder: (context, i) {
                     final movie = _movies[i];
+                    final id = movie['id'] as int;
                     final title = movie['title'] as String? ?? '';
                     final posterUrl = movie['poster_url'] as String?;
+                    final playbackUrl = movie['playback_url'] as String?;
                     final duration = _formatDuration(movie['duration_minutes'] as int?);
 
-                    return Container(
+                    return GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MoviePlayerScreen(
+                            movieId: id,
+                            initialTitle: title,
+                            initialPlaybackUrl: playbackUrl,
+                            initialPosterUrl: posterUrl,
+                          ),
+                        ),
+                      ),
+                      child: Container(
                       decoration: BoxDecoration(
                         color: const Color(0xFFF5F5F7),
                         borderRadius: BorderRadius.circular(12),
@@ -147,6 +162,7 @@ class _MoviesListScreenState extends State<MoviesListScreen> {
                           else
                             const SizedBox(height: 8),
                         ],
+                      ),
                       ),
                     );
                   },
