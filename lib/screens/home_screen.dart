@@ -182,6 +182,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Set<String> _viewedStories = {};
   List<_TutorWithStories> _storyTutors = [];
   List<_Lesson> _todaysLessons = [];
+  Set<int> _savedArticleIds = {};
 
   @override
   void initState() {
@@ -192,6 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadTodaysLessons();
     _loadPodcasts();
     _loadArticles();
+    _loadSavedArticles();
   }
 
   Future<void> _loadProfile() async {
@@ -253,6 +255,49 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } catch (e) {
       dev.log('Articles error: $e');
+    }
+  }
+
+  Future<void> _loadSavedArticles() async {
+    try {
+      final response = await ApiService.get('/student/saved-articles/');
+      if (!mounted) return;
+      final savedList = response['data'] as List<dynamic>? ?? [];
+      setState(() {
+        _savedArticleIds = savedList
+            .map((e) => (e as Map<String, dynamic>)['id'] as int? ?? 0)
+            .toSet();
+      });
+    } catch (e) {
+      dev.log('Saved articles error: $e');
+    }
+  }
+
+  Future<void> _toggleArticleBookmark(int articleId) async {
+    final wasSaved = _savedArticleIds.contains(articleId);
+    setState(() {
+      if (wasSaved) {
+        _savedArticleIds.remove(articleId);
+      } else {
+        _savedArticleIds.add(articleId);
+      }
+    });
+    try {
+      if (wasSaved) {
+        await ApiService.delete('/student/saved-articles/$articleId/');
+      } else {
+        await ApiService.post('/student/saved-articles/', {'article_id': articleId});
+      }
+    } catch (e) {
+      dev.log('ARTICLE BOOKMARK ERROR: $e');
+      if (!mounted) return;
+      setState(() {
+        if (wasSaved) {
+          _savedArticleIds.add(articleId);
+        } else {
+          _savedArticleIds.remove(articleId);
+        }
+      });
     }
   }
 
@@ -385,7 +430,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        _ArticlesSection(articles: _articles),
+                        _ArticlesSection(
+                          articles: _articles,
+                          savedArticleIds: _savedArticleIds,
+                          onToggleBookmark: _toggleArticleBookmark,
+                        ),
 
                         const SizedBox(height: 32),
                       ],
@@ -1016,7 +1065,13 @@ class _PodcastCard extends StatelessWidget {
 
 class _ArticlesSection extends StatelessWidget {
   final List<_Article> articles;
-  const _ArticlesSection({required this.articles});
+  final Set<int> savedArticleIds;
+  final void Function(int articleId) onToggleBookmark;
+  const _ArticlesSection({
+    required this.articles,
+    required this.savedArticleIds,
+    required this.onToggleBookmark,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1026,7 +1081,11 @@ class _ArticlesSection extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: articles.length,
-        itemBuilder: (_, i) => _ArticleCard(article: articles[i]),
+        itemBuilder: (_, i) => _ArticleCard(
+          article: articles[i],
+          isSaved: savedArticleIds.contains(articles[i].id),
+          onToggleBookmark: onToggleBookmark,
+        ),
       ),
     );
   }
@@ -1034,7 +1093,13 @@ class _ArticlesSection extends StatelessWidget {
 
 class _ArticleCard extends StatelessWidget {
   final _Article article;
-  const _ArticleCard({required this.article});
+  final bool isSaved;
+  final void Function(int articleId) onToggleBookmark;
+  const _ArticleCard({
+    required this.article,
+    required this.isSaved,
+    required this.onToggleBookmark,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1069,17 +1134,25 @@ class _ArticleCard extends StatelessWidget {
                 Positioned(
                   top: 8,
                   right: 8,
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: SvgPicture.asset(
-                      'assets/images/icons/bookmark_outline_16.svg',
-                      width: 14,
-                      height: 14,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => onToggleBookmark(article.id),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: SvgPicture.asset(
+                          isSaved
+                              ? 'assets/images/icons/bookmarked.svg'
+                              : 'assets/images/icons/bookmark_outline_16.svg',
+                          width: 14,
+                          height: 14,
+                        ),
+                      ),
                     ),
                   ),
                 ),

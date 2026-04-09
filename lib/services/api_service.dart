@@ -10,6 +10,23 @@ class ApiService {
   static const _baseUrl = apiBaseUrl;
   static bool _refreshing = false;
 
+  /// Invoked when an authenticated request returns 401 and token refresh
+  /// cannot recover the session. Set from main.dart to clear tokens and
+  /// navigate the user back to the login screen.
+  static Future<void> Function()? onSessionExpired;
+  static bool _handlingAuthFailure = false;
+
+  static Future<void> _handleAuthFailure() async {
+    if (_handlingAuthFailure) return;
+    _handlingAuthFailure = true;
+    try {
+      final handler = onSessionExpired;
+      if (handler != null) await handler();
+    } finally {
+      _handlingAuthFailure = false;
+    }
+  }
+
   static Map<String, String> _headers(String? token) => {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
@@ -69,6 +86,9 @@ class ApiService {
           headers: _headers(newToken),
         );
       }
+      if (response.statusCode == 401) {
+        await _handleAuthFailure();
+      }
     }
 
     _logResponse('GET', path, response.statusCode, response.body);
@@ -100,6 +120,9 @@ class ApiService {
           Uri.parse('$_baseUrl$path'),
           headers: _headers(newToken),
         );
+      }
+      if (response.statusCode == 401) {
+        await _handleAuthFailure();
       }
     }
 
@@ -137,6 +160,9 @@ class ApiService {
           headers: _headers(newToken),
           body: encodedBody,
         );
+      }
+      if (response.statusCode == 401) {
+        await _handleAuthFailure();
       }
     }
 
@@ -190,6 +216,9 @@ class ApiService {
           body: encodedBody,
         );
       }
+      if (response.statusCode == 401) {
+        await _handleAuthFailure();
+      }
     }
 
     _logResponse('POST', path, response.statusCode, response.body);
@@ -240,6 +269,9 @@ class ApiService {
           body: encodedBody,
         );
       }
+      if (response.statusCode == 401) {
+        await _handleAuthFailure();
+      }
     }
 
     _logResponse('PATCH', path, response.statusCode, response.body);
@@ -283,6 +315,9 @@ class ApiService {
           Uri.parse('$_baseUrl$path'),
           headers: _headers(newToken),
         );
+      }
+      if (response.statusCode == 401) {
+        await _handleAuthFailure();
       }
     }
 
@@ -333,6 +368,9 @@ class ApiService {
     if (response.statusCode == 401) {
       final newToken = await _tryRefreshToken();
       if (newToken != null) response = await send(newToken);
+      if (response.statusCode == 401) {
+        await _handleAuthFailure();
+      }
     }
 
     final body = await response.stream.bytesToString();

@@ -6,8 +6,10 @@ import 'package:flutter/services.dart';
 // import 'screens/splash_screen.dart'; // restore for release
 import 'screens/home_screen.dart';
 import 'screens/role_selection_screen.dart';
+import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'services/token_service.dart';
+import 'widgets/app_notify.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +21,24 @@ void main() async {
     debugPrint('FLUTTER ERROR: ${details.exceptionAsString()}');
     debugPrint('${details.stack}');
     debugPrint('═══════════════════════════════════════');
+  };
+
+  // Global session-expired handler: any 401 that can't be recovered by
+  // refreshing the token clears auth state and bounces the user to login.
+  ApiService.onSessionExpired = () async {
+    await TokenService.clearTokens();
+    final context = navigatorKey.currentContext;
+    if (context != null) {
+      AppNotify.show(
+        context,
+        message: 'Session expired. Please log in again.',
+        type: NotifyType.error,
+      );
+    }
+    navigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+      (route) => false,
+    );
   };
 
   final isLoggedIn = await TokenService.isLoggedIn();
