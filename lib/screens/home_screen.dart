@@ -11,6 +11,7 @@ import 'my_profile_screen.dart';
 import 'story_upload_screen.dart';
 import 'podcast_player_screen.dart';
 import 'podcasts_list_screen.dart';
+import 'movies_list_screen.dart';
 import 'articles_list_screen.dart';
 import 'article_detail_screen.dart';
 import 'story_viewer_screen.dart';
@@ -115,9 +116,29 @@ class _Lesson {
 }
 
 class _Movie {
+  final int id;
   final String title;
-  final String image;
-  const _Movie(this.title, this.image);
+  final String? posterUrl;
+  final String? playbackUrl;
+  final int? durationMinutes;
+
+  const _Movie({
+    required this.id,
+    required this.title,
+    this.posterUrl,
+    this.playbackUrl,
+    this.durationMinutes,
+  });
+
+  factory _Movie.fromJson(Map<String, dynamic> json) {
+    return _Movie(
+      id: json['id'] as int,
+      title: json['title'] as String? ?? '',
+      posterUrl: json['poster_url'] as String?,
+      playbackUrl: json['playback_url'] as String?,
+      durationMinutes: json['duration_minutes'] as int?,
+    );
+  }
 }
 
 class _Podcast {
@@ -194,6 +215,21 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadPodcasts();
     _loadArticles();
     _loadSavedArticles();
+    _loadMovies();
+  }
+
+  Future<void> _loadMovies() async {
+    try {
+      final list = await ApiService.getList('/content/movies/');
+      if (!mounted) return;
+      setState(() {
+        _movies = list
+            .map((e) => _Movie.fromJson(e as Map<String, dynamic>))
+            .toList();
+      });
+    } catch (e) {
+      dev.log('Movies error: $e');
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -324,11 +360,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {}
   }
 
-  static const _movies = [
-    _Movie('Little Women', 'assets/images/movies/little-women.png'),
-    _Movie('Thor', 'assets/images/movies/thor.png'),
-    _Movie('Joker', 'assets/images/movies/joker.png'),
-  ];
+  List<_Movie> _movies = [];
 
   List<_Podcast> _podcasts = [];
 
@@ -402,7 +434,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 32),
 
                         // Watch a movie section
-                        _SectionHeader(title: 'WATCH A MOVIE'),
+                        _SectionHeader(
+                          title: 'WATCH A MOVIE',
+                          onSeeAll: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const MoviesListScreen()),
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         _MoviesSection(movies: _movies),
 
@@ -928,14 +966,25 @@ class _MovieCard extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
-            child: Image.asset(
-              movie.image,
-              width: double.infinity,
-              height: 170,
-              fit: BoxFit.cover,
-              cacheWidth: 280,
-              cacheHeight: 340,
-            ),
+            child: movie.posterUrl != null && movie.posterUrl!.startsWith('http')
+                ? Image.network(
+                    movie.posterUrl!,
+                    width: double.infinity,
+                    height: 170,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Container(
+                      width: double.infinity,
+                      height: 170,
+                      color: const Color(0xFFE0E0E0),
+                      child: const Icon(Icons.movie, size: 40, color: Color(0xFFAAAAAA)),
+                    ),
+                  )
+                : Container(
+                    width: double.infinity,
+                    height: 170,
+                    color: const Color(0xFFE0E0E0),
+                    child: const Icon(Icons.movie, size: 40, color: Color(0xFFAAAAAA)),
+                  ),
           ),
           Expanded(
             child: Align(

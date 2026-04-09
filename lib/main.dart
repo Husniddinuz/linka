@@ -28,7 +28,7 @@ void main() async {
   ApiService.onSessionExpired = () async {
     await TokenService.clearTokens();
     final context = navigatorKey.currentContext;
-    if (context != null) {
+    if (context != null && context.mounted) {
       AppNotify.show(
         context,
         message: 'Session expired. Please log in again.',
