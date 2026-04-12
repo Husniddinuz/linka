@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../services/wallet_service.dart';
+import '../widgets/skeleton.dart';
 
 
 class PlusSubscriptionScreen extends StatefulWidget {
@@ -11,8 +13,30 @@ class PlusSubscriptionScreen extends StatefulWidget {
 
 class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
   bool _isYearly = true;
+  int? _balance;
+  bool _balanceLoading = true;
 
   int get _price => _isYearly ? 240000 : 30000;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBalance();
+  }
+
+  Future<void> _loadBalance() async {
+    try {
+      final balance = await WalletService.getBalance();
+      if (!mounted) return;
+      setState(() {
+        _balance = balance;
+        _balanceLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _balanceLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -244,28 +268,35 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                               ),
                             ),
                             const Spacer(),
-                            const Text.rich(
-                              TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: '500 000 ',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF27AE60),
+                            if (_balanceLoading)
+                              const Skeleton(
+                                height: 20,
+                                width: 100,
+                                borderRadius: 6,
+                              )
+                            else
+                              Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: '${_formatPrice(_balance ?? 0)} ',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF27AE60),
+                                      ),
                                     ),
-                                  ),
-                                  TextSpan(
-                                    text: 'UZS',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                      color: Color(0xFF999999),
+                                    const TextSpan(
+                                      text: 'UZS',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF999999),
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
                             const SizedBox(width: 8),
                             SvgPicture.asset(
                               'assets/images/buttons/top-up.svg',

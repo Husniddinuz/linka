@@ -73,6 +73,16 @@
 			</array>
 		</dict>
 	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>https</string>
+		<string>http</string>
+		<string>clickuz</string>
+		<string>click</string>
+		<string>payme</string>
+		<string>uzumbank</string>
+		<string>uzum</string>
+	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

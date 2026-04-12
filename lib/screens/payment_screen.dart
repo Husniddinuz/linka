@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../services/wallet_service.dart';
+import '../widgets/skeleton.dart';
 import 'payment_topup_screen.dart';
 import 'payment_success_screen.dart';
 
@@ -34,8 +36,29 @@ class PaymentScreen extends StatefulWidget {
 
 class _PaymentScreenState extends State<PaymentScreen> {
   int _balance = 0;
+  bool _balanceLoading = true;
 
   bool get _canPay => _balance >= widget.totalAmount;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBalance();
+  }
+
+  Future<void> _loadBalance() async {
+    try {
+      final balance = await WalletService.getBalance();
+      if (!mounted) return;
+      setState(() {
+        _balance = balance;
+        _balanceLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _balanceLoading = false);
+    }
+  }
 
   String _formatAmount(int amount) {
     final str = amount.toString();
@@ -52,7 +75,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
       MaterialPageRoute(builder: (_) => const PaymentTopUpScreen()),
     );
     if (result != null) {
-      setState(() => _balance += result);
+      // Re-fetch the wallet balance from server after top-up
+      await _loadBalance();
     }
   }
 
@@ -302,30 +326,37 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                                    textBaseline: TextBaseline.alphabetic,
-                                    children: [
-                                      Text(
-                                        _formatAmount(_balance),
-                                        style: TextStyle(
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.w700,
-                                          color: _canPay
-                                              ? const Color(0xFF4CAF50)
-                                              : const Color(0xFFD32F2F),
+                                  if (_balanceLoading)
+                                    const Skeleton(
+                                      height: 24,
+                                      width: 110,
+                                      borderRadius: 6,
+                                    )
+                                  else
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                                      textBaseline: TextBaseline.alphabetic,
+                                      children: [
+                                        Text(
+                                          _formatAmount(_balance),
+                                          style: TextStyle(
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.w700,
+                                            color: _canPay
+                                                ? const Color(0xFF4CAF50)
+                                                : const Color(0xFFD32F2F),
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      const Text(
-                                        'UZS',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Color(0xFF999999),
+                                        const SizedBox(width: 6),
+                                        const Text(
+                                          'UZS',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Color(0xFF999999),
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
+                                      ],
+                                    ),
                                 ],
                               ),
                               const Spacer(),

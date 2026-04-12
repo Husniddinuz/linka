@@ -4,6 +4,7 @@ import '../widgets/cached_avatar.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/token_service.dart';
+import '../services/wallet_service.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/skeleton.dart';
 import 'profile_setup_screen.dart';
@@ -13,6 +14,7 @@ import 'role_selection_screen.dart';
 import 'faq_screen.dart';
 import 'notifications_screen.dart';
 import 'saved_articles_screen.dart';
+import 'payment_topup_screen.dart';
 
 class MyProfileScreen extends StatefulWidget {
   final VoidCallback? onNavigateToLessons;
@@ -435,7 +437,45 @@ class _MenuRow extends StatelessWidget {
 
 // ─── Balance row ────────────────────────────────────────────────────────────
 
-class _BalanceRow extends StatelessWidget {
+class _BalanceRow extends StatefulWidget {
+  @override
+  State<_BalanceRow> createState() => _BalanceRowState();
+}
+
+class _BalanceRowState extends State<_BalanceRow> {
+  int? _balance;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBalance();
+  }
+
+  Future<void> _loadBalance() async {
+    try {
+      final balance = await WalletService.getBalance();
+      if (!mounted) return;
+      setState(() {
+        _balance = balance;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  String _formatAmount(int amount) {
+    final str = amount.toString();
+    final buffer = StringBuffer();
+    for (var i = 0; i < str.length; i++) {
+      if (i > 0 && (str.length - i) % 3 == 0) buffer.write(' ');
+      buffer.write(str[i]);
+    }
+    return buffer.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -444,8 +484,8 @@ class _BalanceRow extends StatelessWidget {
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
+            children: [
+              const Text(
                 'Balance',
                 style: TextStyle(
                   fontSize: 13,
@@ -453,41 +493,58 @@ class _BalanceRow extends StatelessWidget {
                   color: Color(0xFF999999),
                 ),
               ),
-              SizedBox(height: 4),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: '0 ',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF27AE60),
+              const SizedBox(height: 4),
+              if (_loading)
+                const Skeleton(height: 22, width: 90, borderRadius: 6)
+              else
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '${_formatAmount(_balance ?? 0)} ',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF27AE60),
+                        ),
                       ),
-                    ),
-                    TextSpan(
-                      text: 'UZS',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF999999),
+                      const TextSpan(
+                        text: 'UZS',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF999999),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
           const Spacer(),
           // Plus icon for top-up
-          SvgPicture.asset(
-            'assets/images/buttons/top-up.svg',
-            width: 28,
-            height: 28,
+          GestureDetector(
+            onTap: _onTopUp,
+            behavior: HitTestBehavior.opaque,
+            child: SvgPicture.asset(
+              'assets/images/buttons/top-up.svg',
+              width: 28,
+              height: 28,
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _onTopUp() async {
+    final result = await Navigator.of(context).push<int>(
+      MaterialPageRoute(builder: (_) => const PaymentTopUpScreen()),
+    );
+    if (result != null && mounted) {
+      // Re-fetch wallet balance from server after a successful top-up
+      await _loadBalance();
+    }
   }
 }
 
