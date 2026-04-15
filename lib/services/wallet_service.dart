@@ -32,6 +32,38 @@ class WalletService {
         : result;
     return PaylovCheckoutResult.fromJson(payload);
   }
+
+  /// Checks the real transaction status for a Paylov top-up by order id.
+  /// Backend queries the gateway and returns the current state.
+  static Future<PaylovFinalizeResult> checkPaylovTransactionStatus({
+    required int orderId,
+  }) async {
+    final result = await ApiService.get(
+      '/payments/paylov/transaction-status/?order_id=$orderId',
+    );
+    final payload = (result['data'] is Map<String, dynamic>)
+        ? result['data'] as Map<String, dynamic>
+        : result;
+    return PaylovFinalizeResult.fromJson(payload);
+  }
+
+  /// Finalizes a Paylov top-up after the user returns from the bank app.
+  /// Backend re-checks the payment status. [paymentStatus] and
+  /// [gatewayPaymentId] come from the return URL query string when available.
+  static Future<PaylovFinalizeResult> finalizePaylovCheckout({
+    required int orderId,
+    int? paymentStatus,
+    String? gatewayPaymentId,
+  }) async {
+    final body = <String, dynamic>{'order_id': orderId};
+    if (paymentStatus != null) body['payment_status'] = paymentStatus;
+    if (gatewayPaymentId != null) body['gateway_payment_id'] = gatewayPaymentId;
+    final result = await ApiService.post('/payments/paylov/finalize/', body);
+    final payload = (result['data'] is Map<String, dynamic>)
+        ? result['data'] as Map<String, dynamic>
+        : result;
+    return PaylovFinalizeResult.fromJson(payload);
+  }
 }
 
 class PaylovCheckoutResult {
@@ -62,6 +94,52 @@ class PaylovCheckoutResult {
       state: (json['state'] as num?)?.toInt(),
       requiresOtp: json['requires_otp'] as bool? ?? false,
       message: json['message'] as String?,
+    );
+  }
+}
+
+class PaylovFinalizeResult {
+  final bool success;
+  final bool credited;
+  final int? orderId;
+  final int? paymentStatus;
+  final String? orderStatus;
+  final String? syncStatus;
+  final double? balanceUzs;
+  final String? message;
+  final Map<String, dynamic> raw;
+
+  const PaylovFinalizeResult({
+    required this.success,
+    this.credited = false,
+    this.orderId,
+    this.paymentStatus,
+    this.orderStatus,
+    this.syncStatus,
+    this.balanceUzs,
+    this.message,
+    this.raw = const {},
+  });
+
+  /// Considered paid if the backend credited the wallet, order_status is
+  /// "paid", sync_status is "credited", or payment_status == 2.
+  bool get isPaid =>
+      credited ||
+      orderStatus == 'paid' ||
+      syncStatus == 'credited' ||
+      paymentStatus == 2;
+
+  factory PaylovFinalizeResult.fromJson(Map<String, dynamic> json) {
+    return PaylovFinalizeResult(
+      success: json['success'] as bool? ?? false,
+      credited: json['credited'] as bool? ?? false,
+      orderId: (json['order_id'] as num?)?.toInt(),
+      paymentStatus: (json['payment_status'] as num?)?.toInt(),
+      orderStatus: json['order_status'] as String?,
+      syncStatus: json['sync_status'] as String?,
+      balanceUzs: (json['balance_uzs'] as num?)?.toDouble(),
+      message: json['message'] as String?,
+      raw: json,
     );
   }
 }

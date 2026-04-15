@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   file_selector_windows
   firebase_core
+  flutter_webrtc
   permission_handler_windows
   url_launcher_windows
 )

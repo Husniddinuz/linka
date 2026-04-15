@@ -26,15 +26,168 @@ class PaymentTopUpScreen extends StatefulWidget {
   State<PaymentTopUpScreen> createState() => _PaymentTopUpScreenState();
 }
 
-class _PaymentTopUpScreenState extends State<PaymentTopUpScreen> {
+class _PaymentTopUpScreenState extends State<PaymentTopUpScreen>
+    with WidgetsBindingObserver {
   PaymentMethod? _selected;
   final TextEditingController _amountController = TextEditingController();
   bool _submitting = false;
+  // Set after we hand the user off to an external payment app/page. When
+  // the app comes back to the foreground we'll finalize and pop.
+  int? _awaitingAmount;
+  int? _pendingOrderId;
+  bool _finalizing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _amountController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        _pendingOrderId != null &&
+        !_finalizing) {
+      _finalize();
+    }
+  }
+
+  Future<void> _finalize() async {
+    final orderId = _pendingOrderId;
+    if (orderId == null) return;
+    setState(() => _finalizing = true);
+    try {
+      final result = await WalletService.checkPaylovTransactionStatus(
+        orderId: orderId,
+      );
+      if (!mounted) return;
+      if (result.isPaid) {
+        final amount = _awaitingAmount;
+        _pendingOrderId = null;
+        _awaitingAmount = null;
+        Navigator.pop(context, amount);
+        return;
+      }
+      // Not yet paid — keep the screen open so the user can retry the
+      // finalize check (e.g. if the bank flow is still settling).
+      AppNotify.show(
+        context,
+        message: result.message ??
+            'Payment not confirmed yet. Please try again in a moment.',
+        type: NotifyType.info,
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      AppNotify.show(context, message: e.message, type: NotifyType.error);
+    } catch (_) {
+      if (!mounted) return;
+      AppNotify.show(
+        context,
+        message: 'Could not verify payment',
+        type: NotifyType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _finalizing = false);
+    }
+  }
+
+  Widget _buildWaitingView() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(
+            width: 56,
+            height: 56,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF272942)),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            _finalizing ? 'Verifying payment.' : 'Waiting for payment.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF272942),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _finalizing
+                ? 'Checking the payment status with the bank.'
+                : 'Complete the payment in your bank app, then return here.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF888888),
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 28),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _finalizing ? null : _finalize,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF272942),
+                disabledBackgroundColor: const Color(0xFFCCCCCC),
+                foregroundColor: Colors.white,
+                disabledForegroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
+              ),
+              child: _finalizing
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text(
+                      'I have completed the payment',
+                      style: TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w500),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _finalizing
+                ? null
+                : () {
+                    setState(() {
+                      _awaitingAmount = null;
+                      _pendingOrderId = null;
+                    });
+                  },
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF888888),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   int? get _amount {
@@ -84,9 +237,12 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen> {
         );
         return;
       }
-      // Pop with the amount so the caller can refresh balance after the user
-      // returns from the external payment flow.
-      Navigator.pop(context, amount);
+      // Don't pop yet — wait until the user comes back to the app from the
+      // external payment flow (handled in didChangeAppLifecycleState).
+      setState(() {
+        _awaitingAmount = amount;
+        _pendingOrderId = result.orderId;
+      });
     } on ApiException catch (e) {
       if (!mounted) return;
       AppNotify.show(context, message: e.message, type: NotifyType.error);
@@ -124,7 +280,7 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen> {
           ),
         ),
       ),
-      body: Column(
+      body: _awaitingAmount != null ? _buildWaitingView() : Column(
         children: [
           Expanded(
             child: Padding(

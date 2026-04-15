@@ -4,7 +4,8 @@ import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:daily_flutter/daily_flutter.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../services/api_constants.dart';
 import '../services/api_service.dart';
@@ -24,31 +25,39 @@ class SpeakingTrainingScreen extends StatefulWidget {
 }
 
 class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
-  CallClient? _callClient;
+  // ── UI state ──
   bool _isCameraOn = true;
   bool _isConnected = false;
   bool _isStopping = false;
-  bool _hasJoined = false;
   GenderFilter _genderFilter = GenderFilter.all;
 
-  // Local user info
   String _localName = '';
-
-  // Remote participant info
   String? _remoteName;
-  String? _remoteGender;
+  final String? _remoteGender = null;
   bool _remoteCameraOn = true;
 
-  // Video controllers
-  final _localVideoController = VideoViewController();
-  final _remoteVideoController = VideoViewController();
+  // ── Media ──
+  final _localRenderer = RTCVideoRenderer();
+  final _remoteRenderer = RTCVideoRenderer();
+  MediaStream? _localStream;
 
-  StreamSubscription<Event>? _eventSubscription;
+  // ── Matchmaking WS (existing waiting-room) ──
+  WebSocketChannel? _matchWs;
+  StreamSubscription? _matchSub;
 
-  // WebSocket matchmaking
-  WebSocketChannel? _wsChannel;
-  StreamSubscription? _wsSubscription;
+  // ── Signaling WS (Node relay) ──
+  WebSocketChannel? _sigWs;
+  StreamSubscription? _sigSub;
+
+  // ── WebRTC ──
+  RTCPeerConnection? _pc;
+  bool _isCaller = false;
   int? _sessionId;
+  List<Map<String, dynamic>> _iceServers = const [
+    {'urls': 'stun:stun.l.google.com:19302'},
+  ];
+  final List<RTCIceCandidate> _pendingRemoteCandidates = [];
+  bool _remoteDescSet = false;
 
   @override
   void initState() {
@@ -59,314 +68,452 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   Future<void> _init() async {
     dev.log('INIT → starting');
 
-    // Load user's own name
+    await _localRenderer.initialize();
+    await _remoteRenderer.initialize();
+
     try {
       final result = await ApiService.get('/student/profile/');
       final data = result['data'] as Map<String, dynamic>?;
       final first = data?['first_name'] as String? ?? '';
       final last = data?['last_name'] as String? ?? '';
       _localName = '$first $last'.trim();
-      dev.log('INIT → profile: $_localName');
     } catch (e) {
       dev.log('INIT → profile failed: $e');
     }
-
     if (!mounted) return;
     setState(() {});
 
-    // Create Daily client for local camera preview
-    await _createCallClient();
+    await _startLocalMedia();
     if (!mounted) return;
 
-    // Start local camera preview (without joining a room)
-    if (_callClient != null) {
-      dev.log('INIT → enabling local camera preview');
-      try {
-        await _callClient!.updateInputs(
-          inputs: InputSettingsUpdate.set(
-            camera: CameraInputSettingsUpdate.set(
-              isEnabled: BoolUpdate.set(true),
-            ),
-            microphone: MicrophoneInputSettingsUpdate.set(
-              isEnabled: BoolUpdate.set(false),
-            ),
-          ),
-        );
-        final local = _callClient!.participants.local;
-        _localVideoController.setTrack(local.media?.camera.track);
-        dev.log('INIT → local camera preview active');
-      } catch (e) {
-        dev.log('INIT → camera preview failed: $e');
-      }
-    }
-
-    // Connect to waiting room for matchmaking
     _connectWaitingRoom();
     dev.log('INIT → done');
   }
 
-  Future<void> _createCallClient() async {
-    if (_callClient != null) return;
-    dev.log('DAILY → creating CallClient...');
+  Future<bool> _ensurePermissions() async {
+    final statuses = await [Permission.camera, Permission.microphone].request();
+    final camOk = statuses[Permission.camera]?.isGranted ?? false;
+    final micOk = statuses[Permission.microphone]?.isGranted ?? false;
+    if (!camOk || !micOk) {
+      dev.log('PERM → camera=$camOk, mic=$micOk');
+      if (mounted) _showError('Camera and microphone permissions are required.');
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _startLocalMedia() async {
+    if (!await _ensurePermissions()) return;
     try {
-      final client = await CallClient.create();
-      if (!mounted || _isStopping) {
-        client.dispose();
-        return;
-      }
-      _callClient = client;
-      _eventSubscription = client.events.listen(_handleEvent);
-      dev.log('DAILY → CallClient ready');
+      final stream = await navigator.mediaDevices.getUserMedia({
+        'audio': true,
+        'video': {
+          'facingMode': 'user',
+          'width': {'ideal': 640},
+          'height': {'ideal': 480},
+        },
+      });
+      _localStream = stream;
+      _localRenderer.srcObject = stream;
+      if (mounted) setState(() {});
+      dev.log('MEDIA → local stream ready');
     } catch (e) {
-      dev.log('DAILY → CallClient.create() FAILED: $e');
+      dev.log('MEDIA → getUserMedia failed: $e');
+      if (mounted) _showError('Camera/microphone unavailable.');
     }
   }
 
-  // ─── WebSocket waiting room ───────────────────────────────────────────────
+  // ─── Matchmaking (waiting-room WS) ──────────────────────────────────────
 
   Future<void> _connectWaitingRoom() async {
     dev.log('══════════════════════════════════════');
-    dev.log('WS → _connectWaitingRoom() called');
-
-    // Clean up previous connection
-    if (_wsChannel != null) {
-      dev.log('WS → closing previous connection');
-    }
-    await _wsSubscription?.cancel();
-    _wsChannel?.sink.close();
-    _wsChannel = null;
+    dev.log('MATCH → connecting waiting room');
+    await _teardownSession();
 
     setState(() {
       _isConnected = false;
       _remoteName = null;
-      _remoteGender = null;
+      _remoteCameraOn = true;
       _sessionId = null;
     });
-    _remoteVideoController.setTrack(null);
 
     final token = await TokenService.getAccessToken();
     if (token == null) {
-      dev.log('WS → ERROR: no access token available');
+      dev.log('MATCH → no access token');
       return;
     }
-    if (!mounted) {
-      dev.log('WS → widget not mounted, aborting');
-      return;
-    }
+    if (!mounted) return;
 
-    // Derive WS URL from API base URL
     final apiUri = Uri.parse(apiBaseUrl);
     final wsScheme = apiUri.scheme == 'https' ? 'wss' : 'ws';
-    final wsUrl = '$wsScheme://${apiUri.host}/ws/waiting-room/?token=$token';
-
-    dev.log('WS → connecting to $wsUrl');
+    final url = '$wsScheme://${apiUri.host}/ws/waiting-room/?token=$token';
 
     try {
-      _wsChannel = WebSocketChannel.connect(Uri.parse(wsUrl));
-      dev.log('WS → waiting for ready...');
-      await _wsChannel!.ready;
-      dev.log('WS → connected successfully, listening for messages');
-
-      _wsSubscription = _wsChannel!.stream.listen(
-        _handleWsMessage,
-        onError: (error) {
-          dev.log('WS → stream error: $error');
-          if (mounted) _showWsError('Connection error. Please try again.');
+      _matchWs = WebSocketChannel.connect(Uri.parse(url));
+      await _matchWs!.ready;
+      dev.log('MATCH → connected');
+      _matchSub = _matchWs!.stream.listen(
+        _handleMatchMessage,
+        onError: (e) {
+          dev.log('MATCH → error: $e');
+          if (mounted) _showError('Connection error. Please try again.');
         },
         onDone: () {
-          dev.log('WS → stream done — closeCode: ${_wsChannel?.closeCode}, closeReason: ${_wsChannel?.closeReason}');
-          if (mounted && _wsChannel?.closeCode == 4001) {
-            _showWsError('Authentication failed. Please re-login.');
+          dev.log('MATCH → closed (code=${_matchWs?.closeCode})');
+          if (mounted && _matchWs?.closeCode == 4001) {
+            _showError('Authentication failed. Please re-login.');
           }
         },
       );
     } catch (e) {
-      dev.log('WS → connect failed: $e');
-      if (mounted) _showWsError('Could not connect to server.');
+      dev.log('MATCH → connect failed: $e');
+      if (mounted) _showError('Could not connect to server.');
     }
-    dev.log('══════════════════════════════════════');
   }
 
-  void _handleWsMessage(dynamic raw) {
-    dev.log('══════════════════════════════════════');
-    dev.log('WS ← raw message: $raw');
+  void _handleMatchMessage(dynamic raw) {
+    dev.log('MATCH ← $raw');
     final data = jsonDecode(raw as String) as Map<String, dynamic>;
     final type = data['type'] as String?;
-    dev.log('WS ← parsed type: $type');
-    dev.log('WS ← full data: $data');
 
     switch (type) {
       case 'match_found':
-        final roomUrl = data['room_url'] as String;
-        final dailyToken = data['token'] as String;
-        final partnerName = data['partner_name'] as String?;
+        final roomId = (data['room_id'] ?? data['room'])?.toString();
+        final isCaller = (data['is_caller'] as bool?) ??
+            (data['role']?.toString() == 'caller');
+        final partner = data['partner_name'] as String?;
         final sessionId = data['session_id'] as int?;
-
-        dev.log('WS ← match_found:');
-        dev.log('WS ←   session_id: $sessionId');
-        dev.log('WS ←   room_url: $roomUrl');
-        dev.log('WS ←   partner_name: $partnerName');
-        dev.log('WS ←   token length: ${dailyToken.length}');
-
+        if (roomId == null) {
+          dev.log('MATCH ← missing room_id in match_found');
+          _showError('Invalid match payload.');
+          return;
+        }
         setState(() {
+          _isCaller = isCaller;
+          _remoteName = partner ?? 'Partner';
           _sessionId = sessionId;
-          _remoteName = partnerName ?? 'Partner';
         });
-
-        // Create Daily client on first match, then join
-        _createCallClient().then((_) {
-          if (!mounted || _isStopping) return;
-          dev.log('WS → joining Daily room...');
-          _joinRoom(roomUrl, token: dailyToken);
-        });
+        _startSignaling(roomId);
         break;
 
       case 'error':
         final detail = data['detail'] as String? ?? 'Matchmaking failed';
-        final status = data['status'];
-        dev.log('WS ← error: detail=$detail, status=$status');
-        if (mounted) _showWsError('Matchmaking error. Please try again.');
+        dev.log('MATCH ← error: $detail');
+        if (mounted) _showError('Matchmaking error. Please try again.');
         break;
 
       default:
-        dev.log('WS ← unknown message type: $type');
+        dev.log('MATCH ← unknown type: $type');
     }
-    dev.log('══════════════════════════════════════');
   }
 
-  void _showWsError(String message) {
+  // ─── Signaling + WebRTC ─────────────────────────────────────────────────
+
+  Future<void> _startSignaling(String roomId) async {
+    try {
+      final res = await ApiService.post('/video/signaling/', {'room_id': roomId});
+      final success = res['success'] as bool? ?? false;
+      if (!success) {
+        throw ApiException(res['message']?.toString() ?? 'Signaling request failed');
+      }
+      final signalingUrl = res['signaling_url'] as String;
+      final signalingToken = res['signaling_token'] as String;
+      final ice = res['ice_servers'];
+      if (ice is List) {
+        _iceServers = ice
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
+      dev.log('SIG → signaling_url=$signalingUrl, ice=${_iceServers.length} server(s)');
+
+      await _createPeerConnection();
+      await _connectSignalingWs(signalingUrl, signalingToken);
+    } catch (e) {
+      dev.log('SIG → failed: $e');
+      if (mounted) _showError('Failed to start call. Retrying...');
+      _connectWaitingRoom();
+    }
+  }
+
+  Future<void> _createPeerConnection() async {
+    final config = {
+      'iceServers': _iceServers,
+      'sdpSemantics': 'unified-plan',
+    };
+    final pc = await createPeerConnection(config);
+
+    pc.onIceCandidate = (candidate) {
+      if (candidate.candidate == null) return;
+      _sendSig({
+        'type': 'ice',
+        'candidate': {
+          'candidate': candidate.candidate,
+          'sdpMid': candidate.sdpMid,
+          'sdpMLineIndex': candidate.sdpMLineIndex,
+        },
+      });
+    };
+
+    pc.onTrack = (event) {
+      dev.log('PC → onTrack kind=${event.track.kind}, streams=${event.streams.length}');
+      if (event.streams.isNotEmpty) {
+        _remoteRenderer.srcObject = event.streams.first;
+        if (mounted) {
+          setState(() {
+            _isConnected = true;
+            _remoteCameraOn = true;
+          });
+        }
+      }
+    };
+
+    pc.onConnectionState = (state) {
+      dev.log('PC → connectionState=$state');
+      if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
+          state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected ||
+          state == RTCPeerConnectionState.RTCPeerConnectionStateClosed) {
+        if (!_isStopping && mounted) {
+          dev.log('PC → peer lost, returning to waiting room');
+          _connectWaitingRoom();
+        }
+      }
+    };
+
+    final stream = _localStream;
+    if (stream != null) {
+      for (final track in stream.getTracks()) {
+        await pc.addTrack(track, stream);
+      }
+    }
+
+    _pc = pc;
+  }
+
+  Future<void> _connectSignalingWs(String url, String token) async {
+    try {
+      _sigWs = WebSocketChannel.connect(Uri.parse(url));
+      await _sigWs!.ready;
+      dev.log('SIG WS → connected');
+      _sigSub = _sigWs!.stream.listen(
+        _handleSigMessage,
+        onError: (e) => dev.log('SIG WS → error: $e'),
+        onDone: () => dev.log('SIG WS → closed (code=${_sigWs?.closeCode})'),
+      );
+      _sendSig({'type': 'auth', 'token': token});
+    } catch (e) {
+      dev.log('SIG WS → connect failed: $e');
+      if (mounted) _showError('Signaling connection failed.');
+    }
+  }
+
+  void _sendSig(Map<String, dynamic> msg) {
+    try {
+      _sigWs?.sink.add(jsonEncode(msg));
+    } catch (e) {
+      dev.log('SIG WS → send failed: $e');
+    }
+  }
+
+  Future<void> _handleSigMessage(dynamic raw) async {
+    Map<String, dynamic> msg;
+    try {
+      msg = jsonDecode(raw as String) as Map<String, dynamic>;
+    } catch (e) {
+      dev.log('SIG WS ← bad json: $raw');
+      return;
+    }
+    final type = msg['type'] as String?;
+    dev.log('SIG WS ← $type');
+
+    switch (type) {
+      case 'joined':
+      case 'auth_ok':
+        // waiting for peer
+        break;
+
+      case 'peers':
+      case 'peer-joined':
+        // If we are the caller, start the offer once peer is present
+        if (_isCaller && _pc != null) {
+          await _makeOffer();
+        }
+        break;
+
+      case 'offer':
+        await _handleOffer(msg);
+        break;
+
+      case 'answer':
+        await _handleAnswer(msg);
+        break;
+
+      case 'ice':
+      case 'candidate':
+        await _handleIce(msg);
+        break;
+
+      case 'peer-left':
+        dev.log('SIG WS ← peer-left, re-matching');
+        if (!_isStopping && mounted) _connectWaitingRoom();
+        break;
+
+      case 'error':
+        dev.log('SIG WS ← error: ${msg['detail']}');
+        break;
+    }
+  }
+
+  Future<void> _makeOffer() async {
+    final pc = _pc;
+    if (pc == null) return;
+    try {
+      final offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      _sendSig({'type': 'offer', 'sdp': offer.sdp, 'sdpType': offer.type});
+      dev.log('PC → offer sent');
+    } catch (e) {
+      dev.log('PC → makeOffer failed: $e');
+    }
+  }
+
+  Future<void> _handleOffer(Map<String, dynamic> msg) async {
+    final pc = _pc;
+    if (pc == null) return;
+    final sdp = msg['sdp'] as String?;
+    final sdpType = (msg['sdpType'] ?? msg['sdp_type'] ?? 'offer') as String;
+    if (sdp == null) return;
+    try {
+      await pc.setRemoteDescription(RTCSessionDescription(sdp, sdpType));
+      _remoteDescSet = true;
+      await _flushPendingCandidates();
+      final answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      _sendSig({'type': 'answer', 'sdp': answer.sdp, 'sdpType': answer.type});
+      dev.log('PC → answer sent');
+    } catch (e) {
+      dev.log('PC → handleOffer failed: $e');
+    }
+  }
+
+  Future<void> _handleAnswer(Map<String, dynamic> msg) async {
+    final pc = _pc;
+    if (pc == null) return;
+    final sdp = msg['sdp'] as String?;
+    final sdpType = (msg['sdpType'] ?? msg['sdp_type'] ?? 'answer') as String;
+    if (sdp == null) return;
+    try {
+      await pc.setRemoteDescription(RTCSessionDescription(sdp, sdpType));
+      _remoteDescSet = true;
+      await _flushPendingCandidates();
+      dev.log('PC → remote answer set');
+    } catch (e) {
+      dev.log('PC → handleAnswer failed: $e');
+    }
+  }
+
+  Future<void> _handleIce(Map<String, dynamic> msg) async {
+    final pc = _pc;
+    if (pc == null) return;
+    final c = (msg['candidate'] ?? msg) as Map?;
+    if (c == null) return;
+    final candidate = RTCIceCandidate(
+      c['candidate'] as String?,
+      c['sdpMid'] as String?,
+      c['sdpMLineIndex'] as int?,
+    );
+    if (!_remoteDescSet) {
+      _pendingRemoteCandidates.add(candidate);
+      return;
+    }
+    try {
+      await pc.addCandidate(candidate);
+    } catch (e) {
+      dev.log('PC → addCandidate failed: $e');
+    }
+  }
+
+  Future<void> _flushPendingCandidates() async {
+    final pc = _pc;
+    if (pc == null) return;
+    for (final c in _pendingRemoteCandidates) {
+      try {
+        await pc.addCandidate(c);
+      } catch (e) {
+        dev.log('PC → flush candidate failed: $e');
+      }
+    }
+    _pendingRemoteCandidates.clear();
+  }
+
+  Future<void> _teardownSession() async {
+    await _sigSub?.cancel();
+    _sigSub = null;
+    try { _sigWs?.sink.close(); } catch (_) {}
+    _sigWs = null;
+
+    await _matchSub?.cancel();
+    _matchSub = null;
+    try { _matchWs?.sink.close(); } catch (_) {}
+    _matchWs = null;
+
+    final pc = _pc;
+    _pc = null;
+    if (pc != null) {
+      try { await pc.close(); } catch (_) {}
+    }
+    _remoteRenderer.srcObject = null;
+    _remoteDescSet = false;
+    _pendingRemoteCandidates.clear();
+  }
+
+  // ─── Controls ───────────────────────────────────────────────────────────
+
+  void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: Colors.red.shade700),
     );
   }
 
-  // ─── Daily.co events ──────────────────────────────────────────────────────
-
-  void _handleEvent(Event event) {
-    if (!mounted || _isStopping) return;
-    event.whenOrNull(
-      participantJoined: (participant) {
-        dev.log('DAILY → participantJoined: isLocal=${participant.info.isLocal}, username=${participant.info.username}');
-        if (!participant.info.isLocal) {
-          setState(() {
-            _isConnected = true;
-            _remoteName ??= participant.info.username ?? 'Partner';
-          });
-          _remoteVideoController.setTrack(participant.media?.camera.track);
-          dev.log('DAILY → remote participant connected: $_remoteName');
-        }
-      },
-      participantUpdated: (participant) {
-        dev.log('DAILY → participantUpdated: isLocal=${participant.info.isLocal}, cameraMuted=${participant.isCameraMuted}');
-        if (!participant.info.isLocal) {
-          setState(() {
-            _remoteCameraOn = !participant.isCameraMuted;
-          });
-          _remoteVideoController.setTrack(participant.media?.camera.track);
-        } else {
-          _localVideoController.setTrack(participant.media?.camera.track);
-        }
-      },
-      participantLeft: (participant) {
-        dev.log('DAILY → participantLeft: isLocal=${participant.info.isLocal}, username=${participant.info.username}');
-        if (!participant.info.isLocal && !_isStopping) {
-          dev.log('DAILY → partner left, returning to waiting room');
-          _callClient?.leave();
-          _connectWaitingRoom();
-        }
-      },
-      callStateUpdated: (stateData) {
-        stateData.whenOrNull(
-          joined: (_) {
-            dev.log('DAILY → callState: joined');
-            final local = _callClient?.participants.local;
-            _localVideoController.setTrack(local?.media?.camera.track);
-          },
-          left: () {
-            dev.log('DAILY → callState: left');
-            _localVideoController.setTrack(null);
-            _remoteVideoController.setTrack(null);
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _joinRoom(String url, {String? token}) async {
-    if (_callClient == null) {
-      dev.log('DAILY → _joinRoom: callClient is null, aborting');
-      return;
-    }
-    dev.log('DAILY → joining room: $url (token length: ${token?.length ?? 0})');
-    try {
-      final joinData = await _callClient!.join(url: Uri.parse(url), token: token);
-      _hasJoined = true;
-      dev.log('DAILY → join succeeded: $joinData');
-    } catch (e, st) {
-      dev.log('DAILY → join FAILED: $e');
-      dev.log('DAILY → stacktrace: $st');
-      if (mounted) _showWsError('Failed to join call. Retrying...');
-      _connectWaitingRoom();
-    }
-  }
-
   Future<void> _toggleCamera() async {
-    if (_callClient == null) return;
+    final stream = _localStream;
+    if (stream == null) return;
     final newState = !_isCameraOn;
     setState(() => _isCameraOn = newState);
-    await _callClient!.updateInputs(
-      inputs: InputSettingsUpdate.set(
-        camera: CameraInputSettingsUpdate.set(
-          isEnabled: BoolUpdate.set(newState),
-        ),
-      ),
-    );
+    for (final track in stream.getVideoTracks()) {
+      track.enabled = newState;
+    }
   }
 
-  void _onStop() {
-    dev.log('ACTION → _onStop (hasJoined=$_hasJoined)');
+  Future<void> _onStop() async {
+    if (_isStopping) return;
+    dev.log('ACTION → stop');
     _isStopping = true;
-    _eventSubscription?.cancel();
-    _eventSubscription = null;
-    _wsSubscription?.cancel();
-    _wsSubscription = null;
-    try { _wsChannel?.sink.close(); } catch (_) {}
-    _wsChannel = null;
-    // Pop immediately
-    Navigator.of(context).pop();
-    // Cleanup Daily in background
-    final client = _callClient;
-    final joined = _hasJoined;
-    _callClient = null;
-    if (client != null) {
-      Future(() {
-        if (joined) { try { client.leave(); } catch (_) {} }
-        Future.delayed(const Duration(milliseconds: 500), () {
-          try { client.dispose(); } catch (_) {}
-        });
-      });
+    await _teardownSession();
+    final stream = _localStream;
+    _localStream = null;
+    if (stream != null) {
+      for (final track in stream.getTracks()) {
+        try { await track.stop(); } catch (_) {}
+      }
+      try { await stream.dispose(); } catch (_) {}
     }
+    _localRenderer.srcObject = null;
+    if (!mounted) return;
+    Navigator.of(context).pop();
   }
 
   Future<void> _onNext() async {
     final sessionId = _sessionId;
-    dev.log('ACTION → _onNext: session_id=$sessionId');
-    _callClient?.leave();
-
+    dev.log('ACTION → next (session_id=$sessionId)');
     if (sessionId != null) {
-      dev.log('ACTION → calling POST /skip/ with session_id=$sessionId');
       try {
-        final result = await ApiService.post('/skip/', {'session_id': sessionId});
-        dev.log('ACTION → skip response: $result');
+        await ApiService.post('/skip/', {'session_id': sessionId});
       } catch (e) {
-        dev.log('ACTION → skip API error: $e');
+        dev.log('ACTION → skip failed: $e');
       }
-    } else {
-      dev.log('ACTION → no session_id, skipping skip API call');
     }
-
-    dev.log('ACTION → reconnecting to waiting room');
     _connectWaitingRoom();
   }
 
@@ -436,51 +583,36 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 
   Future<void> _submitReport(String reason) async {
     final sessionId = _sessionId;
-    dev.log('ACTION → _submitReport: reason=$reason, session_id=$sessionId');
-    if (sessionId == null) {
-      dev.log('ACTION → no session_id, aborting report');
-      return;
-    }
-
-    _callClient?.leave();
-
-    dev.log('ACTION → calling POST /report/ with session_id=$sessionId, reason=$reason');
+    if (sessionId == null) return;
     try {
-      final result = await ApiService.post('/report/', {
+      await ApiService.post('/report/', {
         'session_id': sessionId,
         'reason': reason,
       });
-      dev.log('ACTION → report response: $result');
     } catch (e) {
-      dev.log('ACTION → report API error: $e');
+      dev.log('ACTION → report failed: $e');
     }
-
-    dev.log('ACTION → reconnecting to waiting room');
     _connectWaitingRoom();
   }
 
   @override
   void dispose() {
-    dev.log('DISPOSE → start (hasJoined=$_hasJoined)');
+    dev.log('DISPOSE → start');
     _isStopping = true;
-    _eventSubscription?.cancel();
-    _wsSubscription?.cancel();
-    try { _wsChannel?.sink.close(); } catch (_) {}
-    try { _localVideoController.dispose(); } catch (_) {}
-    try { _remoteVideoController.dispose(); } catch (_) {}
-    final client = _callClient;
-    final joined = _hasJoined;
-    _callClient = null;
-    if (client != null) {
-      Future(() {
-        if (joined) { try { client.leave(); } catch (_) {} }
-        Future.delayed(const Duration(milliseconds: 500), () {
-          try { client.dispose(); } catch (_) {}
-          dev.log('DISPOSE → Daily client disposed');
-        });
-      });
-    }
-    dev.log('DISPOSE → done');
+    // Run async teardown fire-and-forget so dispose() returns immediately.
+    () async {
+      await _teardownSession();
+      final stream = _localStream;
+      _localStream = null;
+      if (stream != null) {
+        for (final track in stream.getTracks()) {
+          try { await track.stop(); } catch (_) {}
+        }
+        try { await stream.dispose(); } catch (_) {}
+      }
+      try { await _localRenderer.dispose(); } catch (_) {}
+      try { await _remoteRenderer.dispose(); } catch (_) {}
+    }();
     super.dispose();
   }
 
@@ -492,17 +624,15 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       backgroundColor: const Color(0xFF13152A),
       body: Column(
         children: [
-          // ── Status bar background ──
           Container(
             color: Colors.white,
             height: MediaQuery.of(context).padding.top,
           ),
-          // ── Top video area (remote or searching) ──
           Expanded(
             child: _isConnected
                 ? _remoteCameraOn
                     ? _RemoteVideoArea(
-                        controller: _remoteVideoController,
+                        renderer: _remoteRenderer,
                         name: _remoteName ?? 'Partner',
                         gender: _remoteGender,
                         onReport: _showReportDialog,
@@ -515,20 +645,17 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
                 : const _SearchingView(),
           ),
 
-          // ── Linka bar ──
           const _LinkaBanner(),
 
-          // ── Bottom video area (local) ──
           Expanded(
             child: _isCameraOn
-                ? _LocalVideoArea(controller: _localVideoController)
+                ? _LocalVideoArea(renderer: _localRenderer)
                 : _LocalPreviewView(
                     name: _localName.isNotEmpty ? _localName : 'You',
                     isCameraOn: _isCameraOn,
                   ),
           ),
 
-          // ── Bottom controls ──
           _BottomControls(
             isCameraOn: _isCameraOn,
             isConnected: _isConnected,
@@ -579,7 +706,6 @@ class _SearchingViewState extends State<_SearchingView>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Animated static noise
           AnimatedBuilder(
             animation: _controller,
             builder: (context, _) {
@@ -590,7 +716,6 @@ class _SearchingViewState extends State<_SearchingView>
               );
             },
           ),
-          // Loader on top
           const Center(
             child: SizedBox(
               width: 36,
@@ -614,13 +739,12 @@ class _StaticNoisePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint();
-    // Use a simple pseudo-random based on seed
     int rng = seed;
     const step = 6.0;
     for (double y = 0; y < size.height; y += step) {
       for (double x = 0; x < size.width; x += step) {
         rng = ((rng * 1103515245 + 12345) & 0x7fffffff);
-        final grey = (rng % 40); // dark greys 0-39
+        final grey = (rng % 40);
         paint.color = Color.fromARGB(80, grey, grey, grey);
         canvas.drawRect(Rect.fromLTWH(x, y, step, step), paint);
       }
@@ -634,13 +758,13 @@ class _StaticNoisePainter extends CustomPainter {
 // ─── Remote video area ──────────────────────────────────────────────────────
 
 class _RemoteVideoArea extends StatelessWidget {
-  final VideoViewController controller;
+  final RTCVideoRenderer renderer;
   final String name;
   final String? gender;
   final VoidCallback onReport;
 
   const _RemoteVideoArea({
-    required this.controller,
+    required this.renderer,
     required this.name,
     this.gender,
     required this.onReport,
@@ -651,9 +775,11 @@ class _RemoteVideoArea extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        VideoView(controller: controller, fit: VideoViewFit.cover),
+        RTCVideoView(
+          renderer,
+          objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+        ),
 
-        // Name + gender badge (top-left)
         Positioned(
           top: 8,
           left: 12,
@@ -712,7 +838,6 @@ class _RemoteVideoArea extends StatelessWidget {
           ),
         ),
 
-        // Report button (top-right)
         Positioned(
           top: 8,
           right: 12,
@@ -794,7 +919,6 @@ class _RemoteCameraOffView extends StatelessWidget {
               ],
             ),
           ),
-          // Report button (top-right)
           Positioned(
             top: 8,
             right: 12,
@@ -827,13 +951,17 @@ class _RemoteCameraOffView extends StatelessWidget {
 // ─── Local video area (in-call) ─────────────────────────────────────────────
 
 class _LocalVideoArea extends StatelessWidget {
-  final VideoViewController controller;
+  final RTCVideoRenderer renderer;
 
-  const _LocalVideoArea({required this.controller});
+  const _LocalVideoArea({required this.renderer});
 
   @override
   Widget build(BuildContext context) {
-    return VideoView(controller: controller, fit: VideoViewFit.cover);
+    return RTCVideoView(
+      renderer,
+      mirror: true,
+      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+    );
   }
 }
 
@@ -856,12 +984,10 @@ class _LocalPreviewView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Umbrella icon
             SvgPicture.asset(
               'assets/images/branding/meeting-umbrella.svg',
               width: 140,
             ),
-            // Avatar placeholder
             Container(
               width: 80,
               height: 80,
@@ -944,7 +1070,6 @@ class _BottomControls extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Camera toggle
           GestureDetector(
             onTap: onToggleCamera,
             child: Container(
@@ -967,7 +1092,6 @@ class _BottomControls extends StatelessWidget {
           ),
           const SizedBox(width: 8),
 
-          // Gender filter
           GestureDetector(
             onTap: onGenderFilter,
             child: Container(
@@ -989,7 +1113,6 @@ class _BottomControls extends StatelessWidget {
 
           const SizedBox(width: 12),
 
-          // Stop button
           Expanded(
             child: GestureDetector(
               onTap: onStop,
@@ -1027,7 +1150,6 @@ class _BottomControls extends StatelessWidget {
 
           const SizedBox(width: 12),
 
-          // Next button
           Expanded(
             child: GestureDetector(
               onTap: onNext,
