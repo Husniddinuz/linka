@@ -599,6 +599,17 @@ class _LogoutCard extends StatelessWidget {
   }
 
   Future<void> _handleLogout(BuildContext context) async {
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => const _LogoutConfirmSheet(),
+    );
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+
     try {
       final access = await TokenService.getAccessToken();
       final refresh = await TokenService.getRefreshToken();
@@ -618,6 +629,125 @@ class _LogoutCard extends StatelessWidget {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
       (route) => false,
+    );
+  }
+}
+
+// ─── Logout confirmation sheet ──────────────────────────────────────────────
+
+class _LogoutConfirmSheet extends StatelessWidget {
+  const _LogoutConfirmSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEEEEE),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SvgPicture.asset(
+              'assets/images/buttons/logout.svg',
+              width: 40,
+              height: 40,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Log out',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF272942),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Are you sure you want to log out of your account?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: Color(0xFF999999),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: _SheetButton(
+                    label: 'Cancel',
+                    background: const Color(0xFFF2F2F2),
+                    textColor: const Color(0xFF272942),
+                    onTap: () => Navigator.pop(context, false),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _SheetButton(
+                    label: 'Log out',
+                    background: const Color(0xFFE74C3C),
+                    textColor: Colors.white,
+                    onTap: () => Navigator.pop(context, true),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetButton extends StatelessWidget {
+  final String label;
+  final Color background;
+  final Color textColor;
+  final VoidCallback onTap;
+
+  const _SheetButton({
+    required this.label,
+    required this.background,
+    required this.textColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        height: 52,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+          ),
+        ),
+      ),
     );
   }
 }
