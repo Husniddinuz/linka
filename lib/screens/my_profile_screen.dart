@@ -220,6 +220,10 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                     ),
                     const SizedBox(height: 16),
                     const _LogoutCard(),
+                    const SizedBox(height: 24),
+                    _DeleteAccountCard(
+                      phoneNumber: _profile?['phone_number'] as String?,
+                    ),
                     const SizedBox(height: 32),
                   ],
                 ),
@@ -746,6 +750,324 @@ class _SheetButton extends StatelessWidget {
             fontWeight: FontWeight.w600,
             color: textColor,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Delete account card ──────────────────────────────────────────────────────
+
+class _DeleteAccountCard extends StatefulWidget {
+  final String? phoneNumber;
+  const _DeleteAccountCard({this.phoneNumber});
+
+  @override
+  State<_DeleteAccountCard> createState() => _DeleteAccountCardState();
+}
+
+class _DeleteAccountCardState extends State<_DeleteAccountCard> {
+  bool _deleting = false;
+
+  Future<void> _onTap() async {
+    final phone = widget.phoneNumber;
+    if (phone == null || phone.isEmpty) {
+      AppNotify.show(
+        context,
+        message: 'Unable to verify your phone number. Please try again later.',
+      );
+      return;
+    }
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+        ),
+        child: _DeleteAccountConfirmSheet(phoneNumber: phone),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleting = true);
+    try {
+      await ApiService.delete('/users/me/');
+      await TokenService.clearTokens();
+      if (!mounted) return;
+      AppNotify.show(
+        context,
+        message: 'Account deleted',
+        type: NotifyType.success,
+      );
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+        (route) => false,
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      AppNotify.show(context, message: e.message);
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GestureDetector(
+        onTap: _deleting ? null : _onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (_deleting)
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFFE74C3C),
+                ),
+              )
+            else
+              const Icon(
+                Icons.delete_outline_rounded,
+                color: Color(0xFFE74C3C),
+                size: 16,
+              ),
+            const SizedBox(width: 6),
+            const Text(
+              'Delete account',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFFE74C3C),
+                decoration: TextDecoration.underline,
+                decorationColor: Color(0xFFE74C3C),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Delete account confirmation sheet ────────────────────────────────────────
+
+class _DeleteAccountConfirmSheet extends StatefulWidget {
+  final String phoneNumber;
+  const _DeleteAccountConfirmSheet({required this.phoneNumber});
+
+  @override
+  State<_DeleteAccountConfirmSheet> createState() =>
+      _DeleteAccountConfirmSheetState();
+}
+
+class _DeleteAccountConfirmSheetState
+    extends State<_DeleteAccountConfirmSheet> {
+  final _controller = TextEditingController();
+
+  String _normalize(String s) => s.replaceAll(RegExp(r'[\s\-()]'), '');
+
+  bool get _matches =>
+      _normalize(_controller.text) == _normalize(widget.phoneNumber);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEEEEE),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Center(
+              child: Container(
+                width: 64,
+                height: 64,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE74C3C).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Color(0xFFE74C3C),
+                  size: 34,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Permanently delete account?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFE74C3C),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'This action is IRREVERSIBLE.\n'
+              'Your profile, lessons, messages, reviews, wallet balance, and '
+              'all related data will be permanently deleted and cannot be '
+              'recovered.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                color: Color(0xFF555555),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFFE74C3C).withValues(alpha: 0.25),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'To confirm, type your phone number:',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF272942),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.phoneNumber,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF272942),
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _controller,
+                    keyboardType: TextInputType.phone,
+                    autofocus: true,
+                    onChanged: (_) => setState(() {}),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF272942),
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Enter phone number',
+                      hintStyle: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFFBBBBBB),
+                        fontWeight: FontWeight.w400,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFE74C3C),
+                          width: 1,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: const Color(0xFFE74C3C)
+                              .withValues(alpha: 0.3),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFE74C3C),
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: _SheetButton(
+                    label: 'Cancel',
+                    background: const Color(0xFFF2F2F2),
+                    textColor: const Color(0xFF272942),
+                    onTap: () => Navigator.pop(context, false),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _matches
+                        ? () => Navigator.pop(context, true)
+                        : null,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      height: 52,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: _matches
+                            ? const Color(0xFFE74C3C)
+                            : const Color(0xFFE74C3C).withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Text(
+                        'Delete forever',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
