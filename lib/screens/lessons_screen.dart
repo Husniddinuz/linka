@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
+import '../widgets/lesson_card.dart';
 
 // ─── Screen ─────────────────────────────────────────────────────────────────────
 
@@ -33,9 +34,25 @@ class _LessonsScreenState extends State<LessonsScreen> {
         '/bookings/calendar/?year=${_focusedMonth.year}&month=${_focusedMonth.month}',
       );
       final days = <int>{};
-      if (data['busy_days'] is List) {
-        for (final d in data['busy_days'] as List) {
-          days.add(d is int ? d : int.tryParse(d.toString()) ?? 0);
+      final raw = data['busy_dates'] ?? data['busy_days'];
+      if (raw is List) {
+        for (final d in raw) {
+          if (d is int) {
+            days.add(d);
+            continue;
+          }
+          final s = d.toString();
+          final asInt = int.tryParse(s);
+          if (asInt != null) {
+            days.add(asInt);
+            continue;
+          }
+          final parsed = DateTime.tryParse(s);
+          if (parsed != null &&
+              parsed.year == _focusedMonth.year &&
+              parsed.month == _focusedMonth.month) {
+            days.add(parsed.day);
+          }
         }
       }
       if (mounted) setState(() => _busyDays = days);
@@ -62,7 +79,9 @@ class _LessonsScreenState extends State<LessonsScreen> {
   List<Map<String, dynamic>> get _selectedDayBookings {
     final selectedDate = DateTime(_focusedMonth.year, _focusedMonth.month, _selectedDay);
     return _bookings.where((b) {
-      final startStr = b['start_time']?.toString() ?? b['date']?.toString() ?? '';
+      final startStr = b['start_at']?.toString() ??
+          b['start_time']?.toString() ??
+          b['date']?.toString() ?? '';
       if (startStr.isEmpty) return false;
       final parsed = DateTime.tryParse(startStr);
       if (parsed == null) return false;
@@ -211,24 +230,23 @@ class _LessonsScreenState extends State<LessonsScreen> {
                               ),
                             )
                           else if (dayBookings.isNotEmpty)
-                            ...dayBookings.asMap().entries.map((e) {
-                              final booking = e.value;
+                            ...dayBookings.map((booking) {
                               final now = DateTime.now();
                               final isToday = _focusedMonth.month == now.month &&
                                   _focusedMonth.year == now.year &&
                                   _selectedDay == now.day;
+                              final roomUrl = booking['daily_room_url']?.toString() ?? '';
+                              final lesson = Lesson.fromBooking(booking);
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
-                                child: _LessonCard(
-                                  booking: booking,
-                                  showStartButton: isToday,
+                                child: LessonCard(
+                                  lesson: lesson,
+                                  showStartButton: isToday && roomUrl.isNotEmpty,
                                   onStart: () {
-                                    final id = booking['id'];
-                                    if (id != null) _joinLesson(id is int ? id : int.parse(id.toString()));
+                                    if (lesson.id != 0) _joinLesson(lesson.id);
                                   },
                                   onCancel: () {
-                                    final id = booking['id'];
-                                    if (id != null) _cancelBooking(id is int ? id : int.parse(id.toString()));
+                                    if (lesson.id != 0) _cancelBooking(lesson.id);
                                   },
                                 ),
                               );
@@ -374,20 +392,35 @@ class _CalendarCard extends StatelessWidget {
                                 ? Border.all(color: const Color(0xFF272942), width: 1.5)
                                 : null,
                           ),
-                          child: Center(
-                            child: Text(
-                              '$dayNum',
-                              style: TextStyle(
-                                fontFamily: 'SF Pro',
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                                color: isSelected
-                                    ? (hasLesson ? const Color(0xFF4CAF50) : Colors.white)
-                                    : hasLesson
-                                        ? const Color(0xFF4CAF50)
-                                        : const Color(0xFF272942),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Text(
+                                '$dayNum',
+                                style: TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : const Color(0xFF272942),
+                                ),
                               ),
-                            ),
+                              if (hasLesson)
+                                Positioned(
+                                  bottom: 4,
+                                  child: Container(
+                                    width: 4,
+                                    height: 4,
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? Colors.white
+                                          : const Color(0xFF4CAF50),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ),
@@ -452,273 +485,6 @@ class _DateHeader extends StatelessWidget {
               ),
             ),
         ],
-    );
-  }
-}
-
-// ─── Lesson card ────────────────────────────────────────────────────────────────
-
-class _LessonCard extends StatelessWidget {
-  final Map<String, dynamic> booking;
-  final bool showStartButton;
-  final VoidCallback onStart;
-  final VoidCallback onCancel;
-  const _LessonCard({
-    required this.booking,
-    this.showStartButton = false,
-    required this.onStart,
-    required this.onCancel,
-  });
-
-  String _formatTime(String? isoString) {
-    if (isoString == null) return '--:--';
-    final dt = DateTime.tryParse(isoString)?.toLocal();
-    if (dt == null) return '--:--';
-    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
-
-  String _formatDuration(String? startStr, String? endStr) {
-    if (startStr == null || endStr == null) return '';
-    final start = DateTime.tryParse(startStr);
-    final end = DateTime.tryParse(endStr);
-    if (start == null || end == null) return '';
-    final diff = end.difference(start);
-    if (diff.inHours > 0) return '${diff.inHours} h ${diff.inMinutes % 60} min';
-    return '${diff.inMinutes} min';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tutor = booking['tutor'] as Map<String, dynamic>? ?? {};
-    final tutorName = tutor['first_name']?.toString() ?? booking['tutor_first_name']?.toString() ?? 'Tutor';
-    final tutorImage = tutor['profile_image']?.toString() ?? booking['tutor_profile_image']?.toString();
-    final startTime = booking['start_time']?.toString();
-    final endTime = booking['end_time']?.toString();
-    final status = booking['status']?.toString() ?? '';
-    final isCancelled = status == 'cancelled';
-
-    return Opacity(
-      opacity: isCancelled ? 0.5 : 1.0,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF6F6F6),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 82,
-                  height: 82,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F0F4),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: tutorImage != null && tutorImage.isNotEmpty
-                        ? Image.network(
-                            tutorImage,
-                            width: 82,
-                            height: 82,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => SvgPicture.asset(
-                              'assets/images/branding/blank-avatar.svg',
-                              width: 82,
-                              height: 82,
-                            ),
-                          )
-                        : SvgPicture.asset(
-                            'assets/images/branding/blank-avatar.svg',
-                            width: 82,
-                            height: 82,
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Container(
-                    height: 82,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                tutorName,
-                                style: const TextStyle(
-                                  fontFamily: 'SF Pro',
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF272942),
-                                  height: 1.0,
-                                  letterSpacing: 0,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  SvgPicture.asset(
-                                    'assets/images/icons/recent_outline_20.svg',
-                                    width: 15,
-                                    height: 15,
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    '${_formatTime(startTime)} - ${_formatTime(endTime)}',
-                                    style: const TextStyle(
-                                      fontFamily: 'SF Pro',
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF6C6C6C),
-                                      height: 1.0,
-                                      letterSpacing: 0,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 3),
-                              Row(
-                                children: [
-                                  SvgPicture.asset(
-                                    'assets/images/icons/tabler_hourglass-high.svg',
-                                    width: 15,
-                                    height: 15,
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    _formatDuration(startTime, endTime),
-                                    style: const TextStyle(
-                                      fontFamily: 'SF Pro',
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF6C6C6C),
-                                      height: 1.0,
-                                      letterSpacing: 0,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (!isCancelled)
-                          GestureDetector(
-                            onTap: () => _showOptions(context),
-                            child: Padding(
-                              padding: const EdgeInsets.all(4),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: List.generate(
-                                  3,
-                                  (i) => Padding(
-                                    padding: EdgeInsets.only(top: i == 0 ? 0 : 3),
-                                    child: Container(
-                                      width: 4,
-                                      height: 4,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF272942),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (showStartButton && !isCancelled) ...[
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: onStart,
-                child: Container(
-                  width: double.infinity,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF272942),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'Start the lesson',
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        height: 1.0,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            if (isCancelled) ...[
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEEEEEE),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Center(
-                  child: Text(
-                    'Cancelled',
-                    style: TextStyle(
-                      fontFamily: 'SF Pro',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFFAAAAAA),
-                      height: 1.0,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.cancel_outlined, color: Colors.red),
-              title: const Text('Cancel lesson'),
-              onTap: () {
-                Navigator.pop(ctx);
-                onCancel();
-              },
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

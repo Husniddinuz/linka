@@ -2,6 +2,8 @@ import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../widgets/cached_avatar.dart';
+import '../widgets/lesson_card.dart';
+import '../widgets/skeleton.dart';
 import '../services/api_service.dart';
 import '../services/prefs_service.dart';
 import 'lessons_screen.dart';
@@ -11,8 +13,6 @@ import 'my_profile_screen.dart';
 import 'story_upload_screen.dart';
 import 'podcast_player_screen.dart';
 import 'podcasts_list_screen.dart';
-import 'movies_list_screen.dart';
-import 'movie_player_screen.dart';
 import 'articles_list_screen.dart';
 import 'article_detail_screen.dart';
 import 'story_viewer_screen.dart';
@@ -70,76 +70,6 @@ List<_TutorWithStories> _groupStories(List<dynamic> raw) {
     ));
   }
   return map.values.toList();
-}
-
-class _Lesson {
-  final int id;
-  final String tutorName;
-  final String? tutorImage;
-  final String timeRange;
-  final String duration;
-  final String status;
-  const _Lesson({
-    required this.id,
-    required this.tutorName,
-    this.tutorImage,
-    required this.timeRange,
-    required this.duration,
-    required this.status,
-  });
-
-  factory _Lesson.fromBooking(Map<String, dynamic> booking) {
-    final tutor = booking['tutor'] as Map<String, dynamic>? ?? {};
-    final firstName = tutor['first_name'] as String? ?? '';
-    final lastName = tutor['last_name'] as String? ?? '';
-    final startAt = DateTime.tryParse(booking['start_at'] as String? ?? '');
-    final durationMin = booking['duration_minutes'] as int? ?? 0;
-
-    String timeRange = '';
-    if (startAt != null) {
-      final localStart = startAt.toLocal();
-      final localEnd = localStart.add(Duration(minutes: durationMin));
-      timeRange =
-          '${localStart.hour}:${localStart.minute.toString().padLeft(2, '0')}'
-          ' - '
-          '${localEnd.hour}:${localEnd.minute.toString().padLeft(2, '0')}';
-    }
-
-    return _Lesson(
-      id: booking['id'] as int? ?? 0,
-      tutorName: '$firstName $lastName'.trim(),
-      tutorImage: tutor['profile_image'] as String?,
-      timeRange: timeRange,
-      duration: '$durationMin min',
-      status: booking['status'] as String? ?? '',
-    );
-  }
-}
-
-class _Movie {
-  final int id;
-  final String title;
-  final String? posterUrl;
-  final String? playbackUrl;
-  final int? durationMinutes;
-
-  const _Movie({
-    required this.id,
-    required this.title,
-    this.posterUrl,
-    this.playbackUrl,
-    this.durationMinutes,
-  });
-
-  factory _Movie.fromJson(Map<String, dynamic> json) {
-    return _Movie(
-      id: json['id'] as int,
-      title: json['title'] as String? ?? '',
-      posterUrl: json['poster_url'] as String?,
-      playbackUrl: json['playback_url'] as String?,
-      durationMinutes: json['duration_minutes'] as int?,
-    );
-  }
 }
 
 class _Podcast {
@@ -203,8 +133,12 @@ class _HomeScreenState extends State<HomeScreen> {
   String _userRole = 'student';
   Set<String> _viewedStories = {};
   List<_TutorWithStories> _storyTutors = [];
-  List<_Lesson> _todaysLessons = [];
+  List<Lesson> _todaysLessons = [];
   Set<int> _savedArticleIds = {};
+  bool _loadingStories = true;
+  bool _loadingLessons = true;
+  bool _loadingPodcasts = true;
+  bool _loadingArticles = true;
 
   @override
   void initState() {
@@ -216,21 +150,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadPodcasts();
     _loadArticles();
     _loadSavedArticles();
-    _loadMovies();
-  }
-
-  Future<void> _loadMovies() async {
-    try {
-      final list = await ApiService.getList('/content/movies/');
-      if (!mounted) return;
-      setState(() {
-        _movies = list
-            .map((e) => _Movie.fromJson(e as Map<String, dynamic>))
-            .toList();
-      });
-    } catch (e) {
-      dev.log('Movies error: $e');
-    }
   }
 
   Future<void> _loadProfile() async {
@@ -257,8 +176,12 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() {
         _storyTutors = _groupStories(list);
+        _loadingStories = false;
       });
-    } catch (_) {}
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingStories = false);
+    }
   }
 
   Future<void> _onStoryViewed(String tutorId) async {
@@ -275,9 +198,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _podcasts = list
             .map((e) => _Podcast.fromJson(e as Map<String, dynamic>))
             .toList();
+        _loadingPodcasts = false;
       });
     } catch (e) {
       dev.log('Podcasts error: $e');
+      if (!mounted) return;
+      setState(() => _loadingPodcasts = false);
     }
   }
 
@@ -289,9 +215,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _articles = list
             .map((e) => _Article.fromJson(e as Map<String, dynamic>))
             .toList();
+        _loadingArticles = false;
       });
     } catch (e) {
       dev.log('Articles error: $e');
+      if (!mounted) return;
+      setState(() => _loadingArticles = false);
     }
   }
 
@@ -340,28 +269,35 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadTodaysLessons() async {
     try {
-      final result = await ApiService.get('/bookings/my/?status=confirmed');
+      final list = await ApiService.getList('/bookings/my/');
       if (!mounted) return;
-      final list = (result is List ? result : (result['data'] as List?) ?? []) as List<dynamic>;
       final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final tomorrow = today.add(const Duration(days: 1));
-      final lessons = <_Lesson>[];
+      final lessons = <Lesson>[];
       for (final item in list) {
         final booking = item as Map<String, dynamic>;
-        final startAt = DateTime.tryParse(booking['start_at'] as String? ?? '');
+        final startAt = DateTime.tryParse(
+          booking['start_at'] as String? ?? booking['start_time'] as String? ?? '',
+        );
         if (startAt == null) continue;
-        final localStart = startAt.toLocal();
-        if (localStart.isAfter(today) && localStart.isBefore(tomorrow)) {
-          lessons.add(_Lesson.fromBooking(booking));
-        }
+        final local = startAt.toLocal();
+        final isToday = local.year == now.year &&
+            local.month == now.month &&
+            local.day == now.day;
+        if (!isToday) continue;
+        if ((booking['status'] as String? ?? '') == 'cancelled') continue;
+        lessons.add(Lesson.fromBooking(booking));
       }
       lessons.sort((a, b) => a.timeRange.compareTo(b.timeRange));
-      setState(() => _todaysLessons = lessons);
-    } catch (_) {}
+      setState(() {
+        _todaysLessons = lessons;
+        _loadingLessons = false;
+      });
+    } catch (e) {
+      dev.log('TODAYS LESSONS ERROR: $e');
+      if (!mounted) return;
+      setState(() => _loadingLessons = false);
+    }
   }
-
-  List<_Movie> _movies = [];
 
   List<_Podcast> _podcasts = [];
 
@@ -384,26 +320,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 24),
-
-                        // Tutors list
-                        _TutorsList(
-                          tutors: _storyTutors,
-                          viewedStories: _viewedStories,
-                          onStoryViewed: _onStoryViewed,
-                        ),
-
-                        const SizedBox(height: 28),
+                        if (_loadingStories) ...[
+                          const SizedBox(height: 24),
+                          const _StoriesSkeleton(),
+                          const SizedBox(height: 28),
+                        ] else if (_storyTutors.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          _TutorsList(
+                            tutors: _storyTutors,
+                            viewedStories: _viewedStories,
+                            onStoryViewed: _onStoryViewed,
+                          ),
+                          const SizedBox(height: 28),
+                        ] else
+                          const SizedBox(height: 20),
 
                         // Speaking practice button
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 21),
                           child: GestureDetector(
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const SpeakingTrainingScreen(),
-                              ),
-                            ),
+                            onTap: () => setState(() => _selectedTab = 2),
                             child: LayoutBuilder(
                               builder: (context, constraints) => SvgPicture.asset(
                                 'assets/images/buttons/speaking-practice.svg',
@@ -416,34 +352,39 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 32),
 
                         // Today's lessons
-                        _LessonsSection(lessons: _todaysLessons),
+                        _LessonsSection(
+                          lessons: _todaysLessons,
+                          loading: _loadingLessons,
+                          onSeeAll: () => setState(() => _selectedTab = 1),
+                        ),
 
                         const SizedBox(height: 28),
 
                         // Video chat button
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 21),
-                          child: LayoutBuilder(
-                            builder: (context, constraints) =>
-                                SvgPicture.asset(
-                                  'assets/images/buttons/video-chat.svg',
-                                  width: constraints.maxWidth,
-                                ),
+                          child: GestureDetector(
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const SpeakingTrainingScreen(),
+                              ),
+                            ),
+                            child: LayoutBuilder(
+                              builder: (context, constraints) =>
+                                  SvgPicture.asset(
+                                    'assets/images/buttons/video-chat.svg',
+                                    width: constraints.maxWidth,
+                                  ),
+                            ),
                           ),
                         ),
 
                         const SizedBox(height: 32),
 
-                        // Watch a movie section
-                        _SectionHeader(
-                          title: 'WATCH A MOVIE',
-                          onSeeAll: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const MoviesListScreen()),
-                          ),
-                        ),
+                        // Watch a movie section — coming soon
+                        const _SectionHeader(title: 'WATCH A MOVIE'),
                         const SizedBox(height: 12),
-                        _MoviesSection(movies: _movies),
+                        const _ComingSoonBanner(),
 
                         const SizedBox(height: 28),
 
@@ -456,7 +397,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        _PodcastsSection(podcasts: _podcasts),
+                        _PodcastsSection(podcasts: _podcasts, loading: _loadingPodcasts),
 
                         const SizedBox(height: 28),
 
@@ -471,6 +412,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 12),
                         _ArticlesSection(
                           articles: _articles,
+                          loading: _loadingArticles,
                           savedArticleIds: _savedArticleIds,
                           onToggleBookmark: _toggleArticleBookmark,
                         ),
@@ -555,6 +497,34 @@ class _Header extends StatelessWidget {
 }
 
 // ─── Tutors list ───────────────────────────────────────────────────────────────
+
+class _StoriesSkeleton extends StatelessWidget {
+  const _StoriesSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 128,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: 6,
+        itemBuilder: (_, _) => const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 8),
+          child: Column(
+            children: [
+              Skeleton(width: 86, height: 86, circle: true),
+              SizedBox(height: 8),
+              Skeleton(width: 60, height: 10, borderRadius: 4),
+              SizedBox(height: 4),
+              Skeleton(width: 40, height: 10, borderRadius: 4),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _TutorsList extends StatelessWidget {
   final List<_TutorWithStories> tutors;
@@ -673,8 +643,10 @@ class _TutorItem extends StatelessWidget {
 // ─── Lessons section ───────────────────────────────────────────────────────────
 
 class _LessonsSection extends StatelessWidget {
-  final List<_Lesson> lessons;
-  const _LessonsSection({required this.lessons});
+  final List<Lesson> lessons;
+  final bool loading;
+  final VoidCallback? onSeeAll;
+  const _LessonsSection({required this.lessons, this.loading = false, this.onSeeAll});
 
   @override
   Widget build(BuildContext context) {
@@ -697,22 +669,30 @@ class _LessonsSection extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              const Text(
-                'See all',
-                style: TextStyle(
-                  fontFamily: 'SF Pro',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFFB9BCBE),
-                  height: 1.0,
-                  letterSpacing: 0,
+              GestureDetector(
+                onTap: onSeeAll,
+                child: const Text(
+                  'See all',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFFB9BCBE),
+                    height: 1.0,
+                    letterSpacing: 0,
+                  ),
                 ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 12),
-        if (lessons.isEmpty)
+        if (loading)
+          const Padding(
+            padding: EdgeInsets.only(left: 20, right: 20, bottom: 8),
+            child: Skeleton(height: 98, borderRadius: 16),
+          )
+        else if (lessons.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 20),
             child: Text(
@@ -728,157 +708,10 @@ class _LessonsSection extends StatelessWidget {
           ...lessons.map(
             (l) => Padding(
               padding: const EdgeInsets.only(left: 20, right: 20, bottom: 8),
-              child: _LessonCard(lesson: l),
+              child: LessonCard(lesson: l),
             ),
           ),
       ],
-    );
-  }
-}
-
-class _LessonCard extends StatelessWidget {
-  final _Lesson lesson;
-  const _LessonCard({required this.lesson});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF6F6F6),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Tutor image with rounded corners + padding from card edge
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: lesson.tutorImage != null && lesson.tutorImage!.startsWith('http')
-                ? Image.network(
-                    lesson.tutorImage!,
-                    width: 82,
-                    height: 82,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Image.asset(
-                      'assets/images/tutors/tutor.png',
-                      width: 82,
-                      height: 82,
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                : Image.asset(
-                    'assets/images/tutors/tutor.png',
-                    width: 82,
-                    height: 82,
-                    fit: BoxFit.cover,
-                  ),
-          ),
-
-          const SizedBox(width: 8),
-
-          // White text section — same height, same border radius
-          Expanded(
-            child: Container(
-              height: 82,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          lesson.tutorName,
-                          style: const TextStyle(
-                            fontFamily: 'SF Pro',
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF272942),
-                            height: 1.0,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            SvgPicture.asset(
-                              'assets/images/icons/recent_outline_20.svg',
-                              width: 15,
-                              height: 15,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              lesson.timeRange,
-                              style: const TextStyle(
-                                fontFamily: 'SF Pro',
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF6C6C6C),
-                                height: 1.0,
-                                letterSpacing: 0,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Row(
-                          children: [
-                            SvgPicture.asset(
-                              'assets/images/icons/tabler_hourglass-high.svg',
-                              width: 15,
-                              height: 15,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              lesson.duration,
-                              style: const TextStyle(
-                                fontFamily: 'SF Pro',
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF6C6C6C),
-                                height: 1.0,
-                                letterSpacing: 0,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  // 3-dot pinned to top-right inside white block
-                  Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: List.generate(
-                        3,
-                        (i) => Padding(
-                          padding: EdgeInsets.only(top: i == 0 ? 0 : 3),
-                          child: Container(
-                            width: 4,
-                            height: 4,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF272942),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -928,97 +761,53 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ─── Watch a movie section ─────────────────────────────────────────────────────
+// ─── Coming soon banner ────────────────────────────────────────────────────────
 
-class _MoviesSection extends StatelessWidget {
-  final List<_Movie> movies;
-  const _MoviesSection({required this.movies});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 220,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: movies.length,
-        itemBuilder: (_, i) => _MovieCard(movie: movies[i]),
-      ),
-    );
-  }
-}
-
-class _MovieCard extends StatelessWidget {
-  final _Movie movie;
-  const _MovieCard({required this.movie});
+class _ComingSoonBanner extends StatelessWidget {
+  const _ComingSoonBanner();
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => MoviePlayerScreen(
-            movieId: movie.id,
-            initialTitle: movie.title,
-            initialPlaybackUrl: movie.playbackUrl,
-            initialPosterUrl: movie.posterUrl,
-          ),
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
-      width: 140,
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F7),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: movie.posterUrl != null && movie.posterUrl!.startsWith('http')
-                ? Image.network(
-                    movie.posterUrl!,
-                    width: double.infinity,
-                    height: 170,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
-                      width: double.infinity,
-                      height: 170,
-                      color: const Color(0xFFE0E0E0),
-                      child: const Icon(Icons.movie, size: 40, color: Color(0xFFAAAAAA)),
-                    ),
-                  )
-                : Container(
-                    width: double.infinity,
-                    height: 170,
-                    color: const Color(0xFFE0E0E0),
-                    child: const Icon(Icons.movie, size: 40, color: Color(0xFFAAAAAA)),
-                  ),
-          ),
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                movie.title,
-                style: const TextStyle(
-                  fontFamily: 'SF Pro',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF2B2B2B),
-                  height: 1.0,
-                  letterSpacing: 0,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+        decoration: BoxDecoration(
+          color: const Color(0xFF272942),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          children: [
+            const Icon(
+              Icons.movie_outlined,
+              color: Color(0xFFF5C542),
+              size: 36,
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Coming soon',
+              style: TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                height: 1.2,
               ),
             ),
-          ),
-        ],
-      ),
+            const SizedBox(height: 6),
+            Text(
+              'Movies will be available shortly',
+              style: TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                color: Colors.white.withValues(alpha: 0.7),
+                height: 1.3,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1028,10 +817,28 @@ class _MovieCard extends StatelessWidget {
 
 class _PodcastsSection extends StatelessWidget {
   final List<_Podcast> podcasts;
-  const _PodcastsSection({required this.podcasts});
+  final bool loading;
+  const _PodcastsSection({required this.podcasts, this.loading = false});
 
   @override
   Widget build(BuildContext context) {
+    if (loading) {
+      return SizedBox(
+        height: 100,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: 3,
+          itemBuilder: (_, _) => const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 6),
+            child: SizedBox(
+              width: 240,
+              child: Skeleton(height: 100, borderRadius: 14),
+            ),
+          ),
+        ),
+      );
+    }
     return SizedBox(
       height: 100,
       child: ListView.builder(
@@ -1128,16 +935,35 @@ class _PodcastCard extends StatelessWidget {
 
 class _ArticlesSection extends StatelessWidget {
   final List<_Article> articles;
+  final bool loading;
   final Set<int> savedArticleIds;
   final void Function(int articleId) onToggleBookmark;
   const _ArticlesSection({
     required this.articles,
+    this.loading = false,
     required this.savedArticleIds,
     required this.onToggleBookmark,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (loading) {
+      return SizedBox(
+        height: 180,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: 4,
+          itemBuilder: (_, _) => const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 6),
+            child: SizedBox(
+              width: 140,
+              child: Skeleton(height: 180, borderRadius: 14),
+            ),
+          ),
+        ),
+      );
+    }
     return SizedBox(
       height: 180,
       child: ListView.builder(

@@ -51,6 +51,16 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
     super.dispose();
   }
 
+  String _buildStudentNote() {
+    final parts = <String>[];
+    if (_selectedTopics.isNotEmpty) {
+      parts.add('Topics: ${_selectedTopics.join(', ')}');
+    }
+    final goal = _goalController.text.trim();
+    if (goal.isNotEmpty) parts.add(goal);
+    return parts.join('\n\n');
+  }
+
   void _onRequestLesson() {
     final d = widget.startAt;
     final endMin = d.hour * 60 + d.minute + widget.durationMinutes;
@@ -64,6 +74,9 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => PaymentScreen(
+          tutorId: widget.tutorId,
+          startAt: widget.startAt,
+          durationMinutes: widget.durationMinutes,
           tutorName: widget.tutorName,
           tutorImage: widget.tutorImage,
           experience: widget.experience,
@@ -71,7 +84,7 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
           lessonDate: lessonDate,
           timeRange: timeRange,
           duration: '${widget.durationMinutes} min',
-          goal: _goalController.text,
+          goal: _buildStudentNote(),
           totalAmount: widget.price,
         ),
       ),

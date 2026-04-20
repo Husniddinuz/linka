@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../services/api_service.dart';
+import '../services/booking_service.dart';
 import '../services/wallet_service.dart';
+import '../widgets/app_notify.dart';
 import '../widgets/skeleton.dart';
 import 'payment_topup_screen.dart';
 import 'payment_success_screen.dart';
 
 class PaymentScreen extends StatefulWidget {
+  final int? tutorId;
+  final DateTime? startAt;
+  final int? durationMinutes;
   final String tutorName;
   final String tutorImage;
   final String experience;
@@ -18,6 +24,9 @@ class PaymentScreen extends StatefulWidget {
 
   const PaymentScreen({
     super.key,
+    this.tutorId,
+    this.startAt,
+    this.durationMinutes,
     this.tutorName = 'Azizbek Karimov',
     this.tutorImage = 'assets/images/tutors/azizbek.png',
     this.experience = '+13 yrs',
@@ -37,8 +46,13 @@ class PaymentScreen extends StatefulWidget {
 class _PaymentScreenState extends State<PaymentScreen> {
   int _balance = 0;
   bool _balanceLoading = true;
+  bool _paying = false;
 
-  bool get _canPay => _balance >= widget.totalAmount;
+  bool get _canPay =>
+      _balance >= widget.totalAmount &&
+      widget.tutorId != null &&
+      widget.startAt != null &&
+      widget.durationMinutes != null;
 
   @override
   void initState() {
@@ -80,11 +94,34 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
-  void _onPay() {
-    if (!_canPay) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const PaymentSuccessScreen()),
-    );
+  Future<void> _onPay() async {
+    if (!_canPay || _paying) return;
+    setState(() => _paying = true);
+    try {
+      final bookingId = await BookingService.createBooking(
+        tutorId: widget.tutorId!,
+        startAt: widget.startAt!,
+        durationMinutes: widget.durationMinutes!,
+        studentNote: widget.goal,
+      );
+      await BookingService.payFromWallet(bookingId: bookingId);
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const PaymentSuccessScreen()),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      AppNotify.show(context, message: e.message, type: NotifyType.error);
+    } catch (_) {
+      if (!mounted) return;
+      AppNotify.show(
+        context,
+        message: 'Could not complete payment',
+        type: NotifyType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _paying = false);
+    }
   }
 
   @override
@@ -460,7 +497,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: _canPay ? _onPay : null,
+                onPressed: (_canPay && !_paying) ? _onPay : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF272942),
                   disabledBackgroundColor: const Color(0xFFD0D0D0),
@@ -471,10 +508,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   ),
                   elevation: 0,
                 ),
-                child: const Text(
-                  'Pay',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                ),
+                child: _paying
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          valueColor: AlwaysStoppedAnimation(Colors.white),
+                        ),
+                      )
+                    : const Text(
+                        'Pay',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                      ),
               ),
             ),
           ),

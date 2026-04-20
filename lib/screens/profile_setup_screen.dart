@@ -38,11 +38,24 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _displayNameController = TextEditingController();
+  final _experienceController = TextEditingController();
+  final _aboutMeController = TextEditingController();
+  final _price20Controller = TextEditingController();
+  final _price30Controller = TextEditingController();
+  final _price45Controller = TextEditingController();
   String? _englishLevel;
   String? _gender;
-  String? _ieltsScore;
+  String? _readingScore;
+  String? _listeningScore;
+  String? _writingScore;
+  String? _speakingScore;
+  File? _certificateFile;
   String? _certificateFileName;
+  File? _introVideo;
+  String? _introVideoName;
   bool _submitting = false;
+
+  static const List<String> _bandOptions = ['7.0', '7.5', '8.0', '8.5', '9.0'];
 
   bool get _isTutor => widget.role == 'tutor';
 
@@ -80,13 +93,33 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     'IELTS Preparation': 'Ielts',
   };
 
+  String? get _computedIelts {
+    if (_readingScore == null ||
+        _listeningScore == null ||
+        _writingScore == null ||
+        _speakingScore == null) {
+      return null;
+    }
+    final avg = (double.parse(_readingScore!) +
+            double.parse(_listeningScore!) +
+            double.parse(_writingScore!) +
+            double.parse(_speakingScore!)) /
+        4;
+    return ((avg * 2).round() / 2).toStringAsFixed(1);
+  }
+
   bool get _canSubmit {
     if (_firstNameController.text.trim().isEmpty) return false;
     if (_lastNameController.text.trim().isEmpty) return false;
     if (_gender == null) return false;
     if (_isTutor) {
+      final hasPhoto = _photo != null ||
+          (_networkImageUrl != null && _networkImageUrl!.isNotEmpty);
       return _displayNameController.text.trim().isNotEmpty &&
-          _ieltsScore != null;
+          _computedIelts != null &&
+          _experienceController.text.trim().isNotEmpty &&
+          hasPhoto &&
+          _certificateFile != null;
     }
     return _englishLevel != null;
   }
@@ -115,7 +148,29 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
     );
     if (result != null && mounted) {
-      setState(() => _certificateFileName = result.files.single.name);
+      final picked = result.files.single;
+      final path = picked.path;
+      if (path == null) return;
+      setState(() {
+        _certificateFile = File(path);
+        _certificateFileName = picked.name;
+      });
+    }
+  }
+
+  Future<void> _pickIntroVideo() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['mp4', 'mov', 'webm'],
+    );
+    if (result != null && mounted) {
+      final picked = result.files.single;
+      final path = picked.path;
+      if (path == null) return;
+      setState(() {
+        _introVideo = File(path);
+        _introVideoName = picked.name;
+      });
     }
   }
 
@@ -156,8 +211,37 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       };
 
       if (_isTutor) {
-        body['ielts_score'] = double.tryParse(_ieltsScore ?? '') ?? 0;
-        body['experience'] = 0;
+        body['ielts_score'] = double.tryParse(_computedIelts ?? '') ?? 0;
+        body['experience'] = _experienceController.text.trim();
+        if (_readingScore != null) {
+          body['reading_score'] = double.parse(_readingScore!);
+        }
+        if (_listeningScore != null) {
+          body['listening_score'] = double.parse(_listeningScore!);
+        }
+        if (_writingScore != null) {
+          body['writing_score'] = double.parse(_writingScore!);
+        }
+        if (_speakingScore != null) {
+          body['speaking_score'] = double.parse(_speakingScore!);
+        }
+        final aboutMe = _aboutMeController.text.trim();
+        if (aboutMe.isNotEmpty) body['about_me'] = aboutMe;
+        final prices = <Map<String, dynamic>>[];
+        void addPrice(int minutes, TextEditingController c) {
+          final raw = c.text.trim();
+          if (raw.isEmpty) return;
+          final amount = int.tryParse(raw);
+          if (amount == null) return;
+          prices.add({
+            'duration_minutes': minutes,
+            'price': '$amount.00',
+          });
+        }
+        addPrice(20, _price20Controller);
+        addPrice(30, _price30Controller);
+        addPrice(45, _price45Controller);
+        if (prices.isNotEmpty) body['prices'] = prices;
       } else {
         body['englishLevel'] = _levelMap[_englishLevel] ?? _englishLevel;
       }
@@ -167,6 +251,28 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         final ext = _photo!.path.split('.').last.toLowerCase();
         final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
         body['profile_image'] = 'data:$mime;base64,${base64Encode(bytes)}';
+      }
+
+      if (_isTutor && _certificateFile != null) {
+        final bytes = await _certificateFile!.readAsBytes();
+        final ext = _certificateFile!.path.split('.').last.toLowerCase();
+        final mime = ext == 'pdf'
+            ? 'application/pdf'
+            : ext == 'png'
+                ? 'image/png'
+                : 'image/jpeg';
+        body['certificate_image'] = 'data:$mime;base64,${base64Encode(bytes)}';
+      }
+
+      if (_isTutor && _introVideo != null) {
+        final bytes = await _introVideo!.readAsBytes();
+        final ext = _introVideo!.path.split('.').last.toLowerCase();
+        final mime = ext == 'mov'
+            ? 'video/quicktime'
+            : ext == 'webm'
+                ? 'video/webm'
+                : 'video/mp4';
+        body['intro_video'] = 'data:$mime;base64,${base64Encode(bytes)}';
       }
 
       final path = _isTutor ? '/tutor/profile/' : '/student/profile/';
@@ -194,6 +300,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _displayNameController.dispose();
+    _experienceController.dispose();
+    _aboutMeController.dispose();
+    _price20Controller.dispose();
+    _price30Controller.dispose();
+    _price45Controller.dispose();
     super.dispose();
   }
 
@@ -235,59 +346,39 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     children: [
                       const SizedBox(height: 24),
 
-                      // Avatar
-                      GestureDetector(
+                      _PhotoPicker(
+                        photo: _photo,
+                        networkImageUrl: _networkImageUrl,
                         onTap: _pickPhoto,
-                        child: _photo != null
-                            ? CircleAvatar(
-                                radius: 55,
-                                backgroundImage: FileImage(_photo!),
-                              )
-                            : CachedAvatar(imageUrl: _networkImageUrl, size: 110),
+                      ),
+
+                      const SizedBox(height: 28),
+
+                      const _SectionHeader('Personal info'),
+                      const SizedBox(height: 12),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _ProfileTextField(
+                              controller: _firstNameController,
+                              hint: 'First name',
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _ProfileTextField(
+                              controller: _lastNameController,
+                              hint: 'Last name',
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                        ],
                       ),
 
                       const SizedBox(height: 12),
 
-                      ElevatedButton.icon(
-                        onPressed: _pickPhoto,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF272942),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 10),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20)),
-                          elevation: 0,
-                        ),
-                        icon: const Icon(Icons.add, size: 16),
-                        label: const Text(
-                          'Add a photo',
-                          style: TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w500),
-                        ),
-                      ),
-
-                      const SizedBox(height: 32),
-
-                      // First name
-                      _ProfileTextField(
-                        controller: _firstNameController,
-                        hint: 'First name',
-                        onChanged: (_) => setState(() {}),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // Last name
-                      _ProfileTextField(
-                        controller: _lastNameController,
-                        hint: 'Last name',
-                        onChanged: (_) => setState(() {}),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // Gender
                       _DropdownField(
                         hint: 'Gender',
                         value: _gender,
@@ -299,9 +390,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 12),
-
                       if (_isTutor) ...[
+                        const SizedBox(height: 12),
+
                         _ProfileTextField(
                           controller: _displayNameController,
                           hint: 'Tutor display name',
@@ -309,33 +400,159 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                           onChanged: (_) => setState(() {}),
                         ),
 
+                        const SizedBox(height: 28),
+
+                        const _SectionHeader('IELTS scores'),
                         const SizedBox(height: 12),
 
-                        _DropdownField(
-                          hint: 'IELTS score',
-                          value: _ieltsScore,
-                          valueColor: const Color(0xFFE53935),
-                          valueBadge: true,
-                          showArrow: false,
-                          onTap: () => _openDropdown(
-                            title: 'IELTS score',
-                            options: ['7.0', '7.5', '8.0', '8.5', '9.0'],
-                            selected: _ieltsScore,
-                            onSelect: (v) => _ieltsScore = v,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _DropdownField(
+                                hint: 'Reading',
+                                value: _readingScore,
+                                onTap: () => _openDropdown(
+                                  title: 'Reading score',
+                                  options: _bandOptions,
+                                  selected: _readingScore,
+                                  onSelect: (v) => _readingScore = v,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _DropdownField(
+                                hint: 'Listening',
+                                value: _listeningScore,
+                                onTap: () => _openDropdown(
+                                  title: 'Listening score',
+                                  options: _bandOptions,
+                                  selected: _listeningScore,
+                                  onSelect: (v) => _listeningScore = v,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
 
+                        const SizedBox(height: 10),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _DropdownField(
+                                hint: 'Writing',
+                                value: _writingScore,
+                                onTap: () => _openDropdown(
+                                  title: 'Writing score',
+                                  options: _bandOptions,
+                                  selected: _writingScore,
+                                  onSelect: (v) => _writingScore = v,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _DropdownField(
+                                hint: 'Speaking',
+                                value: _speakingScore,
+                                onTap: () => _openDropdown(
+                                  title: 'Speaking score',
+                                  options: _bandOptions,
+                                  selected: _speakingScore,
+                                  onSelect: (v) => _speakingScore = v,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        _OverallScoreCard(value: _computedIelts),
+
+                        const SizedBox(height: 28),
+
+                        const _SectionHeader('About you'),
+                        const SizedBox(height: 12),
+
+                        _ProfileTextField(
+                          controller: _experienceController,
+                          hint: 'Experience',
+                          onChanged: (_) => setState(() {}),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        _ProfileTextField(
+                          controller: _aboutMeController,
+                          hint: 'Tell students a bit about yourself…',
+                          maxLines: 4,
+                          onChanged: (_) => setState(() {}),
+                        ),
+
+                        const SizedBox(height: 28),
+
+                        const _SectionHeader('Lesson pricing',
+                            trailing: 'UZS'),
+                        const SizedBox(height: 12),
+
+                        _PriceRow(
+                          minutes: 20,
+                          controller: _price20Controller,
+                          onChanged: (_) => setState(() {}),
+                        ),
+                        const SizedBox(height: 10),
+                        _PriceRow(
+                          minutes: 30,
+                          controller: _price30Controller,
+                          onChanged: (_) => setState(() {}),
+                        ),
+                        const SizedBox(height: 10),
+                        _PriceRow(
+                          minutes: 45,
+                          controller: _price45Controller,
+                          onChanged: (_) => setState(() {}),
+                        ),
+
+                        const SizedBox(height: 28),
+
+                        const _SectionHeader('Documents'),
                         const SizedBox(height: 12),
 
                         if (_certificateFileName != null)
                           _UploadedFileCard(
                             name: _certificateFileName!,
-                            onRemove: () =>
-                                setState(() => _certificateFileName = null),
+                            onRemove: () => setState(() {
+                              _certificateFile = null;
+                              _certificateFileName = null;
+                            }),
                           )
                         else
-                          _UploadButton(onTap: _pickCertificate),
+                          _UploadButton(
+                            onTap: _pickCertificate,
+                            label: 'Upload IELTS certificate',
+                            icon: Icons.description_outlined,
+                          ),
+
+                        const SizedBox(height: 10),
+
+                        if (_introVideoName != null)
+                          _UploadedFileCard(
+                            name: _introVideoName!,
+                            onRemove: () => setState(() {
+                              _introVideo = null;
+                              _introVideoName = null;
+                            }),
+                          )
+                        else
+                          _UploadButton(
+                            onTap: _pickIntroVideo,
+                            label: 'Upload intro video',
+                            icon: Icons.videocam_outlined,
+                          ),
                       ] else ...[
+                        const SizedBox(height: 12),
                         _DropdownField(
                           hint: 'English level',
                           value: _englishLevel,
@@ -366,9 +583,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       disabledBackgroundColor: const Color(0xFFE0E0E0),
                       foregroundColor: Colors.white,
                       disabledForegroundColor: const Color(0xFFAAAAAA),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.symmetric(vertical: 18),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(14)),
                       elevation: 0,
                     ),
                     child: _submitting
@@ -402,12 +619,14 @@ class _ProfileTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final int? maxLength;
+  final int maxLines;
   final void Function(String)? onChanged;
 
   const _ProfileTextField({
     required this.controller,
     required this.hint,
     this.maxLength,
+    this.maxLines = 1,
     this.onChanged,
   });
 
@@ -416,6 +635,7 @@ class _ProfileTextField extends StatelessWidget {
     return TextField(
       controller: controller,
       onChanged: onChanged,
+      maxLines: maxLines,
       inputFormatters: maxLength != null
           ? [LengthLimitingTextInputFormatter(maxLength!)]
           : null,
@@ -466,17 +686,11 @@ class _DropdownField extends StatelessWidget {
   final String hint;
   final String? value;
   final VoidCallback onTap;
-  final Color valueColor;
-  final bool showArrow;
-  final bool valueBadge;
 
   const _DropdownField({
     required this.hint,
     this.value,
     required this.onTap,
-    this.valueColor = const Color(0xFF272942),
-    this.showArrow = true,
-    this.valueBadge = false,
   });
 
   @override
@@ -502,39 +716,20 @@ class _DropdownField extends StatelessWidget {
             ),
             const Spacer(),
             if (value != null)
-              valueBadge
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        value!,
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: valueColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    )
-                  : Text(
-                      value!,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: valueColor,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-            if (showArrow) ...[
-              const SizedBox(width: 8),
-              const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: Color(0xFFAAAAAA),
-                size: 22,
+              Text(
+                value!,
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: Color(0xFF272942),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ],
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Color(0xFFAAAAAA),
+              size: 22,
+            ),
           ],
         ),
       ),
@@ -546,36 +741,381 @@ class _DropdownField extends StatelessWidget {
 
 class _UploadButton extends StatelessWidget {
   final VoidCallback onTap;
+  final String label;
+  final IconData icon;
 
-  const _UploadButton({required this.onTap});
+  const _UploadButton({
+    required this.onTap,
+    this.label = 'Upload file',
+    this.icon = Icons.file_upload_outlined,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: DottedBorderBox(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF272942).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: const Color(0xFF272942), size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: Color(0xFF272942),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Tap to choose a file',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFFAAAAAA),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: Color(0xFFCCCCCC),
+                size: 14,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Dotted border container ───────────────────────────────────────────────────
+
+class DottedBorderBox extends StatelessWidget {
+  final Widget child;
+
+  const DottedBorderBox({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DottedBorderPainter(),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Container(color: const Color(0xFFFCFCFD), child: child),
+      ),
+    );
+  }
+}
+
+class _DottedBorderPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFDDDDDD)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      const Radius.circular(14),
+    );
+    final path = Path()..addRRect(rrect);
+    const dashWidth = 5.0;
+    const dashSpace = 4.0;
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final end = distance + dashWidth;
+        canvas.drawPath(
+          metric.extractPath(distance, end.clamp(0, metric.length)),
+          paint,
+        );
+        distance = end + dashSpace;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ─── Overall score card ────────────────────────────────────────────────────────
+
+class _OverallScoreCard extends StatelessWidget {
+  final String? value;
+
+  const _OverallScoreCard({required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = value != null;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF272942),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.auto_awesome_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Overall IELTS',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Auto-calculated from sub-scores',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFAAAAAA),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              hasValue ? value! : '—',
+              style: TextStyle(
+                fontSize: 16,
+                color: hasValue
+                    ? const Color(0xFF272942)
+                    : const Color(0xFFCCCCCC),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Section header ────────────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String? trailing;
+
+  const _SectionHeader(this.title, {this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 18,
+          decoration: BoxDecoration(
+            color: const Color(0xFF272942),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF272942),
+          ),
+        ),
+        const Spacer(),
+        if (trailing != null)
+          Text(
+            trailing!,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFFAAAAAA),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ─── Photo picker ──────────────────────────────────────────────────────────────
+
+class _PhotoPicker extends StatelessWidget {
+  final File? photo;
+  final String? networkImageUrl;
+  final VoidCallback onTap;
+
+  const _PhotoPicker({
+    required this.photo,
+    required this.networkImageUrl,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF272942), width: 2),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.download_outlined, color: Color(0xFF272942), size: 18),
-            SizedBox(width: 8),
-            Text(
-              'Upload IELTS certificate',
-              style: TextStyle(
+      child: Stack(
+        alignment: Alignment.bottomRight,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0xFF272942),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+              ),
+              child: photo != null
+                  ? CircleAvatar(
+                      radius: 56,
+                      backgroundImage: FileImage(photo!),
+                    )
+                  : CachedAvatar(imageUrl: networkImageUrl, size: 112),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF272942),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 3),
+            ),
+            child: const Icon(
+              Icons.camera_alt_rounded,
+              color: Colors.white,
+              size: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Price row ─────────────────────────────────────────────────────────────────
+
+class _PriceRow extends StatelessWidget {
+  final int minutes;
+  final TextEditingController controller;
+  final void Function(String)? onChanged;
+
+  const _PriceRow({
+    required this.minutes,
+    required this.controller,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F7),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.schedule_rounded,
+                  size: 15,
+                  color: Color(0xFF272942),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '$minutes min',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF272942),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textAlign: TextAlign.right,
+              style: const TextStyle(
                 fontSize: 15,
                 color: Color(0xFF272942),
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: const InputDecoration(
+                hintText: '0',
+                hintStyle: TextStyle(
+                  fontSize: 15,
+                  color: Color(0xFFCCCCCC),
+                  fontWeight: FontWeight.w500,
+                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(vertical: 8),
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 6),
+          const Text(
+            'UZS',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFFAAAAAA),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -711,47 +1251,54 @@ class _DropdownSheet extends StatelessWidget {
         const SizedBox(height: 8),
         const Divider(height: 1, color: Color(0xFFEEEEEE)),
 
-        // Options
-        ...options.map((opt) {
-          final isSelected = opt == selected;
-          return InkWell(
-            onTap: () => onSelect(opt),
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              child: Row(
-                children: [
-                  Text(
-                    opt,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      color: Color(0xFF272942),
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSelected
-                          ? const Color(0xFFF5C542)
-                          : Colors.transparent,
-                      border: Border.all(
-                        color: isSelected
-                            ? const Color(0xFFF5C542)
-                            : const Color(0xFFCCCCCC),
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+        Flexible(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              bottom: 16 + MediaQuery.of(context).padding.bottom,
             ),
-          );
-        }),
-
-        const SizedBox(height: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: options.map((opt) {
+                final isSelected = opt == selected;
+                return InkWell(
+                  onTap: () => onSelect(opt),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 14),
+                    child: Row(
+                      children: [
+                        Text(
+                          opt,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: Color(0xFF272942),
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isSelected
+                                ? const Color(0xFFF5C542)
+                                : Colors.transparent,
+                            border: Border.all(
+                              color: isSelected
+                                  ? const Color(0xFFF5C542)
+                                  : const Color(0xFFCCCCCC),
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
       ],
     );
   }

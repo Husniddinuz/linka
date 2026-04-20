@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:developer' as dev;
 import 'package:http/http.dart' as http;
 import 'api_constants.dart';
 import 'auth_service.dart';
@@ -32,17 +31,9 @@ class ApiService {
         if (token != null) 'Authorization': 'Bearer $token',
       };
 
-  static void _logRequest(String method, String path, {String? body}) {
-    dev.log('══════════════════════════════════════');
-    dev.log('→ $method $path');
-    if (body != null) dev.log('→ BODY: $body');
-  }
+  static void _logRequest(String method, String path, {String? body}) {}
 
-  static void _logResponse(String method, String path, int statusCode, String body) {
-    dev.log('← $statusCode $method $path');
-    dev.log('← BODY: $body');
-    dev.log('══════════════════════════════════════');
-  }
+  static void _logResponse(String method, String path, int statusCode, String body) {}
 
   /// Attempts to refresh the access token. Returns the new token or null.
   static Future<String?> _tryRefreshToken() async {
@@ -184,7 +175,7 @@ class ApiService {
       final errors = <String>[];
       for (final entry in data.entries) {
         if (entry.value is List) {
-          errors.add((entry.value as List).join(', '));
+          errors.add('${entry.key}: ${(entry.value as List).join(', ')}');
         }
       }
       if (errors.isNotEmpty) errorMsg = errors.join('\n');
