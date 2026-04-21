@@ -7,8 +7,12 @@ import 'crop_screen.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
+import '../services/token_service.dart';
+import '../services/user_service.dart';
 import '../widgets/app_notify.dart';
 import 'home_screen.dart';
+import 'role_selection_screen.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   final String role;
@@ -30,13 +34,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _displayNameController = TextEditingController();
-  final _experienceController = TextEditingController();
   final _aboutMeController = TextEditingController();
   final _price20Controller = TextEditingController();
   final _price30Controller = TextEditingController();
   final _price45Controller = TextEditingController();
   String? _englishLevel;
   String? _gender;
+  int? _experience;
   String? _readingScore;
   String? _listeningScore;
   String? _writingScore;
@@ -50,6 +54,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   double _progress = 0;
 
   static const List<String> _bandOptions = ['7.0', '7.5', '8.0', '8.5', '9.0'];
+
+  static const Map<int, String> _experienceOptions = {
+    3: '1-3 years',
+    5: '3-5 years',
+    8: '5-8 years',
+    9: '8+ years',
+  };
 
   bool get _isTutor => widget.role == 'tutor';
 
@@ -79,7 +90,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       _listeningScore = _formatBand(p['listening_score']);
       _writingScore = _formatBand(p['writing_score']);
       _speakingScore = _formatBand(p['speaking_score']);
-      _experienceController.text = p['experience']?.toString() ?? '';
+      final rawExp = (p['experience'] as num?)?.toInt();
+      if (rawExp != null && _experienceOptions.containsKey(rawExp)) {
+        _experience = rawExp;
+      }
       _aboutMeController.text = p['about_me']?.toString() ?? '';
       _displayNameController.text = p['display_name']?.toString() ?? '';
 
@@ -166,7 +180,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           (_existingCertificateUrl != null &&
               _existingCertificateUrl!.isNotEmpty);
       return _computedIelts != null &&
-          _experienceController.text.trim().isNotEmpty &&
+          _experience != null &&
           hasPhoto &&
           hasCertificate;
     }
@@ -262,7 +276,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
       if (_isTutor) {
         body['ielts_score'] = double.tryParse(_computedIelts ?? '') ?? 0;
-        body['experience'] = _experienceController.text.trim();
+        body['experience'] = _experience;
         if (_readingScore != null) {
           body['reading_score'] = double.parse(_readingScore!);
         }
@@ -365,7 +379,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _displayNameController.dispose();
-    _experienceController.dispose();
     _aboutMeController.dispose();
     _price20Controller.dispose();
     _price30Controller.dispose();
@@ -373,25 +386,55 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     super.dispose();
   }
 
+  Future<void> _handleBack() async {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+    try {
+      final access = await TokenService.getAccessToken();
+      final refresh = await TokenService.getRefreshToken();
+      if (access != null && refresh != null) {
+        await AuthService.logout(refreshToken: refresh, accessToken: access);
+      }
+    } catch (_) {
+      // best-effort
+    }
+    await TokenService.clearTokens();
+    await UserService.clear();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
           backgroundColor: Colors.white,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          centerTitle: true,
-          leading: IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_rounded,
-              color: Color(0xFF272942),
-              size: 20,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            centerTitle: true,
+            automaticallyImplyLeading: false,
+            leading: IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_rounded,
+                color: Color(0xFF272942),
+                size: 20,
+              ),
+              onPressed: _handleBack,
             ),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
           title: const Text(
             'Profile Setup',
             style: TextStyle(
@@ -541,10 +584,23 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         const _SectionHeader('About you'),
                         const SizedBox(height: 12),
 
-                        _ProfileTextField(
-                          controller: _experienceController,
+                        _DropdownField(
                           hint: 'Experience',
-                          onChanged: (_) => setState(() {}),
+                          value: _experience != null
+                              ? _experienceOptions[_experience]
+                              : null,
+                          onTap: () => _openDropdown(
+                            title: 'Experience',
+                            options: _experienceOptions.values.toList(),
+                            selected: _experience != null
+                                ? _experienceOptions[_experience]
+                                : null,
+                            onSelect: (v) {
+                              _experience = _experienceOptions.entries
+                                  .firstWhere((e) => e.value == v)
+                                  .key;
+                            },
+                          ),
                         ),
 
                         const SizedBox(height: 12),
@@ -695,6 +751,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

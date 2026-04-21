@@ -51,7 +51,11 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 
   // ── WebRTC ──
   RTCPeerConnection? _pc;
-  bool _isCaller = false;
+  bool _offerInFlight = false;
+  // Reentrancy guard: _connectWaitingRoom is triggered from multiple paths
+  // (Next button, peer-left, pc state change). Without this, concurrent calls
+  // race on _matchWs and throw "Stream has already been listened to".
+  bool _reconnecting = false;
   int? _sessionId;
   List<Map<String, dynamic>> _iceServers = const [
     {'urls': 'stun:stun.l.google.com:19302'},
@@ -126,41 +130,54 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   // ─── Matchmaking (waiting-room WS) ──────────────────────────────────────
 
   Future<void> _connectWaitingRoom() async {
-    dev.log('══════════════════════════════════════');
-    dev.log('MATCH → connecting waiting room');
-    await _teardownSession();
-
-    setState(() {
-      _isConnected = false;
-      _remoteName = null;
-      _remoteCameraOn = true;
-      _sessionId = null;
-    });
-
-    final token = await TokenService.getAccessToken();
-    if (token == null) {
-      dev.log('MATCH → no access token');
+    if (_reconnecting) {
+      dev.log('MATCH → skip (already reconnecting)');
       return;
     }
-    if (!mounted) return;
-
-    final apiUri = Uri.parse(apiBaseUrl);
-    final wsScheme = apiUri.scheme == 'https' ? 'wss' : 'ws';
-    final url = '$wsScheme://${apiUri.host}/ws/waiting-room/?token=$token';
-
+    _reconnecting = true;
     try {
-      _matchWs = WebSocketChannel.connect(Uri.parse(url));
-      await _matchWs!.ready;
+      dev.log('══════════════════════════════════════');
+      dev.log('MATCH → connecting waiting room');
+      await _teardownSession();
+
+      if (!mounted) return;
+      setState(() {
+        _isConnected = false;
+        _remoteName = null;
+        _remoteCameraOn = true;
+        _sessionId = null;
+      });
+
+      final token = await TokenService.getAccessToken();
+      if (token == null) {
+        dev.log('MATCH → no access token');
+        return;
+      }
+      if (!mounted) return;
+
+      final apiUri = Uri.parse(apiBaseUrl);
+      final wsScheme = apiUri.scheme == 'https' ? 'wss' : 'ws';
+      final partnerGender = switch (_genderFilter) {
+        GenderFilter.female => 'Female',
+        GenderFilter.male => 'Male',
+        GenderFilter.all => 'Any',
+      };
+      final url =
+          '$wsScheme://${apiUri.host}/ws/waiting-room/?token=$token&partner_gender=$partnerGender';
+
+      final ws = WebSocketChannel.connect(Uri.parse(url));
+      _matchWs = ws;
+      await ws.ready;
       dev.log('MATCH → connected');
-      _matchSub = _matchWs!.stream.listen(
+      _matchSub = ws.stream.listen(
         _handleMatchMessage,
         onError: (e) {
           dev.log('MATCH → error: $e');
           if (mounted) _showError('Connection error. Please try again.');
         },
         onDone: () {
-          dev.log('MATCH → closed (code=${_matchWs?.closeCode})');
-          if (mounted && _matchWs?.closeCode == 4001) {
+          dev.log('MATCH → closed (code=${ws.closeCode})');
+          if (mounted && ws.closeCode == 4001) {
             _showError('Authentication failed. Please re-login.');
           }
         },
@@ -168,6 +185,8 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     } catch (e) {
       dev.log('MATCH → connect failed: $e');
       if (mounted) _showError('Could not connect to server.');
+    } finally {
+      _reconnecting = false;
     }
   }
 
@@ -178,9 +197,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 
     switch (type) {
       case 'match_found':
-        final roomId = (data['room_id'] ?? data['room'])?.toString();
-        final isCaller = (data['is_caller'] as bool?) ??
-            (data['role']?.toString() == 'caller');
+        final roomId = (data['room_id'] ?? data['webrtc_room'] ?? data['webrtc_room_id'] ?? data['room'])?.toString();
         final partner = data['partner_name'] as String?;
         final sessionId = data['session_id'] as int?;
         if (roomId == null) {
@@ -189,9 +206,9 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
           return;
         }
         setState(() {
-          _isCaller = isCaller;
           _remoteName = partner ?? 'Partner';
           _sessionId = sessionId;
+          _offerInFlight = false;
         });
         _startSignaling(roomId);
         break;
@@ -273,7 +290,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
           state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected ||
           state == RTCPeerConnectionState.RTCPeerConnectionStateClosed) {
-        if (!_isStopping && mounted) {
+        if (!_isStopping && !_reconnecting && mounted) {
           dev.log('PC → peer lost, returning to waiting room');
           _connectWaitingRoom();
         }
@@ -324,18 +341,34 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       return;
     }
     final type = msg['type'] as String?;
-    dev.log('SIG WS ← $type');
+    dev.log('SIG WS ← $type | $msg');
 
     switch (type) {
-      case 'joined':
       case 'auth_ok':
-        // waiting for peer
+        break;
+
+      case 'joined':
+        // Server confirms we're in the room. If it includes a non-empty peers
+        // list, someone was here before us — we are the answerer and should
+        // wait for their offer. Otherwise, we wait for peer-joined.
+        final peersOnJoin = msg['peers'];
+        if (peersOnJoin is List && peersOnJoin.isNotEmpty) {
+          dev.log('PC → joined as second peer, waiting for offer');
+        } else {
+          dev.log('PC → joined as first peer, waiting for peer-joined');
+        }
         break;
 
       case 'peers':
+        // Explicit list of existing peers — we joined second, wait for offer.
+        final peerList = msg['peers'];
+        dev.log('PC → peers list=${peerList is List ? peerList.length : '?'} (answerer)');
+        break;
+
       case 'peer-joined':
-        // If we are the caller, start the offer once peer is present
-        if (_isCaller && _pc != null) {
+      case 'peer_joined':
+        // Another peer arrived after us — we drive the offer.
+        if (_pc != null && !_offerInFlight) {
           await _makeOffer();
         }
         break;
@@ -366,7 +399,8 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 
   Future<void> _makeOffer() async {
     final pc = _pc;
-    if (pc == null) return;
+    if (pc == null || _offerInFlight) return;
+    _offerInFlight = true;
     try {
       final offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
@@ -374,6 +408,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       dev.log('PC → offer sent');
     } catch (e) {
       dev.log('PC → makeOffer failed: $e');
+      _offerInFlight = false;
     }
   }
 
@@ -449,6 +484,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   Future<void> _teardownSession() async {
     await _sigSub?.cancel();
     _sigSub = null;
+    try { _sigWs?.sink.add(jsonEncode({'type': 'leave'})); } catch (_) {}
     try { _sigWs?.sink.close(); } catch (_) {}
     _sigWs = null;
 
@@ -527,8 +563,10 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       builder: (_) => _GenderFilterSheet(
         selected: _genderFilter,
         onSelected: (g) {
-          setState(() => _genderFilter = g);
           Navigator.pop(context);
+          if (g == _genderFilter) return;
+          setState(() => _genderFilter = g);
+          _connectWaitingRoom();
         },
       ),
     );

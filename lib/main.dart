@@ -16,11 +16,6 @@ import 'widgets/app_notify.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  await JustAudioBackground.init(
-    androidNotificationChannelId: 'com.linka.app.channel.audio',
-    androidNotificationChannelName: 'Linka Podcasts',
-    androidNotificationOngoing: true,
-  );
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -51,7 +46,23 @@ void main() async {
 
   final isLoggedIn = await TokenService.isLoggedIn();
 
-  // Register FCM token if already logged in
+  runApp(LinkaApp(isLoggedIn: isLoggedIn));
+}
+
+// Runs deferred startup work after the first frame so a hanging plugin
+// (e.g. JustAudioBackground on Android 16, or a slow FCM token fetch) can
+// never freeze the native splash.
+Future<void> _initDeferredServices({required bool isLoggedIn}) async {
+  try {
+    await JustAudioBackground.init(
+      androidNotificationChannelId: 'com.linka.app.channel.audio',
+      androidNotificationChannelName: 'Linka Podcasts',
+      androidNotificationOngoing: true,
+    );
+  } catch (e) {
+    debugPrint('JustAudioBackground init failed: $e');
+  }
+
   if (isLoggedIn) {
     try {
       await NotificationService.registerDevice();
@@ -60,8 +71,6 @@ void main() async {
       debugPrint('FCM registration skipped: $e');
     }
   }
-
-  runApp(LinkaApp(isLoggedIn: isLoggedIn));
 }
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -84,6 +93,9 @@ class _LinkaAppState extends State<LinkaApp> {
     super.initState();
     _appLinks = AppLinks();
     _initDeepLinks();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initDeferredServices(isLoggedIn: widget.isLoggedIn);
+    });
   }
 
   Future<void> _initDeepLinks() {

@@ -45,28 +45,32 @@ class _TutorCard {
 
 class _TutorFilters {
   final String? gender;
-  final String? ieltsScore;
+  final List<String> ieltsScores;
   final int? experienceMin;
   final int? experienceMax;
   final String? search;
 
   const _TutorFilters({
     this.gender,
-    this.ieltsScore,
+    this.ieltsScores = const [],
     this.experienceMin,
     this.experienceMax,
     this.search,
   });
 
   String toQueryString() {
-    final params = <String, String>{};
-    if (gender != null) params['gender'] = gender!;
-    if (ieltsScore != null) params['ielts_score'] = ieltsScore!;
-    if (experienceMin != null) params['experience_min'] = '$experienceMin';
-    if (experienceMax != null) params['experience_max'] = '$experienceMax';
-    if (search != null && search!.isNotEmpty) params['search'] = search!;
-    if (params.isEmpty) return '';
-    return '?${params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&')}';
+    final parts = <String>[];
+    if (gender != null) parts.add('gender=${Uri.encodeComponent(gender!)}');
+    for (final score in ieltsScores) {
+      parts.add('ielts_scores=${Uri.encodeComponent(score)}');
+    }
+    if (experienceMin != null) parts.add('experience_min=$experienceMin');
+    if (experienceMax != null) parts.add('experience_max=$experienceMax');
+    if (search != null && search!.isNotEmpty) {
+      parts.add('search=${Uri.encodeComponent(search!)}');
+    }
+    if (parts.isEmpty) return '';
+    return '?${parts.join('&')}';
   }
 }
 
@@ -232,7 +236,7 @@ class _TutorsScreenState extends State<TutorsScreen> {
           _filters.gender!,
           () => _applyFilters(
             _TutorFilters(
-              ieltsScore: _filters.ieltsScore,
+              ieltsScores: _filters.ieltsScores,
               experienceMin: _filters.experienceMin,
               experienceMax: _filters.experienceMax,
               search: _filters.search,
@@ -242,13 +246,16 @@ class _TutorsScreenState extends State<TutorsScreen> {
       );
     }
 
-    if (_filters.ieltsScore != null) {
+    for (final score in _filters.ieltsScores) {
       chips.add(
         _activeFilterChip(
-          'IELTS ${_filters.ieltsScore!}',
+          'IELTS $score',
           () => _applyFilters(
             _TutorFilters(
               gender: _filters.gender,
+              ieltsScores: _filters.ieltsScores
+                  .where((s) => s != score)
+                  .toList(),
               experienceMin: _filters.experienceMin,
               experienceMax: _filters.experienceMax,
               search: _filters.search,
@@ -268,7 +275,7 @@ class _TutorsScreenState extends State<TutorsScreen> {
           () => _applyFilters(
             _TutorFilters(
               gender: _filters.gender,
-              ieltsScore: _filters.ieltsScore,
+              ieltsScores: _filters.ieltsScores,
               search: _filters.search,
             ),
           ),
@@ -868,7 +875,7 @@ class _FilterSheetState extends State<_FilterSheet> {
 
   final Set<String> _selectedTimes = {};
   final Set<String> _selectedDays = {};
-  String? _selectedScore;
+  final Set<String> _selectedScores = {};
   String? _selectedGender;
   String? _selectedExperience;
 
@@ -876,7 +883,7 @@ class _FilterSheetState extends State<_FilterSheet> {
   void initState() {
     super.initState();
     _selectedGender = widget.filters.gender;
-    _selectedScore = widget.filters.ieltsScore;
+    _selectedScores.addAll(widget.filters.ieltsScores);
     // Restore experience label from min/max
     if (widget.filters.experienceMin != null) {
       for (final entry in _experienceRanges.entries) {
@@ -899,7 +906,7 @@ class _FilterSheetState extends State<_FilterSheet> {
     }
     return _TutorFilters(
       gender: _selectedGender,
-      ieltsScore: _selectedScore,
+      ieltsScores: _selectedScores.toList()..sort(),
       experienceMin: expMin,
       experienceMax: expMax,
     );
@@ -1069,10 +1076,14 @@ class _FilterSheetState extends State<_FilterSheet> {
                   .map(
                     (s) => _chipButton(
                       s,
-                      _selectedScore == s,
-                      () => setState(
-                        () => _selectedScore = _selectedScore == s ? null : s,
-                      ),
+                      _selectedScores.contains(s),
+                      () => setState(() {
+                        if (_selectedScores.contains(s)) {
+                          _selectedScores.remove(s);
+                        } else {
+                          _selectedScores.add(s);
+                        }
+                      }),
                     ),
                   )
                   .toList(),
@@ -1138,7 +1149,7 @@ class _FilterSheetState extends State<_FilterSheet> {
               builder: (_) {
                 final hasSelection =
                     _selectedTimes.isNotEmpty ||
-                    _selectedScore != null ||
+                    _selectedScores.isNotEmpty ||
                     _selectedGender != null ||
                     _selectedExperience != null ||
                     _selectedDays.isNotEmpty;
