@@ -3,73 +3,148 @@ import 'package:video_player/video_player.dart';
 import 'tutor_profile_screen.dart';
 import 'home_screen.dart';
 
-class StoryViewerScreen extends StatefulWidget {
+class StoryTutor {
   final int tutorId;
-  final String tutorName;
-  final String? tutorImage;
+  final String name;
+  final String? image;
   final List<StoryData> stories;
+  const StoryTutor({
+    required this.tutorId,
+    required this.name,
+    this.image,
+    required this.stories,
+  });
+}
+
+class StoryViewerScreen extends StatefulWidget {
+  final List<StoryTutor> tutors;
+  final int initialTutorIndex;
+  final void Function(int tutorId)? onTutorViewed;
 
   const StoryViewerScreen({
     super.key,
-    required this.tutorId,
-    required this.tutorName,
-    this.tutorImage,
-    required this.stories,
+    required this.tutors,
+    this.initialTutorIndex = 0,
+    this.onTutorViewed,
   });
 
   @override
   State<StoryViewerScreen> createState() => _StoryViewerScreenState();
 }
 
-class _StoryViewerScreenState extends State<StoryViewerScreen> {
-  int _currentIndex = 0;
-  VideoPlayerController? _videoController;
+class _StoryViewerScreenState extends State<StoryViewerScreen>
+    with SingleTickerProviderStateMixin {
+  static const Duration _imageDuration = Duration(seconds: 15);
 
-  StoryData get _current => widget.stories[_currentIndex];
+  late int _tutorIndex;
+  int _storyIndex = 0;
+  VideoPlayerController? _videoController;
+  late final AnimationController _progress;
+
+  StoryTutor get _tutor => widget.tutors[_tutorIndex];
+  StoryData get _current => _tutor.stories[_storyIndex];
 
   @override
   void initState() {
     super.initState();
+    _tutorIndex = widget.initialTutorIndex;
+    _progress = AnimationController(vsync: this, duration: _imageDuration);
+    _notifyTutorViewed();
     _initMedia();
   }
 
   @override
   void dispose() {
+    _progress.dispose();
+    _videoController?.removeListener(_onVideoTick);
     _videoController?.dispose();
     super.dispose();
   }
 
+  void _notifyTutorViewed() {
+    widget.onTutorViewed?.call(_tutor.tutorId);
+  }
+
   void _initMedia() {
+    _progress.stop();
+    _progress.value = 0;
+    _videoController?.removeListener(_onVideoTick);
     _videoController?.dispose();
     _videoController = null;
+
     if (_current.mediaType == 'video') {
-      _videoController = VideoPlayerController.networkUrl(Uri.parse(_current.mediaFile))
-        ..initialize().then((_) {
-          if (!mounted) return;
-          setState(() {});
-          _videoController!.play();
-          _videoController!.setLooping(true);
-        });
+      final controller = VideoPlayerController.networkUrl(Uri.parse(_current.mediaFile));
+      _videoController = controller;
+      controller.initialize().then((_) {
+        if (!mounted || _videoController != controller) return;
+        setState(() {});
+        _progress.duration = controller.value.duration == Duration.zero
+            ? _imageDuration
+            : controller.value.duration;
+        controller.play();
+        controller.addListener(_onVideoTick);
+      });
+    } else {
+      _progress.duration = _imageDuration;
+      _progress.forward(from: 0).whenCompleteOrCancel(() {
+        if (!mounted) return;
+        if (_progress.status == AnimationStatus.completed) _advance();
+      });
     }
   }
 
-  void _goTo(int index) {
-    if (index < 0 || index >= widget.stories.length) {
+  void _onVideoTick() {
+    final controller = _videoController;
+    if (controller == null || !controller.value.isInitialized) return;
+    final duration = controller.value.duration;
+    if (duration <= Duration.zero) return;
+    final ratio = controller.value.position.inMilliseconds / duration.inMilliseconds;
+    _progress.value = ratio.clamp(0.0, 1.0);
+    if (controller.value.position >= duration) {
+      controller.removeListener(_onVideoTick);
+      _advance();
+    }
+  }
+
+  void _advance() {
+    if (_storyIndex + 1 < _tutor.stories.length) {
+      setState(() => _storyIndex++);
+      _initMedia();
+    } else if (_tutorIndex + 1 < widget.tutors.length) {
+      setState(() {
+        _tutorIndex++;
+        _storyIndex = 0;
+      });
+      _notifyTutorViewed();
+      _initMedia();
+    } else {
       Navigator.of(context).pop();
-      return;
     }
-    setState(() => _currentIndex = index);
-    _initMedia();
   }
 
-  void _onTapLeft() => _goTo(_currentIndex - 1);
-  void _onTapRight() => _goTo(_currentIndex + 1);
+  void _goBack() {
+    if (_storyIndex > 0) {
+      setState(() => _storyIndex--);
+      _initMedia();
+    } else if (_tutorIndex > 0) {
+      setState(() {
+        _tutorIndex--;
+        _storyIndex = widget.tutors[_tutorIndex].stories.length - 1;
+      });
+      _notifyTutorViewed();
+      _initMedia();
+    }
+  }
+
+  void _onTapLeft() => _goBack();
+  void _onTapRight() => _advance();
 
   void _onBookClass() {
+    final id = _tutor.tutorId;
     Navigator.of(context).pop();
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => TutorProfileScreen(tutorId: widget.tutorId),
+        builder: (_) => TutorProfileScreen(tutorId: id),
       ),
     );
   }
@@ -78,6 +153,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final stories = _tutor.stories;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -154,32 +230,50 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
             ),
 
             // Progress indicators
-            if (widget.stories.length > 1)
-              Positioned(
-                top: topPadding + 8,
-                left: 16,
-                right: 16,
-                child: Row(
-                  children: List.generate(widget.stories.length, (i) {
+            Positioned(
+              top: topPadding + 8,
+              left: 16,
+              right: 16,
+              child: AnimatedBuilder(
+                animation: _progress,
+                builder: (_, _) => Row(
+                  children: List.generate(stories.length, (i) {
+                    final double value;
+                    if (i < _storyIndex) {
+                      value = 1;
+                    } else if (i == _storyIndex) {
+                      value = _progress.value;
+                    } else {
+                      value = 0;
+                    }
                     return Expanded(
                       child: Container(
                         height: 3,
                         margin: const EdgeInsets.symmetric(horizontal: 2),
                         decoration: BoxDecoration(
-                          color: i <= _currentIndex
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.3),
+                          color: Colors.white.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(2),
+                        ),
+                        child: FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: value,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
                         ),
                       ),
                     );
                   }),
                 ),
               ),
+            ),
 
             // Top bar: avatar + name + close
             Positioned(
-              top: topPadding + (widget.stories.length > 1 ? 20 : 12),
+              top: topPadding + 20,
               left: 16,
               right: 16,
               child: Row(
@@ -193,9 +287,9 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                       border: Border.all(color: Colors.white, width: 1.5),
                     ),
                     child: ClipOval(
-                      child: widget.tutorImage != null && widget.tutorImage!.startsWith('http')
+                      child: _tutor.image != null && _tutor.image!.startsWith('http')
                           ? Image.network(
-                              widget.tutorImage!,
+                              _tutor.image!,
                               fit: BoxFit.cover,
                               width: 40,
                               height: 40,
@@ -215,7 +309,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                   // Name
                   Expanded(
                     child: Text(
-                      widget.tutorName,
+                      _tutor.name,
                       style: const TextStyle(
                         fontFamily: 'SF Pro',
                         fontSize: 16,

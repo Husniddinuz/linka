@@ -88,6 +88,21 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
 
   bool get _canProceed => _selectedDate != null && _selectedWindow != null;
 
+  bool _isWindowPast(String window) {
+    final date = _selectedDate;
+    if (date == null) return false;
+    final now = DateTime.now();
+    final isToday = date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
+    if (!isToday) return false;
+    final parts = window.split(' - ')[0].split(':');
+    final h = int.parse(parts[0]);
+    final m = int.parse(parts[1]);
+    final start = DateTime(date.year, date.month, date.day, h, m);
+    return !start.isAfter(now);
+  }
+
   void _showTimePicker() {
     if (_selectedWindow == null) return;
     final parts = _startTime!.split(':');
@@ -478,36 +493,49 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _windows.map((w) {
-            final selected = w == _selectedWindow;
-            return GestureDetector(
-              onTap: () => setState(() => _selectedWindow = w),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: selected ? const Color(0xFF272942) : Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: selected ? const Color(0xFF272942) : const Color(0xFFDDDDDD),
-                    width: 1.5,
-                  ),
-                ),
-                child: Text(
-                  w,
-                  style: TextStyle(
-                    fontFamily: 'SF Pro',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: selected ? Colors.white : const Color(0xFF272942),
-                  ),
-                ),
+        Builder(builder: (_) {
+          final visible = _windows.where((w) => !_isWindowPast(w)).toList();
+          if (visible.isEmpty) {
+            return const Text(
+              'No available windows for this day',
+              style: TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 14,
+                color: Color(0xFF9E9E9E),
               ),
             );
-          }).toList(),
-        ),
+          }
+          return Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: visible.map((w) {
+              final selected = w == _selectedWindow;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedWindow = w),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: selected ? const Color(0xFF272942) : Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: selected ? const Color(0xFF272942) : const Color(0xFFDDDDDD),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Text(
+                    w,
+                    style: TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: selected ? Colors.white : const Color(0xFF272942),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          );
+        }),
       ],
     );
   }

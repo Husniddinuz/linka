@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:just_audio/just_audio.dart';
 import '../services/api_service.dart';
+import '../services/podcast_playback_service.dart';
 
 class PodcastPlayerScreen extends StatefulWidget {
   final int podcastId;
@@ -21,7 +22,11 @@ class PodcastPlayerScreen extends StatefulWidget {
 }
 
 class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
-  final AudioPlayer _player = AudioPlayer();
+  final _service = PodcastPlaybackService.instance;
+  StreamSubscription<Duration>? _positionSub;
+  StreamSubscription<Duration?>? _durationSub;
+  StreamSubscription<PlayerState>? _stateSub;
+  StreamSubscription<PlayerState>? _sleepSub;
 
   bool _loading = true;
   String _title = '';
@@ -37,54 +42,67 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPodcast();
+    _bindStreams();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadPodcast());
+  }
+
+  void _bindStreams() {
+    _positionSub = _service.positionStream.listen((pos) {
+      if (!mounted) return;
+      setState(() => _position = pos);
+    });
+    _durationSub = _service.durationStream.listen((d) {
+      if (!mounted || d == null) return;
+      setState(() => _totalDuration = d);
+    });
+    _stateSub = _service.playerStateStream.listen((state) {
+      if (!mounted) return;
+      setState(() => _playing = state.playing);
+    });
   }
 
   Future<void> _loadPodcast() async {
     try {
+      final existing = _service.currentTrack.value;
+      if (existing != null && existing.id == widget.podcastId) {
+        _title = existing.title;
+        _totalDuration = _service.duration;
+        _position = _service.position;
+        _playing = _service.isPlaying;
+        _speed = _service.player.speed;
+        _muted = _service.player.volume == 0.0;
+        setState(() => _loading = false);
+        return;
+      }
+
       String? audioUrl = widget.initialAudioUrl;
+      String? imageUrl;
       _title = widget.initialTitle ?? '';
 
       if (audioUrl == null || audioUrl.isEmpty) {
-        final data = await ApiService.get('/content/podcasts/${widget.podcastId}/');
+        final data =
+            await ApiService.get('/content/podcasts/${widget.podcastId}/');
         if (!mounted) return;
         final podcast = data['data'] as Map<String, dynamic>? ?? data;
         _title = podcast['title'] as String? ?? '';
         audioUrl = podcast['audio_url'] as String?;
+        imageUrl = podcast['image_url'] as String? ??
+            podcast['cover_url'] as String?;
       }
 
       if (audioUrl != null && audioUrl.isNotEmpty) {
-        final duration = await _player.setUrl(audioUrl);
-        if (duration != null) {
-          _totalDuration = duration;
-        }
+        await _service.load(PodcastTrack(
+          id: widget.podcastId,
+          title: _title,
+          audioUrl: audioUrl,
+          imageUrl: imageUrl,
+        ));
+        _service.play();
       }
 
-      _player.positionStream.listen((pos) {
-        if (!mounted) return;
-        setState(() => _position = pos);
-      });
-
-      _player.playerStateStream.listen((state) {
-        if (!mounted) return;
-        setState(() {
-          _playing = state.playing;
-          if (state.processingState == ProcessingState.completed) {
-            _playing = false;
-            _position = Duration.zero;
-            _player.seek(Duration.zero);
-            _player.pause();
-          }
-        });
-      });
-
-      _player.durationStream.listen((d) {
-        if (!mounted || d == null) return;
-        setState(() => _totalDuration = d);
-      });
-
+      if (!mounted) return;
       setState(() => _loading = false);
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
     }
@@ -93,39 +111,42 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
   @override
   void dispose() {
     _sleepTimer?.cancel();
-    _player.dispose();
+    _sleepSub?.cancel();
+    _positionSub?.cancel();
+    _durationSub?.cancel();
+    _stateSub?.cancel();
     super.dispose();
   }
 
   void _togglePlay() {
     if (_playing) {
-      _player.pause();
+      _service.pause();
     } else {
-      _player.play();
+      _service.play();
     }
   }
 
   void _seekForward() {
     final newPos = _position + const Duration(seconds: 15);
-    _player.seek(newPos > _totalDuration ? _totalDuration : newPos);
+    _service.seek(newPos > _totalDuration ? _totalDuration : newPos);
   }
 
   void _seekBackward() {
     final newPos = _position - const Duration(seconds: 15);
-    _player.seek(newPos < Duration.zero ? Duration.zero : newPos);
+    _service.seek(newPos < Duration.zero ? Duration.zero : newPos);
   }
 
   void _toggleMute() {
     setState(() {
       _muted = !_muted;
-      _player.setVolume(_muted ? 0.0 : 1.0);
+      _service.setVolume(_muted ? 0.0 : 1.0);
     });
   }
 
   void _cycleSpeed() {
     setState(() {
       _speed = _speed == 1.0 ? 1.5 : _speed == 1.5 ? 2.0 : 1.0;
-      _player.setSpeed(_speed);
+      _service.setSpeed(_speed);
     });
   }
 
@@ -141,24 +162,23 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
         onSelected: (label, duration) {
           Navigator.pop(context);
           _sleepTimer?.cancel();
+          _sleepSub?.cancel();
           if (duration == null) {
             setState(() => _sleepLabel = 'Off');
             return;
           }
           setState(() => _sleepLabel = label);
           if (label == 'At the end of the release') {
-            // Pause when current track ends
-            late final StreamSubscription<PlayerState> sub;
-            sub = _player.playerStateStream.listen((state) {
+            _sleepSub = _service.playerStateStream.listen((state) {
               if (state.processingState == ProcessingState.completed) {
-                sub.cancel();
-                _player.pause();
+                _sleepSub?.cancel();
+                _service.pause();
                 if (mounted) setState(() => _sleepLabel = 'Off');
               }
             });
           } else {
             _sleepTimer = Timer(duration, () {
-              _player.pause();
+              _service.pause();
               if (mounted) setState(() => _sleepLabel = 'Off');
             });
           }
@@ -186,11 +206,9 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
       child: Scaffold(
       backgroundColor: const Color(0xFF272942),
       body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFFF5C542)))
-            : Column(
-                children: [
-                  // App bar
+        child: Column(
+              children: [
+                  // App bar (always visible)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     child: Row(
@@ -211,19 +229,34 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                           ),
                         ),
                         IconButton(
-                          onPressed: _toggleMute,
+                          onPressed: _loading ? null : _toggleMute,
                           icon: SvgPicture.asset(
                             _muted
                                 ? 'assets/images/buttons/volume-off.svg'
                                 : 'assets/images/buttons/volume-on.svg',
                             width: 24,
                             height: 24,
-                            colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                            colorFilter: ColorFilter.mode(
+                              _loading
+                                  ? Colors.white.withValues(alpha: 0.3)
+                                  : Colors.white,
+                              BlendMode.srcIn,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
+
+                  if (_loading)
+                    const Expanded(
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFFF5C542),
+                        ),
+                      ),
+                    )
+                  else ...[
 
                   // Podcast image + title
                   Expanded(
@@ -402,7 +435,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                                 ? _totalDuration.inMilliseconds.toDouble()
                                 : 1,
                             onChanged: (v) {
-                              _player.seek(Duration(milliseconds: v.toInt()));
+                              _service.seek(Duration(milliseconds: v.toInt()));
                             },
                           ),
                         ),
@@ -431,6 +464,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                   ),
 
                   const SizedBox(height: 32),
+                  ],
                 ],
               ),
       ),

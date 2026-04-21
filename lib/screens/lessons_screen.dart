@@ -1,7 +1,9 @@
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
 import '../widgets/lesson_card.dart';
+import 'lesson_meeting_screen.dart';
 
 // ─── Screen ─────────────────────────────────────────────────────────────────────
 
@@ -33,6 +35,7 @@ class _LessonsScreenState extends State<LessonsScreen> {
       final data = await ApiService.get(
         '/bookings/calendar/?year=${_focusedMonth.year}&month=${_focusedMonth.month}',
       );
+      developer.log('[LessonsScreen] GET /bookings/calendar/ -> $data', name: 'lessons');
       final days = <int>{};
       final raw = data['busy_dates'] ?? data['busy_days'];
       if (raw is List) {
@@ -65,6 +68,7 @@ class _LessonsScreenState extends State<LessonsScreen> {
     setState(() => _loadingBookings = true);
     try {
       final list = await ApiService.getList('/bookings/my/');
+      developer.log('[LessonsScreen] GET /bookings/my/ -> $list', name: 'lessons');
       if (mounted) {
         setState(() {
           _bookings = list.cast<Map<String, dynamic>>();
@@ -125,7 +129,8 @@ class _LessonsScreenState extends State<LessonsScreen> {
     if (confirm != true) return;
 
     try {
-      await ApiService.patch('/bookings/$bookingId/cancel/');
+      final result = await ApiService.patch('/bookings/$bookingId/cancel/');
+      developer.log('[LessonsScreen] PATCH /bookings/$bookingId/cancel/ -> $result', name: 'lessons');
       _fetchCalendar();
       _fetchBookings();
     } on ApiException catch (e) {
@@ -135,12 +140,28 @@ class _LessonsScreenState extends State<LessonsScreen> {
     }
   }
 
-  Future<void> _joinLesson(int bookingId) async {
+  Future<void> _joinLesson(int bookingId, {String tutorName = 'Tutor'}) async {
     try {
       final data = await ApiService.post('/bookings/$bookingId/join/', {});
-      final roomUrl = data['room_url']?.toString() ?? '';
-      final token = data['token']?.toString() ?? '';
-      if (roomUrl.isEmpty || token.isEmpty) {
+      developer.log('[LessonsScreen] POST /bookings/$bookingId/join/ -> $data', name: 'lessons');
+      final payload = (data['data'] is Map<String, dynamic>)
+          ? data['data'] as Map<String, dynamic>
+          : data;
+      final roomUrl = (payload['joinUrl'] ??
+              payload['join_url'] ??
+              payload['room_url'] ??
+              payload['daily_room_url'] ??
+              payload['roomUrl'] ??
+              '')
+          .toString();
+      final token = (payload['token'] ??
+              payload['daily_token'] ??
+              payload['meeting_token'] ??
+              payload['daily_meeting_token'] ??
+              '')
+          .toString();
+      if (roomUrl.isEmpty) {
+        developer.log('[LessonsScreen] join payload missing room_url: $payload', name: 'lessons');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Could not get room info')),
@@ -148,7 +169,16 @@ class _LessonsScreenState extends State<LessonsScreen> {
         }
         return;
       }
-      // TODO: Navigate to video call screen with roomUrl and token
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => LessonMeetingScreen(
+            roomUrl: roomUrl,
+            token: token,
+            tutorName: tutorName,
+          ),
+        ),
+      );
     } on ApiException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -181,7 +211,13 @@ class _LessonsScreenState extends State<LessonsScreen> {
 
             // Scrollable content
             Expanded(
-              child: SingleChildScrollView(
+              child: RefreshIndicator(
+                color: const Color(0xFF272942),
+                onRefresh: () async {
+                  await Future.wait([_fetchCalendar(), _fetchBookings()]);
+                },
+                child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -231,19 +267,17 @@ class _LessonsScreenState extends State<LessonsScreen> {
                             )
                           else if (dayBookings.isNotEmpty)
                             ...dayBookings.map((booking) {
-                              final now = DateTime.now();
-                              final isToday = _focusedMonth.month == now.month &&
-                                  _focusedMonth.year == now.year &&
-                                  _selectedDay == now.day;
                               final roomUrl = booking['daily_room_url']?.toString() ?? '';
                               final lesson = Lesson.fromBooking(booking);
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: LessonCard(
                                   lesson: lesson,
-                                  showStartButton: isToday && roomUrl.isNotEmpty,
+                                  showStartButton: roomUrl.isNotEmpty,
                                   onStart: () {
-                                    if (lesson.id != 0) _joinLesson(lesson.id);
+                                    if (lesson.id != 0) {
+                                      _joinLesson(lesson.id, tutorName: lesson.participantName);
+                                    }
                                   },
                                   onCancel: () {
                                     if (lesson.id != 0) _cancelBooking(lesson.id);
@@ -260,6 +294,7 @@ class _LessonsScreenState extends State<LessonsScreen> {
                     ),
                   ],
                 ),
+              ),
               ),
             ),
           ],

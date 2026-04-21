@@ -218,6 +218,102 @@ class _TutorsScreenState extends State<TutorsScreen> {
     }
   }
 
+  void _applyFilters(_TutorFilters next) {
+    setState(() => _filters = next);
+    _loadTutors();
+  }
+
+  List<Widget> _buildActiveFilterChips() {
+    final chips = <Widget>[];
+
+    if (_filters.gender != null) {
+      chips.add(
+        _activeFilterChip(
+          _filters.gender!,
+          () => _applyFilters(
+            _TutorFilters(
+              ieltsScore: _filters.ieltsScore,
+              experienceMin: _filters.experienceMin,
+              experienceMax: _filters.experienceMax,
+              search: _filters.search,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_filters.ieltsScore != null) {
+      chips.add(
+        _activeFilterChip(
+          'IELTS ${_filters.ieltsScore!}',
+          () => _applyFilters(
+            _TutorFilters(
+              gender: _filters.gender,
+              experienceMin: _filters.experienceMin,
+              experienceMax: _filters.experienceMax,
+              search: _filters.search,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_filters.experienceMin != null) {
+      final label = _filters.experienceMax != null
+          ? '${_filters.experienceMin}-${_filters.experienceMax} yrs'
+          : '${_filters.experienceMin}+ yrs';
+      chips.add(
+        _activeFilterChip(
+          label,
+          () => _applyFilters(
+            _TutorFilters(
+              gender: _filters.gender,
+              ieltsScore: _filters.ieltsScore,
+              search: _filters.search,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return chips;
+  }
+
+  Widget _activeFilterChip(String label, VoidCallback onRemove) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 7, 8, 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFF272942),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'SF Pro',
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+              height: 1.0,
+            ),
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: onRemove,
+            behavior: HitTestBehavior.opaque,
+            child: const Icon(
+              Icons.close,
+              size: 16,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_showSearch) {
@@ -322,18 +418,69 @@ class _TutorsScreenState extends State<TutorsScreen> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            // Active filter chips
+            Builder(
+              builder: (_) {
+                final chips = _buildActiveFilterChips();
+                if (chips.isEmpty) return const SizedBox(height: 16);
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                  child: SizedBox(
+                    height: 32,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: chips.length + 1,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (_, i) {
+                        if (i < chips.length) return chips[i];
+                        return GestureDetector(
+                          onTap: () => _applyFilters(const _TutorFilters()),
+                          behavior: HitTestBehavior.opaque,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4),
+                            child: Center(
+                              child: Text(
+                                'Clear all',
+                                style: TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF272942),
+                                  decoration: TextDecoration.underline,
+                                  height: 1.0,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
 
             // Tutors grid
             Expanded(
-              child: _loading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF272942),
-                      ),
+              child: RefreshIndicator(
+                color: const Color(0xFF272942),
+                onRefresh: _loadTutors,
+                child: _loading
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 200),
+                        Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF272942),
+                          ),
+                        ),
+                      ],
                     )
                   : _tutors.isEmpty
-                  ? Center(
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -383,9 +530,11 @@ class _TutorsScreenState extends State<TutorsScreen> {
                           ],
                         ],
                       ),
+                    )],
                     )
                   : GridView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
+                      physics: const AlwaysScrollableScrollPhysics(),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
                         crossAxisSpacing: 12,
@@ -411,6 +560,7 @@ class _TutorsScreenState extends State<TutorsScreen> {
                         ),
                       ),
                     ),
+              ),
             ),
           ],
         ),

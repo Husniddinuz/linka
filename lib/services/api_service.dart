@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'api_constants.dart';
 import 'auth_service.dart';
 import 'token_service.dart';
+
+typedef UploadProgressCallback = void Function(int sent, int total);
 
 class ApiService {
   static const _baseUrl = apiBaseUrl;
@@ -90,7 +93,9 @@ class ApiService {
     }
 
     throw ApiException(
-      data['message']?.toString() ?? 'Request failed',
+      data['message']?.toString() ??
+          data['detail']?.toString() ??
+          'Request failed (${response.statusCode})',
       statusCode: response.statusCode,
     );
   }
@@ -129,36 +134,40 @@ class ApiService {
   }
 
   /// Makes an authenticated PUT request. Throws [ApiException] on failure.
+  /// Pass [onProgress] to track byte-level upload progress (useful when the
+  /// JSON body contains large base64-encoded media).
   static Future<Map<String, dynamic>> put(
     String path,
-    Map<String, dynamic> body,
-  ) async {
+    Map<String, dynamic> body, {
+    UploadProgressCallback? onProgress,
+  }) async {
     final encodedBody = jsonEncode(body);
     _logRequest('PUT', path, body: encodedBody);
+
+    Future<http.StreamedResponse> send(String? t) {
+      final request = onProgress != null
+          ? _ProgressRequest('PUT', Uri.parse('$_baseUrl$path'), onProgress)
+          : http.Request('PUT', Uri.parse('$_baseUrl$path'));
+      request.headers.addAll(_headers(t));
+      request.body = encodedBody;
+      return http.Client().send(request);
+    }
+
     var token = await TokenService.getAccessToken();
-    var response = await http.put(
-      Uri.parse('$_baseUrl$path'),
-      headers: _headers(token),
-      body: encodedBody,
-    );
+    var response = await send(token);
 
     // Retry once with refreshed token on 401
     if (response.statusCode == 401) {
       final newToken = await _tryRefreshToken();
-      if (newToken != null) {
-        response = await http.put(
-          Uri.parse('$_baseUrl$path'),
-          headers: _headers(newToken),
-          body: encodedBody,
-        );
-      }
+      if (newToken != null) response = await send(newToken);
       if (response.statusCode == 401) {
         await _handleAuthFailure();
       }
     }
 
-    _logResponse('PUT', path, response.statusCode, response.body);
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final bodyStr = await response.stream.bytesToString();
+    _logResponse('PUT', path, response.statusCode, bodyStr);
+    final data = jsonDecode(bodyStr) as Map<String, dynamic>;
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       return data;
@@ -185,35 +194,39 @@ class ApiService {
   }
 
   /// Makes an authenticated POST request. Throws [ApiException] on failure.
+  /// Pass [onProgress] to track byte-level upload progress (useful when the
+  /// JSON body contains large base64-encoded media).
   static Future<Map<String, dynamic>> post(
     String path,
-    Map<String, dynamic> body,
-  ) async {
+    Map<String, dynamic> body, {
+    UploadProgressCallback? onProgress,
+  }) async {
     final encodedBody = jsonEncode(body);
     _logRequest('POST', path, body: encodedBody);
+
+    Future<http.StreamedResponse> send(String? t) {
+      final request = onProgress != null
+          ? _ProgressRequest('POST', Uri.parse('$_baseUrl$path'), onProgress)
+          : http.Request('POST', Uri.parse('$_baseUrl$path'));
+      request.headers.addAll(_headers(t));
+      request.body = encodedBody;
+      return http.Client().send(request);
+    }
+
     var token = await TokenService.getAccessToken();
-    var response = await http.post(
-      Uri.parse('$_baseUrl$path'),
-      headers: _headers(token),
-      body: encodedBody,
-    );
+    var response = await send(token);
 
     if (response.statusCode == 401) {
       final newToken = await _tryRefreshToken();
-      if (newToken != null) {
-        response = await http.post(
-          Uri.parse('$_baseUrl$path'),
-          headers: _headers(newToken),
-          body: encodedBody,
-        );
-      }
+      if (newToken != null) response = await send(newToken);
       if (response.statusCode == 401) {
         await _handleAuthFailure();
       }
     }
 
-    _logResponse('POST', path, response.statusCode, response.body);
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final bodyStr = await response.stream.bytesToString();
+    _logResponse('POST', path, response.statusCode, bodyStr);
+    final data = jsonDecode(bodyStr) as Map<String, dynamic>;
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       return data;
@@ -334,16 +347,21 @@ class ApiService {
 
   /// Makes an authenticated multipart POST request for file uploads.
   /// [files] is a map of field name → File. [fields] are additional text fields.
+  /// Pass [onProgress] to track byte-level upload progress.
   static Future<Map<String, dynamic>> postMultipart(
     String path, {
     Map<String, File> files = const {},
     Map<String, String> fields = const {},
+    UploadProgressCallback? onProgress,
   }) async {
     _logRequest('POST(multipart)', path, body: 'fields=$fields, files=${files.keys}');
     var token = await TokenService.getAccessToken();
 
     Future<http.StreamedResponse> send(String? t) async {
-      final request = http.MultipartRequest('POST', Uri.parse('$_baseUrl$path'));
+      final request = onProgress != null
+          ? _ProgressMultipartRequest(
+              'POST', Uri.parse('$_baseUrl$path'), onProgress)
+          : http.MultipartRequest('POST', Uri.parse('$_baseUrl$path'));
       if (t != null) request.headers['Authorization'] = 'Bearer $t';
       request.fields.addAll(fields);
       for (final entry in files.entries) {
@@ -367,25 +385,35 @@ class ApiService {
     final body = await response.stream.bytesToString();
     _logResponse('POST(multipart)', path, response.statusCode, body);
 
-    final data = jsonDecode(body) as Map<String, dynamic>;
+    Map<String, dynamic>? data;
+    try {
+      final parsed = jsonDecode(body);
+      if (parsed is Map<String, dynamic>) data = parsed;
+    } catch (_) {
+      // Non-JSON body (e.g. nginx HTML error page for 413/502/504).
+    }
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      return data;
+      return data ?? {};
     }
 
     String errorMsg = 'Request failed (${response.statusCode})';
-    if (data.containsKey('message')) {
-      errorMsg = data['message'].toString();
-    } else if (data.containsKey('detail')) {
-      errorMsg = data['detail'].toString();
-    } else {
-      final errors = <String>[];
-      for (final entry in data.entries) {
-        if (entry.value is List) {
-          errors.add((entry.value as List).join(', '));
+    if (response.statusCode == 413) {
+      errorMsg = 'File is too large to upload';
+    } else if (data != null) {
+      if (data.containsKey('message')) {
+        errorMsg = data['message'].toString();
+      } else if (data.containsKey('detail')) {
+        errorMsg = data['detail'].toString();
+      } else {
+        final errors = <String>[];
+        for (final entry in data.entries) {
+          if (entry.value is List) {
+            errors.add((entry.value as List).join(', '));
+          }
         }
+        if (errors.isNotEmpty) errorMsg = errors.join('\n');
       }
-      if (errors.isNotEmpty) errorMsg = errors.join('\n');
     }
 
     throw ApiException(errorMsg, statusCode: response.statusCode);
@@ -399,4 +427,42 @@ class ApiException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// Wraps a finalized request body stream to report byte-level upload progress.
+http.ByteStream _trackStreamProgress(
+  http.ByteStream source,
+  int total,
+  UploadProgressCallback onProgress,
+) {
+  int sent = 0;
+  return http.ByteStream(
+    source.transform<List<int>>(
+      StreamTransformer.fromHandlers(
+        handleData: (chunk, sink) {
+          sent += chunk.length;
+          sink.add(chunk);
+          onProgress(sent, total);
+        },
+      ),
+    ),
+  );
+}
+
+class _ProgressMultipartRequest extends http.MultipartRequest {
+  _ProgressMultipartRequest(super.method, super.url, this._onProgress);
+  final UploadProgressCallback _onProgress;
+
+  @override
+  http.ByteStream finalize() =>
+      _trackStreamProgress(super.finalize(), contentLength, _onProgress);
+}
+
+class _ProgressRequest extends http.Request {
+  _ProgressRequest(super.method, super.url, this._onProgress);
+  final UploadProgressCallback _onProgress;
+
+  @override
+  http.ByteStream finalize() =>
+      _trackStreamProgress(super.finalize(), contentLength, _onProgress);
 }

@@ -3,17 +3,24 @@ import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 // import 'screens/splash_screen.dart'; // restore for release
 import 'screens/home_screen.dart';
 import 'screens/role_selection_screen.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'services/token_service.dart';
+import 'services/user_service.dart';
 import 'widgets/app_notify.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await JustAudioBackground.init(
+    androidNotificationChannelId: 'com.linka.app.channel.audio',
+    androidNotificationChannelName: 'Linka Podcasts',
+    androidNotificationOngoing: true,
+  );
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -27,6 +34,7 @@ void main() async {
   // refreshing the token clears auth state and bounces the user to login.
   ApiService.onSessionExpired = () async {
     await TokenService.clearTokens();
+    await UserService.clear();
     final context = navigatorKey.currentContext;
     if (context != null && context.mounted) {
       AppNotify.show(
@@ -141,6 +149,10 @@ class _LinkaAppState extends State<LinkaApp> {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF272942)),
         fontFamily: 'Inter',
+      ),
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.dark,
+        child: child ?? const SizedBox.shrink(),
       ),
       home: widget.isLoggedIn ? const HomeScreen() : const RoleSelectionScreen(),
     );

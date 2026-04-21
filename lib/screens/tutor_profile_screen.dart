@@ -1,7 +1,11 @@
+import 'dart:convert';
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:video_player/video_player.dart';
 import '../services/api_service.dart';
+import '../widgets/cached_avatar.dart';
 import 'availability_screen.dart';
 
 class TutorProfileScreen extends StatefulWidget {
@@ -14,7 +18,9 @@ class TutorProfileScreen extends StatefulWidget {
 
 class _TutorProfileScreenState extends State<TutorProfileScreen> {
   Map<String, dynamic>? _tutor;
+  List<Map<String, dynamic>> _reviews = const [];
   bool _loading = true;
+  bool _reviewsLoading = true;
   bool _isBookmarked = false;
   bool _bookmarkLoading = false;
 
@@ -22,11 +28,16 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
   void initState() {
     super.initState();
     _loadTutor();
+    _loadReviews();
   }
 
   Future<void> _loadTutor() async {
     try {
       final result = await ApiService.get('/tutors/${widget.tutorId}/');
+      developer.log(
+        const JsonEncoder.withIndent('  ').convert(result),
+        name: 'TutorProfile',
+      );
       if (!mounted) return;
       setState(() {
         _tutor = result;
@@ -36,6 +47,20 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadReviews() async {
+    try {
+      final result = await ApiService.getList('/tutors/${widget.tutorId}/reviews/');
+      if (!mounted) return;
+      setState(() {
+        _reviews = result.map((e) => e as Map<String, dynamic>).toList();
+        _reviewsLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _reviewsLoading = false);
     }
   }
 
@@ -163,6 +188,23 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
 
                   const SizedBox(height: 8),
 
+                  // ── Bio ─────────────────────────────────────────────────────
+                  Builder(builder: (_) {
+                    final bio = (t?['about_me'] as String?)?.trim() ?? '';
+                    if (bio.isEmpty) return const SizedBox.shrink();
+                    return Container(
+                      width: double.infinity,
+                      color: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                      child: _BioSection(bio: bio),
+                    );
+                  }),
+
+                  Builder(builder: (_) {
+                    final bio = (t?['about_me'] as String?)?.trim() ?? '';
+                    return bio.isEmpty ? const SizedBox.shrink() : const SizedBox(height: 8);
+                  }),
+
                   // ── Lesson duration (info) ──────────────────────────────────
                   Builder(builder: (_) {
                     final prices = t?['lesson_prices'] as List<dynamic>? ?? [];
@@ -185,13 +227,17 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
                   const SizedBox(height: 8),
 
                   // ── Reviews ────────────────────────────────────────────────
-                  Container(
-                    color: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    child: _ReviewsSection(),
-                  ),
-
-                  const SizedBox(height: 8),
+                  if (_reviewsLoading || _reviews.isNotEmpty) ...[
+                    Container(
+                      color: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: _ReviewsSection(
+                        reviews: _reviews,
+                        loading: _reviewsLoading,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                 ],
               ),
             ),
@@ -614,6 +660,40 @@ class _ScoresGrid extends StatelessWidget {
   }
 }
 
+// ─── Bio section ──────────────────────────────────────────────────────────────
+
+class _BioSection extends StatelessWidget {
+  final String bio;
+  const _BioSection({required this.bio});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'BIO',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF9E9E9E),
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          bio,
+          style: const TextStyle(
+            fontSize: 15,
+            color: Color(0xFF272942),
+            height: 1.5,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ─── Lesson duration section ──────────────────────────────────────────────────
 
 class _LessonDurationSection extends StatelessWidget {
@@ -680,24 +760,43 @@ class _LessonDurationSection extends StatelessWidget {
 // ─── Reviews section ──────────────────────────────────────────────────────────
 
 class _ReviewsSection extends StatelessWidget {
-  static const _reviews = [
-    (
-      'Azizbek Karimov',
-      4,
-      'The lesson was very clear, well-organized, and engaging. '
-          'The teacher explains everything in a simple way and creates a comfortable '
-          'environment for learning. I feel more confident in my English after each class.',
-      '10.01.2026',
-    ),
-    (
-      'Azizbek Karimov',
-      4,
-      'The lesson was very clear, well-organized, and engaging. '
-          'The teacher explains everything in a simple way and creates a comfortable '
-          'environment for learning. I feel more confident in my English after each class.',
-      '10.01.2026',
-    ),
-  ];
+  final List<Map<String, dynamic>> reviews;
+  final bool loading;
+
+  const _ReviewsSection({required this.reviews, required this.loading});
+
+  String _formatDate(String? iso) {
+    if (iso == null || iso.isEmpty) return '';
+    final d = DateTime.tryParse(iso);
+    if (d == null) return '';
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    return '$dd.$mm.${d.year}';
+  }
+
+  String _reviewerName(Map<String, dynamic> r) {
+    final s = r['student'];
+    if (s is Map) {
+      final first = (s['first_name'] ?? '').toString().trim();
+      final last = (s['last_name'] ?? '').toString().trim();
+      final full = '$first $last'.trim();
+      if (full.isNotEmpty) return full;
+      final nm = (s['full_name'] ?? s['name'] ?? '').toString().trim();
+      if (nm.isNotEmpty) return nm;
+    }
+    final direct = (r['student_name'] ?? '').toString().trim();
+    if (direct.isNotEmpty) return direct;
+    return 'Student';
+  }
+
+  String? _reviewerImage(Map<String, dynamic> r) {
+    final s = r['student'];
+    if (s is Map) {
+      final img = (s['profile_image'] ?? s['image'] ?? s['avatar']) as String?;
+      if (img != null && img.isNotEmpty) return img;
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -719,88 +818,89 @@ class _ReviewsSection extends StatelessWidget {
         const SizedBox(height: 12),
         SizedBox(
           height: 260,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _reviews.length,
-            itemBuilder: (_, i) {
-              final (name, stars, body, date) = _reviews[i];
-              return Container(
-                width: 280,
-                margin: const EdgeInsets.symmetric(horizontal: 6),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFEEEEEE), width: 1),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Reviewer header
-                    Row(
-                      children: [
-                        ClipOval(
-                          child: Image.asset(
-                            'assets/images/tutors/azizbek.png',
-                            width: 40,
-                            height: 40,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF272942),
+          child: loading
+              ? const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF272942)),
+                )
+              : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: reviews.length,
+                  itemBuilder: (_, i) {
+                    final r = reviews[i];
+                    final name = _reviewerName(r);
+                    final stars = (r['rating'] as num?)?.toInt() ?? 0;
+                    final body = (r['comment'] as String?) ?? '';
+                    final date = _formatDate(r['created_at'] as String?);
+                    final imageUrl = _reviewerImage(r);
+                    return Container(
+                      width: 280,
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFEEEEEE), width: 1),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CachedAvatar(imageUrl: imageUrl, size: 40),
+                              const SizedBox(width: 10),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF272942),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: List.generate(5, (s) {
+                                      return Icon(
+                                        s < stars
+                                            ? Icons.star_rounded
+                                            : Icons.star_outline_rounded,
+                                        size: 16,
+                                        color: const Color(0xFFF5C542),
+                                      );
+                                    }),
+                                  ),
+                                ],
                               ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: Text(
+                              body,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF272942),
+                                height: 1.5,
+                              ),
+                              overflow: TextOverflow.fade,
                             ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: List.generate(5, (s) {
-                                return Icon(
-                                  s < stars
-                                      ? Icons.star_rounded
-                                      : Icons.star_outline_rounded,
-                                  size: 16,
-                                  color: const Color(0xFFF5C542),
-                                );
-                              }),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            date,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF9E9E9E),
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Expanded(
-                      child: Text(
-                        body,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF272942),
-                          height: 1.5,
-                        ),
-                        overflow: TextOverflow.fade,
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      date,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF9E9E9E),
-                      ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
       ],
     );

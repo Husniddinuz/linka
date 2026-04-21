@@ -4,6 +4,7 @@ import '../widgets/cached_avatar.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/token_service.dart';
+import '../services/user_service.dart';
 import '../services/wallet_service.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/skeleton.dart';
@@ -27,19 +28,34 @@ class MyProfileScreen extends StatefulWidget {
 class _MyProfileScreenState extends State<MyProfileScreen> {
   Map<String, dynamic>? _profile;
   bool _loading = true;
+  bool _isTeacher = false;
 
   @override
   void initState() {
     super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    final cached = await UserService.getCachedIsTeacher();
+    if (mounted && cached != null) setState(() => _isTeacher = cached);
     _loadProfile();
   }
 
   Future<void> _loadProfile() async {
     try {
-      final result = await ApiService.get('/student/profile/');
+      final me = UserService.current ?? await UserService.fetchMe();
+      final path = _isTeacher
+          ? '/tutors/${me.tutorProfileId}/'
+          : '/student/profile/';
+      final result = await ApiService.get(path);
+      final profile = (result['data'] is Map<String, dynamic>)
+          ? result['data'] as Map<String, dynamic>
+          : result;
+      profile.putIfAbsent('phone_number', () => me.phone);
       if (!mounted) return;
       setState(() {
-        _profile = result['data'] as Map<String, dynamic>?;
+        _profile = profile;
         _loading = false;
       });
     } catch (_) {
@@ -60,7 +76,11 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
           Expanded(
             child: Container(
               color: const Color(0xFFF5F5F7),
-              child: SingleChildScrollView(
+              child: RefreshIndicator(
+                color: const Color(0xFF272942),
+                onRefresh: _loadProfile,
+                child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(
                   children: [
                     // White section: header + profile card
@@ -99,25 +119,10 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                                         .push(
                                           MaterialPageRoute(
                                             builder: (_) => ProfileSetupScreen(
-                                              role:
-                                                  _profile?['role']
-                                                      as String? ??
-                                                  'student',
-                                              firstName:
-                                                  _profile?['first_name']
-                                                      as String?,
-                                              lastName:
-                                                  _profile?['last_name']
-                                                      as String?,
-                                              gender:
-                                                  _profile?['gender']
-                                                      as String?,
-                                              englishLevel:
-                                                  _profile?['englishLevel']
-                                                      as String?,
-                                              profileImageUrl:
-                                                  _profile?['profile_image']
-                                                      as String?,
+                                              role: _isTeacher
+                                                  ? 'tutor'
+                                                  : 'student',
+                                              profile: _profile,
                                             ),
                                           ),
                                         )
@@ -141,49 +146,47 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
 
                     // Gray section: rest of content
                     const SizedBox(height: 16),
-                    _JoinPlusBanner(),
-                    const SizedBox(height: 16),
+                    if (!_isTeacher) ...[
+                      _JoinPlusBanner(),
+                      const SizedBox(height: 16),
+                      _CardGroup(children: [_BalanceRow()]),
+                      const SizedBox(height: 16),
+                    ],
                     _CardGroup(
                       children: [
-                        _MenuRow(
-                          icon: 'assets/images/buttons/wallet.svg',
-                          label: 'My wallet',
-                          onTap: () {},
-                        ),
-                        const _Divider(),
-                        _BalanceRow(),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _CardGroup(
-                      children: [
-                        _MenuRow(
-                          icon: 'assets/images/buttons/my-lessons.svg',
-                          label: 'My lessons',
-                          onTap: () => widget.onNavigateToLessons?.call(),
-                        ),
-                        const _Divider(),
+                        if (!_isTeacher) ...[
+                          _MenuRow(
+                            icon: 'assets/images/buttons/my-lessons.svg',
+                            label: 'My lessons',
+                            onTap: () => widget.onNavigateToLessons?.call(),
+                          ),
+                          const _Divider(),
+                        ],
                         _MenuRow(
                           icon: 'assets/images/buttons/my-reviews.svg',
                           label: 'My reviews',
                           onTap: () {},
                         ),
-                        const _Divider(),
-                        _MenuRow(
-                          icon: 'assets/images/buttons/saved-tutors.svg',
-                          label: 'Saved tutors',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const SavedTutorsScreen()),
+                        if (!_isTeacher) ...[
+                          const _Divider(),
+                          _MenuRow(
+                            icon: 'assets/images/buttons/saved-tutors.svg',
+                            label: 'Saved tutors',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const SavedTutorsScreen()),
+                            ),
                           ),
-                        ),
-                        const _Divider(),
-                        _MenuRow(
-                          icon: 'assets/images/buttons/saved-articles.svg',
-                          label: 'Saved articles',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const SavedArticlesScreen()),
+                          const _Divider(),
+                          _MenuRow(
+                            icon: 'assets/images/buttons/saved-articles.svg',
+                            label: 'Saved articles',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const SavedArticlesScreen()),
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -227,6 +230,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                     const SizedBox(height: 32),
                   ],
                 ),
+              ),
               ),
             ),
           ),
@@ -624,6 +628,7 @@ class _LogoutCard extends StatelessWidget {
       // logout is best-effort
     }
     await TokenService.clearTokens();
+    await UserService.clear();
     if (!context.mounted) return;
     AppNotify.show(
       context,
@@ -800,6 +805,7 @@ class _DeleteAccountCardState extends State<_DeleteAccountCard> {
     try {
       await ApiService.delete('/users/me/');
       await TokenService.clearTokens();
+      await UserService.clear();
       if (!mounted) return;
       AppNotify.show(
         context,

@@ -3,29 +3,21 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/cached_avatar.dart';
-import 'package:image_picker/image_picker.dart';
 import 'crop_screen.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import '../widgets/app_notify.dart';
 import 'home_screen.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   final String role;
-  final String? firstName;
-  final String? lastName;
-  final String? gender;
-  final String? englishLevel;
-  final String? profileImageUrl;
+  final Map<String, dynamic>? profile;
 
   const ProfileSetupScreen({
     super.key,
     required this.role,
-    this.firstName,
-    this.lastName,
-    this.gender,
-    this.englishLevel,
-    this.profileImageUrl,
+    this.profile,
   });
 
   @override
@@ -51,9 +43,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   String? _speakingScore;
   File? _certificateFile;
   String? _certificateFileName;
+  String? _existingCertificateUrl;
   File? _introVideo;
   String? _introVideoName;
   bool _submitting = false;
+  double _progress = 0;
 
   static const List<String> _bandOptions = ['7.0', '7.5', '8.0', '8.5', '9.0'];
 
@@ -72,15 +66,68 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.firstName != null) {
-      _firstNameController.text = widget.firstName!;
+    final p = widget.profile;
+    if (p == null) return;
+
+    _firstNameController.text = p['first_name']?.toString() ?? '';
+    _lastNameController.text = p['last_name']?.toString() ?? '';
+    _gender = p['gender'] as String?;
+    _networkImageUrl = p['profile_image'] as String?;
+
+    if (_isTutor) {
+      _readingScore = _formatBand(p['reading_score']);
+      _listeningScore = _formatBand(p['listening_score']);
+      _writingScore = _formatBand(p['writing_score']);
+      _speakingScore = _formatBand(p['speaking_score']);
+      _experienceController.text = p['experience']?.toString() ?? '';
+      _aboutMeController.text = p['about_me']?.toString() ?? '';
+      _displayNameController.text = p['display_name']?.toString() ?? '';
+
+      final prices = p['lesson_prices'];
+      if (prices is List) {
+        for (final raw in prices) {
+          if (raw is! Map) continue;
+          final mins = (raw['duration_minutes'] as num?)?.toInt();
+          final price = _formatPrice(raw['price']);
+          if (price.isEmpty) continue;
+          if (mins == 20) _price20Controller.text = price;
+          if (mins == 30) _price30Controller.text = price;
+          if (mins == 45) _price45Controller.text = price;
+        }
+      }
+
+      final certUrl = (p['ielts_certificate'] ?? p['certificate_image']) as String?;
+      if (certUrl != null && certUrl.isNotEmpty) {
+        _existingCertificateUrl = certUrl;
+        _certificateFileName = _fileNameFromUrl(certUrl);
+      }
+      final videoUrl = p['intro_video'] as String?;
+      if (videoUrl != null && videoUrl.isNotEmpty) {
+        _introVideoName = _fileNameFromUrl(videoUrl);
+      }
+    } else {
+      _englishLevel = _reverseLevelMap[p['englishLevel'] as String?];
     }
-    if (widget.lastName != null) {
-      _lastNameController.text = widget.lastName!;
-    }
-    _gender = widget.gender;
-    _englishLevel = _reverseLevelMap[widget.englishLevel];
-    _networkImageUrl = widget.profileImageUrl;
+  }
+
+  static String? _formatBand(dynamic v) {
+    if (v == null) return null;
+    final n = v is num ? v.toDouble() : double.tryParse(v.toString());
+    if (n == null) return null;
+    return n.toStringAsFixed(1);
+  }
+
+  static String _formatPrice(dynamic v) {
+    if (v == null) return '';
+    final s = v.toString();
+    final dot = s.indexOf('.');
+    return dot >= 0 ? s.substring(0, dot) : s;
+  }
+
+  static String _fileNameFromUrl(String url) {
+    final path = Uri.tryParse(url)?.path ?? url;
+    final seg = path.split('/').where((s) => s.isNotEmpty).toList();
+    return seg.isEmpty ? url : seg.last;
   }
 
   static const _levelMap = {
@@ -115,23 +162,27 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     if (_isTutor) {
       final hasPhoto = _photo != null ||
           (_networkImageUrl != null && _networkImageUrl!.isNotEmpty);
-      return _displayNameController.text.trim().isNotEmpty &&
-          _computedIelts != null &&
+      final hasCertificate = _certificateFile != null ||
+          (_existingCertificateUrl != null &&
+              _existingCertificateUrl!.isNotEmpty);
+      return _computedIelts != null &&
           _experienceController.text.trim().isNotEmpty &&
           hasPhoto &&
-          _certificateFile != null;
+          hasCertificate;
     }
     return _englishLevel != null;
   }
 
   Future<void> _pickPhoto() async {
-    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (image == null || !mounted) return;
+    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    if (result == null || !mounted) return;
+    final path = result.files.single.path;
+    if (path == null) return;
 
     final cropped = await Navigator.of(context).push<File>(
       MaterialPageRoute(
         builder: (_) => CropScreen(
-          imageFile: File(image.path),
+          imageFile: File(path),
           aspectRatio: 3 / 2,
         ),
       ),
@@ -159,19 +210,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _pickIntroVideo() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['mp4', 'mov', 'webm'],
+    final picked = await ImagePicker().pickVideo(
+      source: ImageSource.gallery,
+      maxDuration: const Duration(minutes: 2),
     );
-    if (result != null && mounted) {
-      final picked = result.files.single;
-      final path = picked.path;
-      if (path == null) return;
-      setState(() {
-        _introVideo = File(path);
-        _introVideoName = picked.name;
-      });
-    }
+    if (picked == null || !mounted) return;
+    setState(() {
+      _introVideo = File(picked.path);
+      _introVideoName = picked.name;
+    });
   }
 
   void _openDropdown({
@@ -201,7 +248,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   Future<void> _submit() async {
     if (_submitting) return;
-    setState(() => _submitting = true);
+    setState(() {
+      _submitting = true;
+      _progress = 0;
+    });
 
     try {
       final body = <String, dynamic>{
@@ -227,6 +277,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         }
         final aboutMe = _aboutMeController.text.trim();
         if (aboutMe.isNotEmpty) body['about_me'] = aboutMe;
+        final displayName = _displayNameController.text.trim();
+        if (displayName.isNotEmpty) body['display_name'] = displayName;
         final prices = <Map<String, dynamic>>[];
         void addPrice(int minutes, TextEditingController c) {
           final raw = c.text.trim();
@@ -276,7 +328,20 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       }
 
       final path = _isTutor ? '/tutor/profile/' : '/student/profile/';
-      await ApiService.put(path, body);
+      final hasMedia = _photo != null ||
+          (_isTutor && (_certificateFile != null || _introVideo != null));
+      await ApiService.put(
+        path,
+        body,
+        onProgress: hasMedia
+            ? (sent, total) {
+                if (!mounted || total <= 0) return;
+                final next = sent / total;
+                if ((next - _progress).abs() < 0.01 && next < 1.0) return;
+                setState(() => _progress = next);
+              }
+            : null,
+      );
 
       if (!mounted) return;
       AppNotify.show(context,
@@ -577,7 +642,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 child: SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _canSubmit && !_submitting ? _submit : null,
+                    onPressed: _submitting
+                        ? () {}
+                        : (_canSubmit ? _submit : null),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF272942),
                       disabledBackgroundColor: const Color(0xFFE0E0E0),
@@ -589,13 +656,34 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       elevation: 0,
                     ),
                     child: _submitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  value: (_progress == 0 || _progress >= 1.0)
+                                      ? null
+                                      : _progress,
+                                  color: Colors.white,
+                                  backgroundColor:
+                                      Colors.white.withValues(alpha: 0.2),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                _progress == 0
+                                    ? 'Preparing…'
+                                    : _progress >= 1.0
+                                        ? 'Processing…'
+                                        : 'Uploading ${(_progress * 100).round()}%',
+                                style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ],
                           )
                         : const Text(
                             'Done',

@@ -3,33 +3,50 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 class Lesson {
   final int id;
-  final String tutorName;
-  final String? tutorImage;
+  final String participantName;
+  final String? participantImage;
   final String timeRange;
   final String duration;
   final String status;
+  final DateTime? startAt;
+  final String dailyRoomUrl;
 
   const Lesson({
     required this.id,
-    required this.tutorName,
-    this.tutorImage,
+    required this.participantName,
+    this.participantImage,
     required this.timeRange,
     required this.duration,
     required this.status,
+    this.startAt,
+    this.dailyRoomUrl = '',
   });
 
   bool get isCancelled => status == 'cancelled';
 
-  factory Lesson.fromBooking(Map<String, dynamic> booking) {
-    final tutor = booking['tutor'] as Map<String, dynamic>? ?? {};
-    final firstName = tutor['first_name'] as String? ?? booking['tutor_first_name'] as String? ?? '';
-    final lastName = tutor['last_name'] as String? ?? booking['tutor_last_name'] as String? ?? '';
+  factory Lesson.fromBooking(
+    Map<String, dynamic> booking, {
+    bool viewerIsTutor = false,
+  }) {
+    final party = (viewerIsTutor
+            ? booking['student'] as Map<String, dynamic>?
+            : booking['tutor'] as Map<String, dynamic>?) ??
+        {};
+    final firstName = party['first_name'] as String? ??
+        booking[viewerIsTutor ? 'student_first_name' : 'tutor_first_name'] as String? ??
+        '';
+    final lastName = party['last_name'] as String? ??
+        booking[viewerIsTutor ? 'student_last_name' : 'tutor_last_name'] as String? ??
+        '';
+    final profileImage = (party['profile_image'] as String?) ??
+        booking[viewerIsTutor ? 'student_profile_image' : 'tutor_profile_image'] as String?;
     final startAt = DateTime.tryParse(
       booking['start_at'] as String? ?? booking['start_time'] as String? ?? '',
     );
     final endAt = DateTime.tryParse(
       booking['end_at'] as String? ?? booking['end_time'] as String? ?? '',
     );
+    final localStartAt = startAt?.toLocal();
 
     final durationRaw = booking['duration_minutes'];
     final durationFromField = durationRaw is int
@@ -60,11 +77,13 @@ class Lesson {
 
     return Lesson(
       id: booking['id'] as int? ?? 0,
-      tutorName: '$firstName $lastName'.trim(),
-      tutorImage: (tutor['profile_image'] as String?) ?? booking['tutor_profile_image'] as String?,
+      participantName: '$firstName $lastName'.trim(),
+      participantImage: profileImage,
       timeRange: timeRange,
       duration: durationLabel,
       status: booking['status'] as String? ?? '',
+      startAt: localStartAt,
+      dailyRoomUrl: booking['daily_room_url']?.toString() ?? '',
     );
   }
 }
@@ -102,9 +121,9 @@ class LessonCard extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: lesson.tutorImage != null && lesson.tutorImage!.startsWith('http')
+                  child: lesson.participantImage != null && lesson.participantImage!.startsWith('http')
                       ? Image.network(
-                          lesson.tutorImage!,
+                          lesson.participantImage!,
                           width: 82,
                           height: 82,
                           fit: BoxFit.cover,
@@ -140,7 +159,7 @@ class LessonCard extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                lesson.tutorName,
+                                lesson.participantName,
                                 style: const TextStyle(
                                   fontFamily: 'SF Pro',
                                   fontSize: 15,

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -18,6 +19,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
   VideoPlayerController? _videoController;
   final _descController = TextEditingController();
   bool _uploading = false;
+  double _progress = 0;
 
   @override
   void dispose() {
@@ -127,15 +129,35 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
 
   Future<void> _upload() async {
     if (_media == null || _uploading) return;
-    setState(() => _uploading = true);
+    setState(() {
+      _uploading = true;
+      _progress = 0;
+    });
 
     try {
-      await ApiService.postMultipart(
-        '/student/stories/',
-        files: {'file': _media!},
-        fields: {
+      final bytes = await _media!.readAsBytes();
+      final ext = _media!.path.split('.').last.toLowerCase();
+      final mime = _isVideo
+          ? (ext == 'mov'
+              ? 'video/quicktime'
+              : ext == 'webm'
+                  ? 'video/webm'
+                  : 'video/mp4')
+          : (ext == 'png' ? 'image/png' : 'image/jpeg');
+      final dataUri = 'data:$mime;base64,${base64Encode(bytes)}';
+
+      await ApiService.post(
+        '/tutor/stories/',
+        {
+          'media_file': dataUri,
           if (_descController.text.trim().isNotEmpty)
             'description': _descController.text.trim(),
+        },
+        onProgress: (sent, total) {
+          if (!mounted || total <= 0) return;
+          final next = sent / total;
+          if ((next - _progress).abs() < 0.01 && next < 1.0) return;
+          setState(() => _progress = next);
         },
       );
 
@@ -308,6 +330,45 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
           ),
         ),
 
+        // Upload progress bar
+        if (_uploading)
+          Container(
+            color: const Color(0xFF1A1A1A),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: (_progress == 0 || _progress >= 1.0)
+                          ? null
+                          : _progress,
+                      minHeight: 4,
+                      backgroundColor: const Color(0xFF2A2A2A),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Color(0xFFF5C542),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  _progress == 0
+                      ? 'Preparing…'
+                      : _progress >= 1.0
+                          ? 'Processing…'
+                          : '${(_progress * 100).round()}%',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
         // Description + share button
         Container(
           color: const Color(0xFF1A1A1A),
@@ -317,6 +378,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
               Expanded(
                 child: TextField(
                   controller: _descController,
+                  enabled: !_uploading,
                   style: const TextStyle(color: Colors.white, fontSize: 15),
                   maxLines: 1,
                   maxLength: 200,
@@ -351,11 +413,16 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: _uploading
-                      ? const Padding(
-                          padding: EdgeInsets.all(14),
+                      ? Padding(
+                          padding: const EdgeInsets.all(14),
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Color(0xFF272942),
+                            value: (_progress == 0 || _progress >= 1.0)
+                                ? null
+                                : _progress,
+                            color: const Color(0xFF272942),
+                            backgroundColor:
+                                const Color(0xFF272942).withValues(alpha: 0.2),
                           ),
                         )
                       : const Icon(
