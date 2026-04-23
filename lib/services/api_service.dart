@@ -18,6 +18,27 @@ class ApiService {
   static Future<void> Function()? onSessionExpired;
   static bool _handlingAuthFailure = false;
 
+  /// Invoked when a request fails due to no network (SocketException /
+  /// host lookup failure). Set from ConnectivityWrapper.
+  static void Function()? onNetworkFailure;
+
+  static Future<T> _guard<T>(Future<T> Function() fn) async {
+    try {
+      return await fn();
+    } on SocketException {
+      onNetworkFailure?.call();
+      throw const ApiException('No internet connection', statusCode: 0);
+    } on http.ClientException catch (e) {
+      if (e.message.contains('SocketException') ||
+          e.message.contains('Failed host lookup') ||
+          e.message.contains('Connection refused')) {
+        onNetworkFailure?.call();
+        throw const ApiException('No internet connection', statusCode: 0);
+      }
+      rethrow;
+    }
+  }
+
   static Future<void> _handleAuthFailure() async {
     if (_handlingAuthFailure) return;
     _handlingAuthFailure = true;
@@ -66,10 +87,10 @@ class ApiService {
   static Future<Map<String, dynamic>> get(String path) async {
     _logRequest('GET', path);
     var token = await TokenService.getAccessToken();
-    var response = await http.get(
+    var response = await _guard(() => http.get(
       Uri.parse('$_baseUrl$path'),
       headers: _headers(token),
-    );
+    ));
 
     // Retry once with refreshed token on 401
     if (response.statusCode == 401) {
@@ -104,10 +125,10 @@ class ApiService {
   static Future<List<dynamic>> getList(String path) async {
     _logRequest('GET', path);
     var token = await TokenService.getAccessToken();
-    var response = await http.get(
+    var response = await _guard(() => http.get(
       Uri.parse('$_baseUrl$path'),
       headers: _headers(token),
-    );
+    ));
 
     if (response.statusCode == 401) {
       final newToken = await _tryRefreshToken();
@@ -154,7 +175,7 @@ class ApiService {
     }
 
     var token = await TokenService.getAccessToken();
-    var response = await send(token);
+    var response = await _guard(() => send(token));
 
     // Retry once with refreshed token on 401
     if (response.statusCode == 401) {
@@ -214,7 +235,7 @@ class ApiService {
     }
 
     var token = await TokenService.getAccessToken();
-    var response = await send(token);
+    var response = await _guard(() => send(token));
 
     if (response.statusCode == 401) {
       final newToken = await _tryRefreshToken();
@@ -258,11 +279,11 @@ class ApiService {
     final encodedBody = jsonEncode(body);
     _logRequest('PATCH', path, body: encodedBody);
     var token = await TokenService.getAccessToken();
-    var response = await http.patch(
+    var response = await _guard(() => http.patch(
       Uri.parse('$_baseUrl$path'),
       headers: _headers(token),
       body: encodedBody,
-    );
+    ));
 
     if (response.statusCode == 401) {
       final newToken = await _tryRefreshToken();
@@ -307,10 +328,10 @@ class ApiService {
   static Future<void> delete(String path) async {
     _logRequest('DELETE', path);
     var token = await TokenService.getAccessToken();
-    var response = await http.delete(
+    var response = await _guard(() => http.delete(
       Uri.parse('$_baseUrl$path'),
       headers: _headers(token),
-    );
+    ));
 
     if (response.statusCode == 401) {
       final newToken = await _tryRefreshToken();
@@ -372,7 +393,7 @@ class ApiService {
       return request.send();
     }
 
-    var response = await send(token);
+    var response = await _guard(() => send(token));
 
     if (response.statusCode == 401) {
       final newToken = await _tryRefreshToken();

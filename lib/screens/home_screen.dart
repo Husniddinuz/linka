@@ -169,6 +169,20 @@ class _HomeScreenState extends State<HomeScreen> {
     await showUpdateDialog(context, info);
   }
 
+  // TODO: remove before release — test-only trigger
+  void _showTestUpdateDialog() {
+    showUpdateDialog(
+      context,
+      const UpdateInfo(
+        hasUpdate: true,
+        isForce: false,
+        title: 'New Update Available',
+        message: 'A new version of Linka is available. Update now to get the latest features and improvements.',
+        storeUrl: 'https://apps.apple.com',
+      ),
+    );
+  }
+
   Future<void> _bootstrapRole() async {
     // First paint: use cached role so bottom nav doesn't flicker.
     final cached = await UserService.getCachedIsTeacher();
@@ -436,7 +450,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Header(profileImage: _profileImage, isTutor: false),
+          _Header(profileImage: _profileImage, isTutor: false, onLogoLongPress: _showTestUpdateDialog),
           Expanded(
             child: RefreshIndicator(
               color: const Color(0xFF272942),
@@ -682,7 +696,8 @@ class _NavItem {
 class _Header extends StatefulWidget {
   final String? profileImage;
   final bool isTutor;
-  const _Header({this.profileImage, this.isTutor = false});
+  final VoidCallback? onLogoLongPress;
+  const _Header({this.profileImage, this.isTutor = false, this.onLogoLongPress});
 
   @override
   State<_Header> createState() => _HeaderState();
@@ -725,9 +740,12 @@ class _HeaderState extends State<_Header> {
           // Logo centered
           Expanded(
             child: Center(
-              child: SvgPicture.asset(
-                'assets/images/branding/header-logo.svg',
-                height: 26,
+              child: GestureDetector(
+                onLongPress: widget.onLogoLongPress,
+                child: SvgPicture.asset(
+                  'assets/images/branding/header-logo.svg',
+                  height: 26,
+                ),
               ),
             ),
           ),
@@ -962,35 +980,62 @@ class _LessonsSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        if (loading)
-          const Padding(
-            padding: EdgeInsets.only(left: 20, right: 20, bottom: 8),
-            child: Skeleton(height: 98, borderRadius: 16),
-          )
-        else if (lessons.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'No lessons scheduled for today',
-              style: TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 13,
-                color: Color(0xFFAAAAAA),
+        Builder(builder: (context) {
+          final cardWidth = MediaQuery.of(context).size.width - 52;
+          if (loading) {
+            return SizedBox(
+              height: 114,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: 2,
+                itemBuilder: (_, _) => Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: SizedBox(
+                    width: cardWidth,
+                    child: const Skeleton(height: 98, borderRadius: 16),
+                  ),
+                ),
               ),
-            ),
-          )
-        else
-          ...lessons.map(
-            (l) => Padding(
-              padding: const EdgeInsets.only(left: 20, right: 20, bottom: 8),
-              child: LessonCard(
-                lesson: l,
-                showStartButton: l.dailyRoomUrl.isNotEmpty,
-                onStart: onStartLesson != null ? () => onStartLesson!(l) : null,
-                onCancel: onCancelLesson != null ? () => onCancelLesson!(l) : null,
+            );
+          }
+          if (lessons.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'No lessons scheduled for today',
+                style: TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: 13,
+                  color: Color(0xFFAAAAAA),
+                ),
               ),
+            );
+          }
+          return SizedBox(
+            height: 162,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: lessons.length,
+              itemBuilder: (_, i) {
+                final l = lessons[i];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: SizedBox(
+                    width: cardWidth,
+                    child: LessonCard(
+                      lesson: l,
+                      showStartButton: l.dailyRoomUrl.isNotEmpty,
+                      onStart: onStartLesson != null ? () => onStartLesson!(l) : null,
+                      onCancel: onCancelLesson != null ? () => onCancelLesson!(l) : null,
+                    ),
+                  ),
+                );
+              },
             ),
-          ),
+          );
+        }),
       ],
     );
   }

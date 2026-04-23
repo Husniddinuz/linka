@@ -125,17 +125,19 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
   }
 
   Future<void> _connectChat() async {
+    if (!widget.webinar.isLive) return;
+
     final token = await TokenService.getAccessToken();
     if (token == null || !mounted) return;
 
-    final wsBase = apiBaseUrl
-        .replaceFirst('https://', 'wss://')
-        .replaceFirst('http://', 'ws://')
-        .replaceFirst('/api/v1', '');
-    final wsUrl = '$wsBase/ws/webinars/${widget.webinar.id}/chat/?token=$token';
+    final apiUri = Uri.parse(apiBaseUrl);
+    final wsScheme = apiUri.scheme == 'https' ? 'wss' : 'ws';
+    final wsUrl = '$wsScheme://${apiUri.host}/ws/webinars/${widget.webinar.id}/chat/?token=$token';
 
     try {
       _chatWs = WebSocketChannel.connect(Uri.parse(wsUrl));
+      await _chatWs!.ready;
+      if (!mounted) return;
       _chatSub = _chatWs!.stream.listen(
         _onChatMessage,
         onError: (e) => dev.log('Webinar chat WS error: $e'),

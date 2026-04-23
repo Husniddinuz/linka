@@ -12,6 +12,7 @@ import 'services/notification_service.dart';
 import 'services/token_service.dart';
 import 'services/user_service.dart';
 import 'widgets/app_notify.dart';
+import 'widgets/connectivity_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -164,7 +165,7 @@ class _LinkaAppState extends State<LinkaApp> {
       ),
       builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.dark,
-        child: child ?? const SizedBox.shrink(),
+        child: ConnectivityWrapper(child: child ?? const SizedBox.shrink()),
       ),
       home: widget.isLoggedIn ? const HomeScreen() : const RoleSelectionScreen(),
     );
