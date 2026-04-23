@@ -10,6 +10,15 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../services/api_constants.dart';
 import '../services/api_service.dart';
 import '../services/token_service.dart';
+import '../widgets/free_minutes_dialog.dart';
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+String _resolveImageUrl(String path) {
+  if (path.startsWith('http')) return path;
+  final uri = Uri.parse(apiBaseUrl);
+  return '${uri.scheme}://${uri.host}$path';
+}
 
 // ─── Gender filter enum ─────────────────────────────────────────────────────
 
@@ -33,7 +42,8 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 
   String _localName = '';
   String? _remoteName;
-  final String? _remoteGender = null;
+  String? _remoteGender;
+  String? _remoteProfileImage;
   bool _remoteCameraOn = true;
 
   // ── Media ──
@@ -144,6 +154,8 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       setState(() {
         _isConnected = false;
         _remoteName = null;
+        _remoteGender = null;
+        _remoteProfileImage = null;
         _remoteCameraOn = true;
         _sessionId = null;
       });
@@ -190,7 +202,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     }
   }
 
-  void _handleMatchMessage(dynamic raw) {
+  Future<void> _handleMatchMessage(dynamic raw) async {
     dev.log('MATCH ← $raw');
     final data = jsonDecode(raw as String) as Map<String, dynamic>;
     final type = data['type'] as String?;
@@ -199,7 +211,12 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       case 'match_found':
         final roomId = (data['room_id'] ?? data['webrtc_room'] ?? data['webrtc_room_id'] ?? data['room'])?.toString();
         final partner = data['partner_name'] as String?;
+        final partnerGender = data['partner_gender'] as String?;
+        final partnerProfileImage = data['partner_profile_image'] as String?;
         final sessionId = data['session_id'] as int?;
+        final inlineSignalingUrl = data['signaling_url'] as String?;
+        final inlineSignalingToken = data['signaling_token'] as String?;
+        final inlineIce = data['ice_servers'];
         if (roomId == null) {
           dev.log('MATCH ← missing room_id in match_found');
           _showError('Invalid match payload.');
@@ -207,10 +224,26 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         }
         setState(() {
           _remoteName = partner ?? 'Partner';
+          _remoteGender = partnerGender;
+          _remoteProfileImage = partnerProfileImage;
           _sessionId = sessionId;
           _offerInFlight = false;
         });
-        _startSignaling(roomId);
+        if (inlineSignalingUrl != null && inlineSignalingToken != null) {
+          // Use credentials already present in match_found — avoids an extra
+          // REST round-trip that would mint a conflicting token.
+          if (inlineIce is List) {
+            _iceServers = inlineIce
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList();
+          }
+          dev.log('SIG → using inline signaling data from match_found');
+          await _createPeerConnection();
+          await _connectSignalingWs(inlineSignalingUrl, inlineSignalingToken);
+        } else {
+          _startSignaling(roomId);
+        }
         break;
 
       case 'error':
@@ -242,7 +275,14 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
             .map((e) => Map<String, dynamic>.from(e))
             .toList();
       }
-      dev.log('SIG → signaling_url=$signalingUrl, ice=${_iceServers.length} server(s)');
+      dev.log('SIG → signaling_url=$signalingUrl');
+      dev.log('SIG → ice_servers (${_iceServers.length}):');
+      for (var i = 0; i < _iceServers.length; i++) {
+        final srv = _iceServers[i];
+        final urls = srv['urls'] ?? srv['url'];
+        final hasCred = srv['username'] != null || srv['credential'] != null;
+        dev.log('SIG →   [$i] urls=$urls${hasCred ? ' (with credentials)' : ''}');
+      }
 
       await _createPeerConnection();
       await _connectSignalingWs(signalingUrl, signalingToken);
@@ -262,6 +302,11 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 
     pc.onIceCandidate = (candidate) {
       if (candidate.candidate == null) return;
+      // Candidate types: host (local), srflx (STUN reflexive), relay (TURN),
+      // prflx (peer reflexive). Seeing only `host` means STUN is not reachable.
+      final candStr = candidate.candidate!;
+      final typ = RegExp(r'typ (\w+)').firstMatch(candStr)?.group(1) ?? '?';
+      dev.log('ICE → local candidate typ=$typ | $candStr');
       _sendSig({
         'type': 'ice',
         'candidate': {
@@ -270,6 +315,14 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
           'sdpMLineIndex': candidate.sdpMLineIndex,
         },
       });
+    };
+
+    pc.onIceGatheringState = (state) {
+      dev.log('ICE → gatheringState=$state');
+    };
+
+    pc.onIceConnectionState = (state) {
+      dev.log('ICE → connectionState=$state');
     };
 
     pc.onTrack = (event) {
@@ -352,10 +405,24 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         // list, someone was here before us — we are the answerer and should
         // wait for their offer. Otherwise, we wait for peer-joined.
         final peersOnJoin = msg['peers'];
+        final peerProfiles = msg['peer_profiles'];
         if (peersOnJoin is List && peersOnJoin.isNotEmpty) {
           dev.log('PC → joined as second peer, waiting for offer');
         } else {
           dev.log('PC → joined as first peer, waiting for peer-joined');
+        }
+        if (peerProfiles is List && peerProfiles.isNotEmpty) {
+          final profile = peerProfiles.first as Map<String, dynamic>?;
+          if (profile != null && mounted) {
+            final firstName = profile['first_name'] as String? ?? '';
+            final lastName = profile['last_name'] as String? ?? '';
+            final name = '$firstName $lastName'.trim();
+            setState(() {
+              if (name.isNotEmpty) _remoteName = name;
+              _remoteGender = profile['gender'] as String?;
+              _remoteProfileImage = profile['profile_image'] as String?;
+            });
+          }
         }
         break;
 
@@ -368,6 +435,16 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       case 'peer-joined':
       case 'peer_joined':
         // Another peer arrived after us — we drive the offer.
+        final peerFirstName = msg['first_name'] as String? ?? '';
+        final peerLastName = msg['last_name'] as String? ?? '';
+        final peerName = '$peerFirstName $peerLastName'.trim();
+        if (mounted) {
+          setState(() {
+            if (peerName.isNotEmpty) _remoteName = peerName;
+            _remoteGender = msg['gender'] as String?;
+            _remoteProfileImage = msg['profile_image'] as String?;
+          });
+        }
         if (_pc != null && !_offerInFlight) {
           await _makeOffer();
         }
@@ -389,6 +466,27 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       case 'peer-left':
         dev.log('SIG WS ← peer-left, re-matching');
         if (!_isStopping && mounted) _connectWaitingRoom();
+        break;
+
+      case 'limit finished':
+        dev.log('SIG WS ← limit finished');
+        if (!_isStopping && mounted) {
+          _isStopping = true;
+          await _teardownSession();
+          final stream = _localStream;
+          _localStream = null;
+          if (stream != null) {
+            for (final track in stream.getTracks()) {
+              try { await track.stop(); } catch (_) {}
+            }
+            try { await stream.dispose(); } catch (_) {}
+          }
+          _localRenderer.srcObject = null;
+          if (mounted) {
+            await showFreeMinutesDialog(context);
+            if (mounted) Navigator.of(context).pop();
+          }
+        }
         break;
 
       case 'error':
@@ -452,8 +550,13 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     if (pc == null) return;
     final c = (msg['candidate'] ?? msg) as Map?;
     if (c == null) return;
+    final candStr = c['candidate'] as String?;
+    final typ = candStr == null
+        ? '?'
+        : RegExp(r'typ (\w+)').firstMatch(candStr)?.group(1) ?? '?';
+    dev.log('ICE ← remote candidate typ=$typ | $candStr');
     final candidate = RTCIceCandidate(
-      c['candidate'] as String?,
+      candStr,
       c['sdpMid'] as String?,
       c['sdpMLineIndex'] as int?,
     );
@@ -673,11 +776,13 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
                         renderer: _remoteRenderer,
                         name: _remoteName ?? 'Partner',
                         gender: _remoteGender,
+                        profileImage: _remoteProfileImage,
                         onReport: _showReportDialog,
                       )
                     : _RemoteCameraOffView(
                         name: _remoteName ?? 'Partner',
                         gender: _remoteGender,
+                        profileImage: _remoteProfileImage,
                         onReport: _showReportDialog,
                       )
                 : const _SearchingView(),
@@ -799,12 +904,14 @@ class _RemoteVideoArea extends StatelessWidget {
   final RTCVideoRenderer renderer;
   final String name;
   final String? gender;
+  final String? profileImage;
   final VoidCallback onReport;
 
   const _RemoteVideoArea({
     required this.renderer,
     required this.name,
     this.gender,
+    this.profileImage,
     required this.onReport,
   });
 
@@ -831,7 +938,16 @@ class _RemoteVideoArea extends StatelessWidget {
                   color: Colors.grey.shade300,
                   border: Border.all(color: Colors.white, width: 2),
                 ),
-                child: const Icon(Icons.person, size: 20, color: Colors.white),
+                child: ClipOval(
+                  child: profileImage != null
+                      ? Image.network(
+                          _resolveImageUrl(profileImage!),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) =>
+                              const Icon(Icons.person, size: 20, color: Colors.white),
+                        )
+                      : const Icon(Icons.person, size: 20, color: Colors.white),
+                ),
               ),
               const SizedBox(width: 8),
               Column(
@@ -909,11 +1025,13 @@ class _RemoteVideoArea extends StatelessWidget {
 class _RemoteCameraOffView extends StatelessWidget {
   final String name;
   final String? gender;
+  final String? profileImage;
   final VoidCallback onReport;
 
   const _RemoteCameraOffView({
     required this.name,
     this.gender,
+    this.profileImage,
     required this.onReport,
   });
 
@@ -939,10 +1057,15 @@ class _RemoteCameraOffView extends StatelessWidget {
                     color: Colors.grey.shade400,
                     border: Border.all(color: Colors.white, width: 3),
                   ),
-                  child: Icon(
-                    Icons.person,
-                    size: 50,
-                    color: Colors.grey.shade300,
+                  child: ClipOval(
+                    child: profileImage != null
+                        ? Image.network(
+                            _resolveImageUrl(profileImage!),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) =>
+                                Icon(Icons.person, size: 50, color: Colors.grey.shade300),
+                          )
+                        : Icon(Icons.person, size: 50, color: Colors.grey.shade300),
                   ),
                 ),
                 const SizedBox(height: 12),

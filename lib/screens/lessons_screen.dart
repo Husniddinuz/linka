@@ -1,4 +1,3 @@
-import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
@@ -35,7 +34,6 @@ class _LessonsScreenState extends State<LessonsScreen> {
       final data = await ApiService.get(
         '/bookings/calendar/?year=${_focusedMonth.year}&month=${_focusedMonth.month}',
       );
-      developer.log('[LessonsScreen] GET /bookings/calendar/ -> $data', name: 'lessons');
       final days = <int>{};
       final raw = data['busy_dates'] ?? data['busy_days'];
       if (raw is List) {
@@ -68,7 +66,6 @@ class _LessonsScreenState extends State<LessonsScreen> {
     setState(() => _loadingBookings = true);
     try {
       final list = await ApiService.getList('/bookings/my/');
-      developer.log('[LessonsScreen] GET /bookings/my/ -> $list', name: 'lessons');
       if (mounted) {
         setState(() {
           _bookings = list.cast<Map<String, dynamic>>();
@@ -115,22 +112,16 @@ class _LessonsScreenState extends State<LessonsScreen> {
   }
 
   Future<void> _cancelBooking(int bookingId) async {
-    final confirm = await showDialog<bool>(
+    final reason = await showModalBottomSheet<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Cancel Lesson'),
-        content: const Text('Are you sure you want to cancel this lesson?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Yes, cancel')),
-        ],
-      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const CancelLessonSheet(),
     );
-    if (confirm != true) return;
+    if (reason == null) return;
 
     try {
-      final result = await ApiService.patch('/bookings/$bookingId/cancel/');
-      developer.log('[LessonsScreen] PATCH /bookings/$bookingId/cancel/ -> $result', name: 'lessons');
+      await ApiService.patch('/bookings/$bookingId/cancel/', {'reason': reason});
       _fetchCalendar();
       _fetchBookings();
     } on ApiException catch (e) {
@@ -143,7 +134,6 @@ class _LessonsScreenState extends State<LessonsScreen> {
   Future<void> _joinLesson(int bookingId, {String tutorName = 'Tutor'}) async {
     try {
       final data = await ApiService.post('/bookings/$bookingId/join/', {});
-      developer.log('[LessonsScreen] POST /bookings/$bookingId/join/ -> $data', name: 'lessons');
       final payload = (data['data'] is Map<String, dynamic>)
           ? data['data'] as Map<String, dynamic>
           : data;
@@ -161,7 +151,6 @@ class _LessonsScreenState extends State<LessonsScreen> {
               '')
           .toString();
       if (roomUrl.isEmpty) {
-        developer.log('[LessonsScreen] join payload missing room_url: $payload', name: 'lessons');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Could not get room info')),
@@ -582,6 +571,222 @@ class _NoClassesCard extends StatelessWidget {
             ),
           ),
         ],
+    );
+  }
+}
+
+// ─── Cancel lesson bottom sheet ─────────────────────────────────────────────────
+
+class CancelLessonSheet extends StatefulWidget {
+  const CancelLessonSheet({super.key});
+
+  @override
+  State<CancelLessonSheet> createState() => _CancelLessonSheetState();
+}
+
+class _CancelLessonSheetState extends State<CancelLessonSheet> {
+  final _controller = TextEditingController();
+  bool _showError = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _confirm() {
+    final reason = _controller.text.trim();
+    if (reason.isEmpty) {
+      setState(() => _showError = true);
+      return;
+    }
+    Navigator.of(context).pop(reason);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: bottomInset),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFDDDDDD),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            width: 72,
+            height: 72,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFEDED),
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.warning_amber_rounded,
+                color: Color(0xFFE53935),
+                size: 40,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Cancel Lesson?',
+            style: TextStyle(
+              fontFamily: 'SF Pro',
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF272942),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFEDED),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE53935).withValues(alpha: 0.35)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.info_outline_rounded, color: Color(0xFFE53935), size: 18),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Your payment will NOT be refunded.\nThe lesson fee has already been charged and cancellations are non-reversible.',
+                    style: TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFFB71C1C),
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Reason for cancellation',
+                style: TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF272942),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _controller,
+                onChanged: (_) => setState(() => _showError = false),
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Please explain why you are cancelling…',
+                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFFAAAAAA)),
+                  filled: true,
+                  fillColor: const Color(0xFFF5F5F7),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: _showError
+                        ? const BorderSide(color: Color(0xFFE53935), width: 1.5)
+                        : BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF272942), width: 1.5),
+                  ),
+                ),
+              ),
+              if (_showError) ...[
+                const SizedBox(height: 4),
+                const Text(
+                  'A reason is required to cancel.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFE53935),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF2F2F4),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Keep lesson',
+                        style: TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF272942),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: _confirm,
+                  child: Container(
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE53935),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Yes, cancel',
+                        style: TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

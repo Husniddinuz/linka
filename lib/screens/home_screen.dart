@@ -1,4 +1,5 @@
 import 'dart:developer' as dev;
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../widgets/cached_avatar.dart';
@@ -6,12 +7,16 @@ import '../widgets/lesson_card.dart';
 import '../widgets/mini_player_bar.dart';
 import '../widgets/skeleton.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import '../services/prefs_service.dart';
+import '../services/update_service.dart';
 import '../services/user_service.dart';
+import '../widgets/update_dialog.dart';
+import 'speaking_training_screen.dart';
 import 'lesson_meeting_screen.dart';
+import 'notifications_inbox_screen.dart';
 import 'lessons_screen.dart';
 import 'tutors_screen.dart';
-import 'speaking_training_screen.dart';
 import 'my_profile_screen.dart';
 import 'story_upload_screen.dart';
 import 'podcast_player_screen.dart';
@@ -22,6 +27,7 @@ import 'story_viewer_screen.dart';
 import 'tutor_earnings_screen.dart';
 import 'tutor_stories_screen.dart';
 import 'profile_setup_screen.dart';
+import 'webinar_viewer_screen.dart';
 
 // ─── Data models ───────────────────────────────────────────────────────────────
 
@@ -120,6 +126,7 @@ class _Article {
   }
 }
 
+
 // ─── Screen ────────────────────────────────────────────────────────────────────
 
 class HomeScreen extends StatefulWidget {
@@ -153,6 +160,13 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadPodcasts();
     _loadArticles();
     _loadSavedArticles();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
+  }
+
+  Future<void> _checkForUpdate() async {
+    final info = await UpdateService.checkForUpdate();
+    if (info == null || !mounted) return;
+    await showUpdateDialog(context, info);
   }
 
   Future<void> _bootstrapRole() async {
@@ -317,6 +331,70 @@ class _HomeScreenState extends State<HomeScreen> {
     ]);
   }
 
+  Future<void> _cancelLesson(Lesson lesson) async {
+    if (lesson.id == 0) return;
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const CancelLessonSheet(),
+    );
+    if (reason == null) return;
+    try {
+      await ApiService.patch('/bookings/${lesson.id}/cancel/', {'reason': reason});
+      _loadTodaysLessons();
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
+  Future<void> _joinLesson(Lesson lesson) async {
+    if (lesson.id == 0) return;
+    try {
+      final data = await ApiService.post('/bookings/${lesson.id}/join/', {});
+      final payload = (data['data'] is Map<String, dynamic>)
+          ? data['data'] as Map<String, dynamic>
+          : data;
+      final roomUrl = (payload['joinUrl'] ??
+              payload['join_url'] ??
+              payload['room_url'] ??
+              payload['daily_room_url'] ??
+              payload['roomUrl'] ??
+              lesson.dailyRoomUrl)
+          .toString();
+      final token = (payload['token'] ??
+              payload['daily_token'] ??
+              payload['meeting_token'] ??
+              payload['daily_meeting_token'] ??
+              '')
+          .toString();
+      if (roomUrl.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not get room info')),
+          );
+        }
+        return;
+      }
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => LessonMeetingScreen(
+            roomUrl: roomUrl,
+            token: token,
+            tutorName: lesson.participantName,
+          ),
+        ),
+      );
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
   Future<void> _loadTodaysLessons() async {
     try {
       final list = await ApiService.getList('/bookings/my/');
@@ -383,6 +461,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ] else
                     const SizedBox(height: 20),
 
+                  // Webinar block
+                  const _WebinarBlock(),
+                  const SizedBox(height: 28),
+
                   // Speaking practice button
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 21),
@@ -404,6 +486,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     lessons: _todaysLessons,
                     loading: _loadingLessons,
                     onSeeAll: () => setState(() => _selectedTab = 1),
+                    onStartLesson: _joinLesson,
+                    onCancelLesson: _cancelLesson,
                   ),
 
                   const SizedBox(height: 28),
@@ -595,14 +679,41 @@ class _NavItem {
 
 // ─── Header ────────────────────────────────────────────────────────────────────
 
-class _Header extends StatelessWidget {
+class _Header extends StatefulWidget {
   final String? profileImage;
   final bool isTutor;
   const _Header({this.profileImage, this.isTutor = false});
 
   @override
+  State<_Header> createState() => _HeaderState();
+}
+
+class _HeaderState extends State<_Header> {
+  bool _hasNew = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshHasNew();
+  }
+
+  Future<void> _refreshHasNew() async {
+    final v = await NotificationService.hasNew();
+    if (!mounted) return;
+    setState(() => _hasNew = v);
+  }
+
+  Future<void> _openInbox() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const NotificationsInboxScreen()),
+    );
+    // Inbox interactions (tap, mark-all) may have changed unread state.
+    if (mounted) _refreshHasNew();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final avatar = CachedAvatar(imageUrl: profileImage, size: 44);
+    final avatar = CachedAvatar(imageUrl: widget.profileImage, size: 44);
 
     return Container(
       color: Colors.white,
@@ -622,7 +733,7 @@ class _Header extends StatelessWidget {
           ),
 
           // Add story button (tutors only)
-          if (isTutor)
+          if (widget.isTutor)
             GestureDetector(
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const StoryUploadScreen()),
@@ -637,11 +748,17 @@ class _Header extends StatelessWidget {
               ),
             ),
 
-          // Bell with red dot
-          SvgPicture.asset(
-            'assets/images/icons/notification.svg',
-            width: 30,
-            height: 27,
+          // Bell — red dot shown only when the inbox has unread items.
+          GestureDetector(
+            onTap: _openInbox,
+            behavior: HitTestBehavior.opaque,
+            child: SvgPicture.asset(
+              _hasNew
+                  ? 'assets/images/icons/notification.svg'
+                  : 'assets/images/icons/notification_empty.svg',
+              width: 30,
+              height: 27,
+            ),
           ),
         ],
       ),
@@ -802,7 +919,9 @@ class _LessonsSection extends StatelessWidget {
   final List<Lesson> lessons;
   final bool loading;
   final VoidCallback? onSeeAll;
-  const _LessonsSection({required this.lessons, this.loading = false, this.onSeeAll});
+  final ValueChanged<Lesson>? onStartLesson;
+  final ValueChanged<Lesson>? onCancelLesson;
+  const _LessonsSection({required this.lessons, this.loading = false, this.onSeeAll, this.onStartLesson, this.onCancelLesson});
 
   @override
   Widget build(BuildContext context) {
@@ -864,7 +983,12 @@ class _LessonsSection extends StatelessWidget {
           ...lessons.map(
             (l) => Padding(
               padding: const EdgeInsets.only(left: 20, right: 20, bottom: 8),
-              child: LessonCard(lesson: l),
+              child: LessonCard(
+                lesson: l,
+                showStartButton: l.dailyRoomUrl.isNotEmpty,
+                onStart: onStartLesson != null ? () => onStartLesson!(l) : null,
+                onCancel: onCancelLesson != null ? () => onCancelLesson!(l) : null,
+              ),
             ),
           ),
       ],
@@ -922,47 +1046,191 @@ class _SectionHeader extends StatelessWidget {
 class _ComingSoonBanner extends StatelessWidget {
   const _ComingSoonBanner();
 
+  static const _posters = [
+    'assets/images/movies/joker.png',
+    'assets/images/movies/little-women.png',
+    'assets/images/movies/thor.png',
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
-        decoration: BoxDecoration(
-          color: const Color(0xFF272942),
-          borderRadius: BorderRadius.circular(14),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: SizedBox(
+          height: 160,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Blurred movie posters row
+              ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: 2.5, sigmaY: 2.5),
+                child: Row(
+                  children: _posters.map((path) => Expanded(
+                    child: Image.asset(
+                      path,
+                      fit: BoxFit.cover,
+                      height: double.infinity,
+                    ),
+                  )).toList(),
+                ),
+              ),
+              // Dark overlay
+              Container(color: const Color(0xFF272942).withValues(alpha: 0.55)),
+              // Coming soon badge
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.movie_outlined,
+                      color: Color(0xFFF5C542),
+                      size: 32,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Coming soon',
+                      style: TextStyle(
+                        fontFamily: 'SF Pro',
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Movies will be available shortly',
+                      style: TextStyle(
+                        fontFamily: 'SF Pro',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.white.withValues(alpha: 0.75),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-        child: Column(
-          children: [
-            const Icon(
-              Icons.movie_outlined,
-              color: Color(0xFFF5C542),
-              size: 36,
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Coming soon',
-              style: TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                height: 1.2,
+      ),
+    );
+  }
+}
+
+// ─── Webinar block (single featured webinar) ───────────────────────────────────
+
+class _WebinarBlock extends StatelessWidget {
+  const _WebinarBlock();
+
+  @override
+  Widget build(BuildContext context) {
+    final webinar = WebinarData(
+      id: 1,
+      title: 'English Grammar Masterclass',
+      tutorName: 'Sarah Johnson',
+      tutorImage: null,
+      scheduledAt: DateTime.now().copyWith(hour: 21, minute: 0, second: 0),
+      status: 'live',
+      playbackUrl: 'https://live.143b.ch/cam/flux/ts:abr.m3u8',
+      viewerCount: 12,
+    );
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => WebinarViewerScreen(webinar: webinar)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF272942),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5C542).withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.live_tv_rounded,
+                      color: Color(0xFFF5C542),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'WEBINAR',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFF5C542),
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        Text(
+                          'Today, Tutor ${webinar.tutorName} will hold a session at 21:00',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withValues(alpha: 0.85),
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Movies will be available shortly',
-              style: TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 13,
-                fontWeight: FontWeight.w400,
-                color: Colors.white.withValues(alpha: 0.7),
-                height: 1.3,
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  const Icon(Icons.people_outline_rounded, size: 14, color: Color(0xFFAAAAAA)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Unlimited viewers · Chat only',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5C542),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      'Join',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF272942),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

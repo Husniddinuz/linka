@@ -66,4 +66,56 @@ class NotificationService {
       }
     });
   }
+
+  // ─── Inbox ──────────────────────────────────────────────────────────────
+
+  /// Returns `true` when the user has unread notifications. Never throws;
+  /// returns `false` on network/parse failure so the bell indicator fails
+  /// safely (no false positive).
+  static Future<bool> hasNew() async {
+    try {
+      final data = await ApiService.get('/notifications/inbox/has-new/');
+      return data['has_new'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Fetches the notifications inbox. The backend may return either a bare
+  /// JSON array or a paginated `{results: [...]}` object — both are handled.
+  static Future<List<Map<String, dynamic>>> fetchInbox({
+    int page = 1,
+    int limit = 20,
+    String? status,
+    String? type,
+  }) async {
+    final query = <String, String>{
+      'page': '$page',
+      'limit': '$limit',
+      'status': ?status,
+      'type': ?type,
+    };
+    final qs = query.entries.map((e) => '${e.key}=${e.value}').join('&');
+    final path = '/notifications/inbox/?$qs';
+
+    try {
+      final list = await ApiService.getList(path);
+      return list.cast<Map<String, dynamic>>();
+    } catch (_) {
+      // Fall through to try the wrapped-object shape (ApiException on HTTP
+      // error, TypeError when the body is a Map instead of a List).
+    }
+    final data = await ApiService.get(path);
+    final results = data['results'];
+    if (results is List) return results.cast<Map<String, dynamic>>();
+    return const [];
+  }
+
+  static Future<void> markRead(String notificationId) async {
+    await ApiService.post('/notifications/inbox/$notificationId/read/', {});
+  }
+
+  static Future<void> markAllRead() async {
+    await ApiService.post('/notifications/inbox/mark-all-read/', {});
+  }
 }

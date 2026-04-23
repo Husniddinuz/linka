@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../widgets/cached_avatar.dart';
+import '../widgets/plus_member_card.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/plus_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 import '../services/wallet_service.dart';
@@ -14,8 +16,10 @@ import 'saved_tutors_screen.dart';
 import 'role_selection_screen.dart';
 import 'faq_screen.dart';
 import 'notifications_screen.dart';
+import 'my_reviews_screen.dart';
 import 'saved_articles_screen.dart';
 import 'payment_topup_screen.dart';
+import 'tutor_schedule_screen.dart';
 
 class MyProfileScreen extends StatefulWidget {
   final VoidCallback? onNavigateToLessons;
@@ -29,6 +33,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
   Map<String, dynamic>? _profile;
   bool _loading = true;
   bool _isTeacher = false;
+  PlusStatus? _plusStatus;
 
   @override
   void initState() {
@@ -40,12 +45,77 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
     final cached = await UserService.getCachedIsTeacher();
     if (mounted && cached != null) setState(() => _isTeacher = cached);
     _loadProfile();
+    _loadPlusStatus();
+  }
+
+  Future<void> _loadPlusStatus() async {
+    if (_isTeacher) return;
+    try {
+      final status = await PlusService.getMyStatus();
+      if (!mounted) return;
+      setState(() => _plusStatus = status);
+    } catch (_) {
+      // Leave _plusStatus null — the card is hidden when we can't confirm.
+    }
+  }
+
+  Future<void> _openPlusSubscription() async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const PlusSubscriptionScreen()),
+    );
+    if (changed == true && mounted) _loadPlusStatus();
+  }
+
+  String _plusPlanLabel(PlusStatus? status) {
+    switch (status?.planCode) {
+      case 'yearly':
+        return 'ANNUAL';
+      case 'monthly':
+        return 'MONTHLY';
+    }
+    return status?.planCode?.toUpperCase() ?? 'PLUS';
+  }
+
+  String _plusPriceLabel(PlusStatus? status) {
+    final price = status?.currentPlan?.priceUzs;
+    if (price != null && price > 0) return '${_formatPrice(price)} UZS';
+    switch (status?.planCode) {
+      case 'yearly':
+        return '240 000 UZS';
+      case 'monthly':
+        return '30 000 UZS';
+    }
+    return '';
+  }
+
+  String _formatPrice(int price) {
+    final str = price.toString();
+    final buffer = StringBuffer();
+    for (var i = 0; i < str.length; i++) {
+      if (i > 0 && (str.length - i) % 3 == 0) buffer.write(' ');
+      buffer.write(str[i]);
+    }
+    return buffer.toString();
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return '—';
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final month = months[(date.month - 1).clamp(0, 11)];
+    return '$month ${date.day}, ${date.year}';
   }
 
   Future<void> _loadProfile() async {
     try {
       final me = UserService.current ?? await UserService.fetchMe();
-      final path = _isTeacher
+      final isTeacher = me.isTeacher;
+      if (mounted && isTeacher != _isTeacher) {
+        setState(() => _isTeacher = isTeacher);
+      }
+      final path = isTeacher
           ? '/tutors/${me.tutorProfileId}/'
           : '/student/profile/';
       final result = await ApiService.get(path);
@@ -147,7 +217,16 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                     // Gray section: rest of content
                     const SizedBox(height: 16),
                     if (!_isTeacher) ...[
-                      _JoinPlusBanner(),
+                      if (_plusStatus?.isActive == true)
+                        PlusMemberCard(
+                          plan: _plusPlanLabel(_plusStatus),
+                          memberSince: _formatDate(_plusStatus?.since),
+                          nextRenewal: _formatDate(_plusStatus?.plusUntil),
+                          priceLabel: _plusPriceLabel(_plusStatus),
+                          onTap: () => _openPlusSubscription(),
+                        )
+                      else
+                        _JoinPlusBanner(onTap: _openPlusSubscription),
                       const SizedBox(height: 16),
                       _CardGroup(children: [_BalanceRow()]),
                       const SizedBox(height: 16),
@@ -162,10 +241,24 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                           ),
                           const _Divider(),
                         ],
+                        if (_isTeacher) ...[
+                          _MenuRow(
+                            icon: 'assets/images/icons/calendar_outline_20.svg',
+                            label: 'My schedule',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const TutorScheduleScreen()),
+                            ),
+                          ),
+                          const _Divider(),
+                        ],
                         _MenuRow(
                           icon: 'assets/images/buttons/my-reviews.svg',
                           label: 'My reviews',
-                          onTap: () {},
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => const MyReviewsScreen()),
+                          ),
                         ),
                         if (!_isTeacher) ...[
                           const _Divider(),
@@ -339,23 +432,20 @@ class _ProfileCard extends StatelessWidget {
 // ─── Join PLUS banner ───────────────────────────────────────────────────────
 
 class _JoinPlusBanner extends StatelessWidget {
+  final VoidCallback onTap;
+  const _JoinPlusBanner({required this.onTap});
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GestureDetector(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const PlusSubscriptionScreen()),
-          );
-        },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: Image.asset(
-            'assets/images/branding/profile-join-plus.png',
-            width: double.infinity,
-            fit: BoxFit.fitWidth,
-          ),
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Image.asset(
+          'assets/images/branding/profile-join-plus.png',
+          width: double.infinity,
+          fit: BoxFit.fitWidth,
         ),
       ),
     );

@@ -1,6 +1,3 @@
-import 'dart:convert';
-import 'dart:developer' as developer;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:video_player/video_player.dart';
@@ -34,11 +31,7 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
   Future<void> _loadTutor() async {
     try {
       final result = await ApiService.get('/tutors/${widget.tutorId}/');
-      developer.log(
-        const JsonEncoder.withIndent('  ').convert(result),
-        name: 'TutorProfile',
-      );
-      if (!mounted) return;
+if (!mounted) return;
       setState(() {
         _tutor = result;
         _isBookmarked = result['is_bookmarked'] as bool? ?? false;
@@ -55,7 +48,7 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
       final result = await ApiService.getList('/tutors/${widget.tutorId}/reviews/');
       if (!mounted) return;
       setState(() {
-        _reviews = result.map((e) => e as Map<String, dynamic>).toList();
+        _reviews = result.cast<Map<String, dynamic>>();
         _reviewsLoading = false;
       });
     } catch (_) {
@@ -336,11 +329,13 @@ class _TutorVideoState extends State<_TutorVideo> {
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
       ..addListener(() {
         if (mounted) setState(() {});
-      })
-      ..initialize().then((_) {
-        if (!mounted) return;
-        setState(() => _initialized = true);
       });
+    _controller.initialize().then((_) {
+      if (!mounted) return;
+      setState(() => _initialized = true);
+    }).catchError((_) {
+      // Video URL is invalid or unreachable — hide the player silently.
+    });
   }
 
   @override
@@ -777,15 +772,15 @@ class _ReviewsSection extends StatelessWidget {
   String _reviewerName(Map<String, dynamic> r) {
     final s = r['student'];
     if (s is Map) {
+      for (final key in ['display_name', 'full_name', 'name']) {
+        final v = (s[key] ?? '').toString().trim();
+        if (v.isNotEmpty) return v;
+      }
       final first = (s['first_name'] ?? '').toString().trim();
       final last = (s['last_name'] ?? '').toString().trim();
       final full = '$first $last'.trim();
       if (full.isNotEmpty) return full;
-      final nm = (s['full_name'] ?? s['name'] ?? '').toString().trim();
-      if (nm.isNotEmpty) return nm;
     }
-    final direct = (r['student_name'] ?? '').toString().trim();
-    if (direct.isNotEmpty) return direct;
     return 'Student';
   }
 

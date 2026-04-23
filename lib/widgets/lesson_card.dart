@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -88,7 +89,7 @@ class Lesson {
   }
 }
 
-class LessonCard extends StatelessWidget {
+class LessonCard extends StatefulWidget {
   final Lesson lesson;
   final bool showStartButton;
   final VoidCallback? onStart;
@@ -103,8 +104,92 @@ class LessonCard extends StatelessWidget {
   });
 
   @override
+  State<LessonCard> createState() => _LessonCardState();
+}
+
+class _LessonCardState extends State<LessonCard> {
+  Timer? _timer;
+  Duration _remaining = Duration.zero;
+
+  static const _windowMinutes = 120;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateRemaining();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateRemaining());
+  }
+
+  @override
+  void didUpdateWidget(LessonCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.lesson.startAt != widget.lesson.startAt) {
+      _updateRemaining();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _updateRemaining() {
+    final startAt = widget.lesson.startAt;
+    if (startAt == null) {
+      if (mounted) setState(() => _remaining = Duration.zero);
+      return;
+    }
+    final diff = startAt.difference(DateTime.now());
+    if (mounted) setState(() => _remaining = diff > Duration.zero ? diff : Duration.zero);
+  }
+
+  bool get _canStart =>
+      widget.lesson.startAt == null ||
+      _remaining <= const Duration(minutes: _windowMinutes);
+
+  String get _countdownLabel {
+    final total = _remaining.inSeconds;
+    final h = total ~/ 3600;
+    final m = (total % 3600) ~/ 60;
+    final s = total % 60;
+    if (h > 0) {
+      return '${h}h ${m.toString().padLeft(2, '0')}m ${s.toString().padLeft(2, '0')}s';
+    }
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  void _showOptions(BuildContext context) {
+    final cancel = widget.onCancel;
+    if (cancel == null) return;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.cancel_outlined, color: Colors.red),
+              title: const Text('Cancel lesson'),
+              onTap: () {
+                Navigator.pop(ctx);
+                cancel();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isCancelled = lesson.isCancelled;
+    final isCancelled = widget.lesson.isCancelled;
+    final isUpcoming = widget.lesson.startAt == null ||
+        widget.lesson.startAt!.isAfter(DateTime.now());
 
     return Opacity(
       opacity: isCancelled ? 0.5 : 1.0,
@@ -121,9 +206,10 @@ class LessonCard extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: lesson.participantImage != null && lesson.participantImage!.startsWith('http')
+                  child: widget.lesson.participantImage != null &&
+                          widget.lesson.participantImage!.startsWith('http')
                       ? Image.network(
-                          lesson.participantImage!,
+                          widget.lesson.participantImage!,
                           width: 82,
                           height: 82,
                           fit: BoxFit.cover,
@@ -159,7 +245,7 @@ class LessonCard extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                lesson.participantName,
+                                widget.lesson.participantName,
                                 style: const TextStyle(
                                   fontFamily: 'SF Pro',
                                   fontSize: 15,
@@ -179,7 +265,7 @@ class LessonCard extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 5),
                                   Text(
-                                    lesson.timeRange,
+                                    widget.lesson.timeRange,
                                     style: const TextStyle(
                                       fontFamily: 'SF Pro',
                                       fontSize: 11,
@@ -201,7 +287,7 @@ class LessonCard extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 5),
                                   Text(
-                                    lesson.duration,
+                                    widget.lesson.duration,
                                     style: const TextStyle(
                                       fontFamily: 'SF Pro',
                                       fontSize: 11,
@@ -216,11 +302,15 @@ class LessonCard extends StatelessWidget {
                             ],
                           ),
                         ),
-                        if (!isCancelled)
+                        if (!isCancelled && isUpcoming)
                           GestureDetector(
-                            onTap: onCancel != null ? () => _showOptions(context) : null,
+                            onTap: widget.onCancel != null
+                                ? () => _showOptions(context)
+                                : null,
+                            behavior: HitTestBehavior.opaque,
                             child: Padding(
-                              padding: const EdgeInsets.all(4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: List.generate(
@@ -246,31 +336,67 @@ class LessonCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (showStartButton && !isCancelled && onStart != null) ...[
+            if (widget.showStartButton && !isCancelled && widget.onStart != null) ...[
               const SizedBox(height: 8),
-              GestureDetector(
-                onTap: onStart,
-                child: Container(
+              if (_canStart)
+                GestureDetector(
+                  onTap: widget.onStart,
+                  child: Container(
+                    width: double.infinity,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF272942),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _LiveDot(),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Join the lesson',
+                          style: TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            height: 1.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                Container(
                   width: double.infinity,
                   height: 46,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF272942),
+                    color: const Color(0xFFF2F2F4),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Center(
-                    child: Text(
-                      'Start the lesson',
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        height: 1.0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.access_time_rounded,
+                        size: 16,
+                        color: Color(0xFF6C6C6C),
                       ),
-                    ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Starts in $_countdownLabel',
+                        style: const TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF6C6C6C),
+                          height: 1.0,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
             ],
             if (isCancelled) ...[
               const SizedBox(height: 8),
@@ -300,28 +426,45 @@ class LessonCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  void _showOptions(BuildContext context) {
-    final cancel = onCancel;
-    if (cancel == null) return;
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.cancel_outlined, color: Colors.red),
-              title: const Text('Cancel lesson'),
-              onTap: () {
-                Navigator.pop(ctx);
-                cancel();
-              },
-            ),
-          ],
+class _LiveDot extends StatefulWidget {
+  @override
+  State<_LiveDot> createState() => _LiveDotState();
+}
+
+class _LiveDotState extends State<_LiveDot> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _scale = Tween<double>(begin: 0.6, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scale,
+      child: Container(
+        width: 10,
+        height: 10,
+        decoration: const BoxDecoration(
+          color: Color(0xFFE53935),
+          shape: BoxShape.circle,
         ),
       ),
     );
