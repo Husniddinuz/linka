@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../services/api_constants.dart';
 import '../services/api_service.dart';
@@ -81,6 +82,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 
   Future<void> _init() async {
     dev.log('INIT → starting');
+    WakelockPlus.enable();
 
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
@@ -129,6 +131,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       });
       _localStream = stream;
       _localRenderer.srcObject = stream;
+      await Helper.setSpeakerphoneOn(true);
       if (mounted) setState(() {});
       dev.log('MEDIA → local stream ready');
     } catch (e) {
@@ -740,6 +743,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   void dispose() {
     dev.log('DISPOSE → start');
     _isStopping = true;
+    WakelockPlus.disable();
     // Run async teardown fire-and-forget so dispose() returns immediately.
     () async {
       await _teardownSession();

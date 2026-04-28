@@ -1,6 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
-
-import 'api_service.dart';
+import 'api_constants.dart';
 
 class UpdateInfo {
   final bool hasUpdate;
@@ -32,12 +34,13 @@ class UpdateService {
   static Future<UpdateInfo?> checkForUpdate() async {
     try {
       final pkg = await PackageInfo.fromPlatform();
-      final result = await ApiService.get(
-        '/app/version/?version=${pkg.version}',
+      final osType = Platform.isIOS ? 'ios' : 'android';
+      final uri = Uri.parse(
+        '$apiBaseUrl/app/version/?os_type=$osType&version=${pkg.version}',
       );
-      final data = (result['data'] is Map<String, dynamic>)
-          ? result['data'] as Map<String, dynamic>
-          : result;
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return null;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
       final info = UpdateInfo.fromJson(data);
       return info.hasUpdate ? info : null;
     } catch (_) {

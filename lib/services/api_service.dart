@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as dev;
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'api_constants.dart';
@@ -55,9 +56,14 @@ class ApiService {
         if (token != null) 'Authorization': 'Bearer $token',
       };
 
-  static void _logRequest(String method, String path, {String? body}) {}
+  static void _logRequest(String method, String path, {String? body}) {
+    dev.log('┌── $method $path', name: 'ApiService');
+    if (body != null) dev.log('│ body: $body', name: 'ApiService');
+  }
 
-  static void _logResponse(String method, String path, int statusCode, String body) {}
+  static void _logResponse(String method, String path, int statusCode, String body) {
+    dev.log('└── $method $path → $statusCode\n$body', name: 'ApiService');
+  }
 
   /// Attempts to refresh the access token. Returns the new token or null.
   static Future<String?> _tryRefreshToken() async {

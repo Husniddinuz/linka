@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
 import '../services/booking_service.dart';
 import '../services/wallet_service.dart';
@@ -259,24 +258,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         const SizedBox(height: 20),
 
                         // DETAILS header
-                        Row(
-                          children: [
-                            const Text(
-                              'DETAILS',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFAAAAAA),
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const Spacer(),
-                            SvgPicture.asset(
-                              'assets/images/buttons/edit-session.svg',
-                              width: 18,
-                              height: 18,
-                            ),
-                          ],
+                        const Text(
+                          'DETAILS',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFAAAAAA),
+                            letterSpacing: 0.5,
+                          ),
                         ),
 
                         const SizedBox(height: 10),

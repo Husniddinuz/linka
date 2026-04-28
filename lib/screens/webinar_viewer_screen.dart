@@ -20,6 +20,8 @@ class WebinarData {
   final String status; // "live" | "upcoming" | "ended"
   final String? playbackUrl;
   final int viewerCount;
+  final bool isAvailable;
+  final String? vodUrl;
 
   const WebinarData({
     required this.id,
@@ -30,6 +32,8 @@ class WebinarData {
     required this.status,
     this.playbackUrl,
     this.viewerCount = 0,
+    this.isAvailable = false,
+    this.vodUrl,
   });
 
   factory WebinarData.fromJson(Map<String, dynamic> j) {
@@ -46,10 +50,13 @@ class WebinarData {
       status: (j['status'] ?? 'upcoming').toString(),
       playbackUrl: (j['playback_url'] ?? j['stream_url'] ?? '') as String?,
       viewerCount: (j['viewer_count'] ?? j['viewers_count'] ?? 0) as int,
+      isAvailable: j['is_available'] as bool? ?? false,
+      vodUrl: j['vod_url']?.toString() ?? j['recording_url']?.toString(),
     );
   }
 
   bool get isLive => status == 'live';
+  bool get hasVod => (vodUrl?.isNotEmpty ?? false) && status == 'ended';
 }
 
 // ─── Chat message model ────────────────────────────────────────────────────────
@@ -99,11 +106,15 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     if (widget.webinar.isLive && widget.webinar.playbackUrl != null && widget.webinar.playbackUrl!.isNotEmpty) {
       _initVideo(widget.webinar.playbackUrl!);
+    } else if (widget.webinar.hasVod) {
+      _initVideo(widget.webinar.vodUrl!);
     }
     _connectChat();
   }
 
   Future<void> _initVideo(String url) async {
+    final kind = widget.webinar.hasVod ? 'VOD' : 'live';
+    dev.log('webinar: init $kind video — $url', name: 'webinar');
     try {
       final controller = VideoPlayerController.networkUrl(Uri.parse(url));
       await controller.initialize();
@@ -111,6 +122,7 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
         controller.dispose();
         return;
       }
+      dev.log('webinar: $kind video ready (duration=${controller.value.duration})', name: 'webinar');
       setState(() {
         _videoController = controller;
         _videoInitialized = true;
@@ -118,7 +130,7 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
       controller.play();
       controller.setLooping(false);
     } catch (e) {
-      dev.log('Webinar video init error: $e');
+      dev.log('webinar: $kind video init error — $e', name: 'webinar');
       if (!mounted) return;
       setState(() => _videoError = true);
     }
@@ -133,18 +145,20 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
     final apiUri = Uri.parse(apiBaseUrl);
     final wsScheme = apiUri.scheme == 'https' ? 'wss' : 'ws';
     final wsUrl = '$wsScheme://${apiUri.host}/ws/webinars/${widget.webinar.id}/chat/?token=$token';
+    dev.log('webinar: connecting chat WS — $wsUrl', name: 'webinar');
 
     try {
       _chatWs = WebSocketChannel.connect(Uri.parse(wsUrl));
       await _chatWs!.ready;
+      dev.log('webinar: chat WS connected (id=${widget.webinar.id})', name: 'webinar');
       if (!mounted) return;
       _chatSub = _chatWs!.stream.listen(
         _onChatMessage,
-        onError: (e) => dev.log('Webinar chat WS error: $e'),
+        onError: (e) => dev.log('webinar: chat WS error — $e', name: 'webinar'),
         cancelOnError: false,
       );
     } catch (e) {
-      dev.log('Webinar chat connect error: $e');
+      dev.log('webinar: chat WS connect failed — $e', name: 'webinar');
     }
   }
 
@@ -197,8 +211,9 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
 
     try {
       _chatWs!.sink.add(json.encode({'type': 'chat_message', 'message': text}));
+      dev.log('webinar: chat → sent "$text"', name: 'webinar');
     } catch (e) {
-      dev.log('Chat send error: $e');
+      dev.log('webinar: chat send error — $e', name: 'webinar');
     } finally {
       if (mounted) setState(() => _sendingMessage = false);
     }
@@ -266,13 +281,17 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
   }
 
   Widget _buildVideoSection() {
-    if (!widget.webinar.isLive) {
+    final showPlayer = widget.webinar.isLive || widget.webinar.hasVod;
+    if (!showPlayer) {
       return _UpcomingVideoPlaceholder(webinar: widget.webinar);
     }
     if (_videoError) {
       return _VideoErrorPlaceholder(onRetry: () {
         setState(() => _videoError = false);
-        if (widget.webinar.playbackUrl != null) _initVideo(widget.webinar.playbackUrl!);
+        final url = widget.webinar.isLive
+            ? widget.webinar.playbackUrl
+            : widget.webinar.vodUrl;
+        if (url != null && url.isNotEmpty) _initVideo(url);
       });
     }
     if (!_videoInitialized || _videoController == null) {

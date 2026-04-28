@@ -1,3 +1,4 @@
+import 'dart:developer' as dev;
 import 'api_service.dart';
 
 class BookingService {
@@ -16,7 +17,9 @@ class BookingService {
       if (studentNote != null && studentNote.trim().isNotEmpty)
         'student_note': studentNote.trim(),
     };
+    dev.log('createBooking request: $body', name: 'booking');
     final result = await ApiService.post('/bookings/', body);
+    dev.log('createBooking response: $result', name: 'booking');
     final payload = (result['data'] is Map<String, dynamic>)
         ? result['data'] as Map<String, dynamic>
         : result;
@@ -27,10 +30,10 @@ class BookingService {
 
   /// Pays the given booking from the student's wallet balance.
   static Future<void> payFromWallet({required int bookingId}) async {
-    await ApiService.post(
-      '/payments/bookings/pay/',
-      {'booking_id': bookingId},
-    );
+    final body = {'booking_id': bookingId};
+    dev.log('payFromWallet request: $body', name: 'booking');
+    final result = await ApiService.post('/payments/bookings/pay/', body);
+    dev.log('payFromWallet response: $result', name: 'booking');
   }
 
   /// Formats [dt] as ISO 8601 with timezone offset (e.g. 2026-03-25T14:00:00+05:00).

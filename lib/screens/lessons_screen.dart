@@ -7,7 +7,8 @@ import 'lesson_meeting_screen.dart';
 // ─── Screen ─────────────────────────────────────────────────────────────────────
 
 class LessonsScreen extends StatefulWidget {
-  const LessonsScreen({super.key});
+  final VoidCallback? onFindTutor;
+  const LessonsScreen({super.key, this.onFindTutor});
 
   @override
   State<LessonsScreen> createState() => _LessonsScreenState();
@@ -271,11 +272,12 @@ class _LessonsScreenState extends State<LessonsScreen> {
                                   onCancel: () {
                                     if (lesson.id != 0) _cancelBooking(lesson.id);
                                   },
+                                  onRated: _fetchBookings,
                                 ),
                               );
                             })
                           else
-                            const _NoClassesCard(),
+                            _NoClassesCard(onFindTutor: widget.onFindTutor),
 
                           const SizedBox(height: 32),
                         ],
@@ -516,7 +518,8 @@ class _DateHeader extends StatelessWidget {
 // ─── No classes card ────────────────────────────────────────────────────────────
 
 class _NoClassesCard extends StatelessWidget {
-  const _NoClassesCard();
+  final VoidCallback? onFindTutor;
+  const _NoClassesCard({this.onFindTutor});
 
   @override
   Widget build(BuildContext context) {
@@ -550,22 +553,25 @@ class _NoClassesCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            height: 46,
-            decoration: BoxDecoration(
-              color: const Color(0xFF272942),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Center(
-              child: Text(
-                'Find a tutor',
-                style: TextStyle(
-                  fontFamily: 'SF Pro',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  height: 1.0,
+          GestureDetector(
+            onTap: onFindTutor,
+            child: Container(
+              width: double.infinity,
+              height: 46,
+              decoration: BoxDecoration(
+                color: const Color(0xFF272942),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Center(
+                child: Text(
+                  'Find a tutor',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    height: 1.0,
+                  ),
                 ),
               ),
             ),

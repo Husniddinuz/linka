@@ -50,15 +50,17 @@ class _MoviePlayerScreenState extends State<MoviePlayerScreen> {
   Future<void> _loadMovie() async {
     String? playbackUrl = widget.initialPlaybackUrl;
 
-    try {
-      final data = await ApiService.get('/content/movies/${widget.movieId}/');
-      if (!mounted) return;
-      final movie = data['data'] as Map<String, dynamic>? ?? data;
-      _title = movie['title'] as String? ?? _title;
-      _description = movie['description'] as String? ?? '';
-      playbackUrl = movie['playback_url'] as String? ?? playbackUrl;
-    } catch (e) {
-      dev.log('Movie detail error: $e');
+    if (widget.movieId != 0) {
+      try {
+        final data = await ApiService.get('/content/movies/${widget.movieId}/');
+        if (!mounted) return;
+        final movie = data['data'] as Map<String, dynamic>? ?? data;
+        _title = movie['title'] as String? ?? _title;
+        _description = movie['description'] as String? ?? '';
+        playbackUrl = movie['playback_url'] as String? ?? playbackUrl;
+      } catch (e) {
+        dev.log('Movie detail error: $e');
+      }
     }
 
     if (playbackUrl == null || playbackUrl.isEmpty) {

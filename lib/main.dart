@@ -10,9 +10,11 @@ import 'screens/role_selection_screen.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'services/token_service.dart';
+import 'services/update_service.dart';
 import 'services/user_service.dart';
 import 'widgets/app_notify.dart';
 import 'widgets/connectivity_wrapper.dart';
+import 'widgets/update_dialog.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -96,6 +98,7 @@ class _LinkaAppState extends State<LinkaApp> {
     _initDeepLinks();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initDeferredServices(isLoggedIn: widget.isLoggedIn);
+      _checkForUpdate();
     });
   }
 
@@ -151,6 +154,14 @@ class _LinkaAppState extends State<LinkaApp> {
         _showDeepLinkToast('Deep link: $uri');
         debugPrint('Unknown deep link host: $host');
     }
+  }
+
+  Future<void> _checkForUpdate() async {
+    final info = await UpdateService.checkForUpdate();
+    if (info == null) return;
+    final context = navigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+    await showUpdateDialog(context, info);
   }
 
   @override

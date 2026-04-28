@@ -502,6 +502,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     onSeeAll: () => setState(() => _selectedTab = 1),
                     onStartLesson: _joinLesson,
                     onCancelLesson: _cancelLesson,
+                    onRatedLesson: _loadTodaysLessons,
                   ),
 
                   const SizedBox(height: 28),
@@ -597,7 +598,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ]
         : <Widget>[
             _buildStudentHomeBody(),
-            const LessonsScreen(),
+            LessonsScreen(onFindTutor: () => setState(() => _selectedTab = 2)),
             const TutorsScreen(),
             MyProfileScreen(
               onNavigateToLessons: () => setState(() => _selectedTab = 1),
@@ -939,7 +940,8 @@ class _LessonsSection extends StatelessWidget {
   final VoidCallback? onSeeAll;
   final ValueChanged<Lesson>? onStartLesson;
   final ValueChanged<Lesson>? onCancelLesson;
-  const _LessonsSection({required this.lessons, this.loading = false, this.onSeeAll, this.onStartLesson, this.onCancelLesson});
+  final VoidCallback? onRatedLesson;
+  const _LessonsSection({required this.lessons, this.loading = false, this.onSeeAll, this.onStartLesson, this.onCancelLesson, this.onRatedLesson});
 
   @override
   Widget build(BuildContext context) {
@@ -1029,6 +1031,7 @@ class _LessonsSection extends StatelessWidget {
                       showStartButton: l.dailyRoomUrl.isNotEmpty,
                       onStart: onStartLesson != null ? () => onStartLesson!(l) : null,
                       onCancel: onCancelLesson != null ? () => onCancelLesson!(l) : null,
+                      onRated: onRatedLesson,
                     ),
                   ),
                 );
@@ -2068,6 +2071,8 @@ class _TutorListMode extends StatelessWidget {
                       lesson: lesson,
                       showStartButton:
                           tab == 'upcoming' && lesson.dailyRoomUrl.isNotEmpty,
+                      showCopyLink:
+                          tab == 'upcoming' && lesson.dailyRoomUrl.isNotEmpty,
                       onStart: () => onStartLesson(lesson),
                     ),
                   );
@@ -2248,6 +2253,7 @@ class _TutorCalendarMode extends StatelessWidget {
               child: LessonCard(
                 lesson: l,
                 showStartButton: l.dailyRoomUrl.isNotEmpty,
+                showCopyLink: l.dailyRoomUrl.isNotEmpty,
                 onStart: () => onStartLesson(l),
               ),
             ),
