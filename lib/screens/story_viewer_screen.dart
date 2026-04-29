@@ -41,6 +41,9 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   VideoPlayerController? _videoController;
   late final AnimationController _progress;
 
+  // Preloaded controllers keyed by media URL.
+  final Map<String, VideoPlayerController> _preloadedVideos = {};
+
   StoryTutor get _tutor => widget.tutors[_tutorIndex];
   StoryData get _current => _tutor.stories[_storyIndex];
 
@@ -58,7 +61,32 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _progress.dispose();
     _videoController?.removeListener(_onVideoTick);
     _videoController?.dispose();
+    for (final ctrl in _preloadedVideos.values) {
+      ctrl.dispose();
+    }
     super.dispose();
+  }
+
+  void _preloadNext() {
+    if (!mounted) return;
+    final nextStories = <StoryData>[];
+    if (_storyIndex + 1 < _tutor.stories.length) {
+      nextStories.add(_tutor.stories[_storyIndex + 1]);
+    }
+    if (_tutorIndex + 1 < widget.tutors.length) {
+      nextStories.add(widget.tutors[_tutorIndex + 1].stories.first);
+    }
+    for (final story in nextStories) {
+      if (story.mediaType == 'video') {
+        if (!_preloadedVideos.containsKey(story.mediaFile)) {
+          final ctrl = VideoPlayerController.networkUrl(Uri.parse(story.mediaFile));
+          _preloadedVideos[story.mediaFile] = ctrl;
+          ctrl.initialize();
+        }
+      } else {
+        precacheImage(NetworkImage(story.mediaFile), context);
+      }
+    }
   }
 
   void _notifyTutorViewed() {
@@ -73,17 +101,30 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _videoController = null;
 
     if (_current.mediaType == 'video') {
-      final controller = VideoPlayerController.networkUrl(Uri.parse(_current.mediaFile));
+      final url = _current.mediaFile;
+      final preloaded = _preloadedVideos.remove(url);
+      final controller =
+          preloaded ?? VideoPlayerController.networkUrl(Uri.parse(url));
       _videoController = controller;
-      controller.initialize().then((_) {
-        if (!mounted || _videoController != controller) return;
-        setState(() {});
+
+      void startPlaying() {
         _progress.duration = controller.value.duration == Duration.zero
             ? _imageDuration
             : controller.value.duration;
         controller.play();
         controller.addListener(_onVideoTick);
-      });
+      }
+
+      if (preloaded != null && preloaded.value.isInitialized) {
+        setState(() {});
+        startPlaying();
+      } else {
+        controller.initialize().then((_) {
+          if (!mounted || _videoController != controller) return;
+          setState(() {});
+          startPlaying();
+        });
+      }
     } else {
       _progress.duration = _imageDuration;
       _progress.forward(from: 0).whenCompleteOrCancel(() {
@@ -91,6 +132,10 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
         if (_progress.status == AnimationStatus.completed) _advance();
       });
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _preloadNext();
+    });
   }
 
   void _onVideoTick() {
@@ -173,11 +218,9 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
             // Story content
             if (_current.mediaType == 'video' && _videoController != null)
               _videoController!.value.isInitialized
-                  ? FittedBox(
-                      fit: BoxFit.cover,
-                      child: SizedBox(
-                        width: _videoController!.value.size.width,
-                        height: _videoController!.value.size.height,
+                  ? Center(
+                      child: AspectRatio(
+                        aspectRatio: _videoController!.value.aspectRatio,
                         child: VideoPlayer(_videoController!),
                       ),
                     )

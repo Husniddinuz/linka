@@ -150,6 +150,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loadingPodcasts = true;
   bool _loadingArticles = true;
 
+  bool get _isInitialLoading =>
+      _loadingStories && _loadingLessons && _loadingPodcasts && _loadingArticles;
+
   @override
   void initState() {
     super.initState();
@@ -161,6 +164,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadArticles();
     _loadSavedArticles();
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
+    NotificationService.registerDevice().catchError((_) {});
+    NotificationService.listenTokenRefresh();
   }
 
   Future<void> _checkForUpdate() async {
@@ -452,7 +457,9 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _Header(profileImage: _profileImage, isTutor: false, onLogoLongPress: _showTestUpdateDialog),
           Expanded(
-            child: RefreshIndicator(
+            child: _isInitialLoading
+                ? const _StudentHomeSkeleton()
+                : RefreshIndicator(
               color: const Color(0xFF272942),
               onRefresh: _refreshStudentHome,
               child: SingleChildScrollView(
@@ -815,6 +822,179 @@ class _StoriesSkeleton extends StatelessWidget {
   }
 }
 
+class _StudentHomeSkeleton extends StatelessWidget {
+  const _StudentHomeSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Stories row
+          const SizedBox(height: 24),
+          const _StoriesSkeleton(),
+          const SizedBox(height: 28),
+
+          // Webinar card
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              height: 96,
+              decoration: BoxDecoration(
+                color: const Color(0xFF272942),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Skeleton(width: 40, height: 40, circle: true),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Skeleton(height: 12, borderRadius: 6),
+                        SizedBox(height: 8),
+                        Skeleton(width: 160, height: 10, borderRadius: 5),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // Speaking practice button placeholder
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 21),
+            child: Skeleton(height: 60, borderRadius: 14),
+          ),
+          const SizedBox(height: 32),
+
+          // Today's lessons header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: const [
+                Skeleton(width: 120, height: 12, borderRadius: 4),
+                Spacer(),
+                Skeleton(width: 48, height: 12, borderRadius: 4),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 98,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: 2,
+              itemBuilder: (_, i) => Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: SizedBox(
+                  width: MediaQuery.of(context).size.width - 52,
+                  child: const Skeleton(height: 98, borderRadius: 16),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // Video chat button placeholder
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 21),
+            child: Skeleton(height: 60, borderRadius: 14),
+          ),
+          const SizedBox(height: 32),
+
+          // Watch a movie header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: const [
+                Skeleton(width: 110, height: 12, borderRadius: 4),
+                Spacer(),
+                Skeleton(width: 48, height: 12, borderRadius: 4),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: Skeleton(height: 160, borderRadius: 14),
+          ),
+          const SizedBox(height: 28),
+
+          // Podcasts header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: const [
+                Skeleton(width: 80, height: 12, borderRadius: 4),
+                Spacer(),
+                Skeleton(width: 48, height: 12, borderRadius: 4),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: 3,
+              itemBuilder: (_, _) => const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6),
+                child: SizedBox(
+                  width: 240,
+                  child: Skeleton(height: 100, borderRadius: 14),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // Articles header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: const [
+                Skeleton(width: 70, height: 12, borderRadius: 4),
+                Spacer(),
+                Skeleton(width: 48, height: 12, borderRadius: 4),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 180,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: 4,
+              itemBuilder: (_, _) => const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6),
+                child: SizedBox(
+                  width: 140,
+                  child: Skeleton(height: 180, borderRadius: 14),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+}
+
 class _TutorsList extends StatelessWidget {
   final List<StoryTutor> tutors;
   final Set<String> viewedStories;
@@ -892,27 +1072,7 @@ class _TutorItem extends StatelessWidget {
               ),
               child: Padding(
                 padding: const EdgeInsets.all(3),
-                child: ClipOval(
-                  child: tutor.image != null && tutor.image!.startsWith('http')
-                      ? Image.network(
-                          tutor.image!,
-                          fit: BoxFit.cover,
-                          width: 80,
-                          height: 80,
-                          errorBuilder: (_, _, _) => Container(
-                            width: 80,
-                            height: 80,
-                            color: const Color(0xFFE0E0E0),
-                            child: const Icon(Icons.person, size: 30, color: Color(0xFFAAAAAA)),
-                          ),
-                        )
-                      : Container(
-                          width: 80,
-                          height: 80,
-                          color: const Color(0xFFE0E0E0),
-                          child: const Icon(Icons.person, size: 30, color: Color(0xFFAAAAAA)),
-                        ),
-                ),
+                child: CachedAvatar(imageUrl: tutor.image, size: 80),
               ),
             ),
             const SizedBox(height: 6),
@@ -1169,23 +1329,81 @@ class _ComingSoonBanner extends StatelessWidget {
   }
 }
 
-// ─── Webinar block (single featured webinar) ───────────────────────────────────
+// ─── Webinar block (today's session) ───────────────────────────────────────────
 
-class _WebinarBlock extends StatelessWidget {
+class _WebinarBlock extends StatefulWidget {
   const _WebinarBlock();
 
   @override
+  State<_WebinarBlock> createState() => _WebinarBlockState();
+}
+
+class _WebinarBlockState extends State<_WebinarBlock> {
+  WebinarData? _webinar;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchToday();
+  }
+
+  Future<void> _fetchToday() async {
+    try {
+      final data = await ApiService.get('/live/webinar/today/');
+      if (!mounted) return;
+      final hasSession = data['has_session'] as bool? ?? false;
+      setState(() {
+        _webinar = hasSession ? WebinarData.fromJson(data) : null;
+        _loading = false;
+      });
+    } on ApiException {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final webinar = WebinarData(
-      id: 1,
-      title: 'English Grammar Masterclass',
-      tutorName: 'Sarah Johnson',
-      tutorImage: null,
-      scheduledAt: DateTime.now().copyWith(hour: 21, minute: 0, second: 0),
-      status: 'live',
-      playbackUrl: 'https://live.143b.ch/cam/flux/ts:abr.m3u8',
-      viewerCount: 12,
-    );
+    if (_loading) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          height: 96,
+          decoration: BoxDecoration(
+            color: const Color(0xFF272942),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                color: Color(0xFFF5C542),
+                strokeWidth: 2,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final webinar = _webinar;
+    if (webinar == null) return const SizedBox.shrink();
+
+    // Status badge
+    final (String badgeLabel, Color badgeColor) = switch (webinar.status) {
+      'live' => ('LIVE', const Color(0xFFE53935)),
+      'ended' => ('ENDED', const Color(0xFF6C6C6C)),
+      _ => ('UPCOMING', const Color(0xFFF5C542)),
+    };
+
+    // Time label
+    String timeLabel = '';
+    if (webinar.scheduledAt != null) {
+      final h = webinar.scheduledAt!.hour.toString().padLeft(2, '0');
+      final m = webinar.scheduledAt!.minute.toString().padLeft(2, '0');
+      timeLabel = '$h:$m';
+    }
 
     return GestureDetector(
       onTap: () => Navigator.push(
@@ -1224,17 +1442,42 @@ class _WebinarBlock extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'WEBINAR',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFF5C542),
-                            letterSpacing: 1,
-                          ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: badgeColor.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                badgeLabel,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: badgeColor,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'WEBINAR',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFF5C542),
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 3),
                         Text(
-                          'Today, Tutor ${webinar.tutorName} will hold a session at 21:00',
+                          webinar.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
@@ -1250,31 +1493,43 @@ class _WebinarBlock extends StatelessWidget {
               const SizedBox(height: 14),
               Row(
                 children: [
-                  const Icon(Icons.people_outline_rounded, size: 14, color: Color(0xFFAAAAAA)),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Unlimited viewers · Chat only',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.white.withValues(alpha: 0.45),
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF5C542),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'Join',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF272942),
+                  if (webinar.tutorName.isNotEmpty) ...[
+                    const Icon(Icons.person_outline_rounded,
+                        size: 14, color: Color(0xFFAAAAAA)),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        timeLabel.isNotEmpty
+                            ? '${webinar.tutorName} · $timeLabel'
+                            : webinar.tutorName,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.white.withValues(alpha: 0.45),
+                        ),
                       ),
                     ),
-                  ),
+                  ] else
+                    const Spacer(),
+                  if (webinar.joinEnabled) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5C542),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'Join',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF272942),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],

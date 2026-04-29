@@ -40,6 +40,9 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   bool _isConnected = false;
   bool _isStopping = false;
   GenderFilter _genderFilter = GenderFilter.all;
+  int? _secondsLeft;
+  int? _sessionSecondsLeft; // persists across matches so the budget doesn't reset on Next
+  Timer? _countdownTimer;
 
   String _localName = '';
   String? _remoteName;
@@ -161,6 +164,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         _remoteProfileImage = null;
         _remoteCameraOn = true;
         _sessionId = null;
+        _secondsLeft = null;
       });
 
       final token = await TokenService.getAccessToken();
@@ -205,6 +209,37 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     }
   }
 
+  void _startCountdown(int serverSeconds) {
+    _countdownTimer?.cancel();
+    if (!mounted) return;
+    // Use whichever is smaller: remaining session budget or new token TTL.
+    // This prevents the timer from resetting to the full server value on each
+    // new match when the user still has unused time from the previous call.
+    final prior = _sessionSecondsLeft;
+    final effective = (prior != null && prior > 0 && prior < serverSeconds)
+        ? prior
+        : serverSeconds;
+    setState(() {
+      _secondsLeft = effective;
+      _sessionSecondsLeft = effective;
+    });
+    if (effective <= 0) return;
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) { t.cancel(); return; }
+      setState(() {
+        final s = _secondsLeft;
+        if (s == null || s <= 0) {
+          t.cancel();
+          _secondsLeft = 0;
+          _sessionSecondsLeft = 0;
+        } else {
+          _secondsLeft = s - 1;
+          _sessionSecondsLeft = s - 1;
+        }
+      });
+    });
+  }
+
   Future<void> _handleMatchMessage(dynamic raw) async {
     dev.log('MATCH ← $raw');
     final data = jsonDecode(raw as String) as Map<String, dynamic>;
@@ -242,6 +277,17 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
                 .toList();
           }
           dev.log('SIG → using inline signaling data from match_found');
+          final inlineExpiresAt = data['signaling_expires_at'] as String?;
+          final inlineServerNow = data['server_now'] as String?;
+          int inlineSeconds = data['signaling_seconds_left'] as int? ??
+              data['signaling_token_ttl_seconds'] as int? ?? 0;
+          if (inlineExpiresAt != null && inlineServerNow != null) {
+            final exp = DateTime.tryParse(inlineExpiresAt);
+            final now = DateTime.tryParse(inlineServerNow);
+            if (exp != null && now != null) inlineSeconds = exp.difference(now).inSeconds;
+          }
+          dev.log('SIG → inline countdown=${inlineSeconds}s');
+          if (inlineSeconds > 0) _startCountdown(inlineSeconds);
           await _createPeerConnection();
           await _connectSignalingWs(inlineSignalingUrl, inlineSignalingToken);
         } else {
@@ -286,6 +332,20 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         final hasCred = srv['username'] != null || srv['credential'] != null;
         dev.log('SIG →   [$i] urls=$urls${hasCred ? ' (with credentials)' : ''}');
       }
+
+      final expiresAtStr = res['signaling_expires_at'] as String?;
+      final serverNowStr = res['server_now'] as String?;
+      int secondsLeft = res['signaling_seconds_left'] as int? ??
+          res['signaling_token_ttl_seconds'] as int? ?? 0;
+      if (expiresAtStr != null && serverNowStr != null) {
+        final expiresAt = DateTime.tryParse(expiresAtStr);
+        final serverNow = DateTime.tryParse(serverNowStr);
+        if (expiresAt != null && serverNow != null) {
+          secondsLeft = expiresAt.difference(serverNow).inSeconds;
+        }
+      }
+      dev.log('SIG → countdown=${secondsLeft}s');
+      if (secondsLeft > 0) _startCountdown(secondsLeft);
 
       await _createPeerConnection();
       await _connectSignalingWs(signalingUrl, signalingToken);
@@ -475,6 +535,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         dev.log('SIG WS ← limit finished');
         if (!_isStopping && mounted) {
           _isStopping = true;
+          _sessionSecondsLeft = null;
           await _teardownSession();
           final stream = _localStream;
           _localStream = null;
@@ -607,6 +668,8 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     _remoteRenderer.srcObject = null;
     _remoteDescSet = false;
     _pendingRemoteCandidates.clear();
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
   }
 
   // ─── Controls ───────────────────────────────────────────────────────────
@@ -632,6 +695,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     if (_isStopping) return;
     dev.log('ACTION → stop');
     _isStopping = true;
+    _sessionSecondsLeft = null;
     await _teardownSession();
     final stream = _localStream;
     _localStream = null;
@@ -743,6 +807,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   void dispose() {
     dev.log('DISPOSE → start');
     _isStopping = true;
+    _countdownTimer?.cancel();
     WakelockPlus.disable();
     // Run async teardown fire-and-forget so dispose() returns immediately.
     () async {
@@ -792,7 +857,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
                 : const _SearchingView(),
           ),
 
-          const _LinkaBanner(),
+          _LinkaBanner(secondsLeft: _secondsLeft),
 
           Expanded(
             child: _isCameraOn
@@ -1186,7 +1251,8 @@ class _LocalPreviewView extends StatelessWidget {
 // ─── Linka banner bar ───────────────────────────────────────────────────────
 
 class _LinkaBanner extends StatelessWidget {
-  const _LinkaBanner();
+  final int? secondsLeft;
+  const _LinkaBanner({this.secondsLeft});
 
   @override
   Widget build(BuildContext context) {
@@ -1194,11 +1260,59 @@ class _LinkaBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 10),
       color: const Color(0xFF272942),
-      child: Center(
-        child: SvgPicture.asset(
-          'assets/images/branding/white-logo.svg',
-          height: 26,
-        ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SvgPicture.asset(
+            'assets/images/branding/white-logo.svg',
+            height: 26,
+          ),
+          if (secondsLeft != null)
+            Positioned(
+              right: 16,
+              child: _CountdownBadge(seconds: secondsLeft!),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CountdownBadge extends StatelessWidget {
+  final int seconds;
+  const _CountdownBadge({required this.seconds});
+
+  @override
+  Widget build(BuildContext context) {
+    final mins = seconds ~/ 60;
+    final secs = seconds % 60;
+    final label = '$mins:${secs.toString().padLeft(2, '0')}';
+    final color = seconds > 60
+        ? const Color(0xFF27AE60)
+        : seconds > 30
+            ? const Color(0xFFF5C542)
+            : Colors.red;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color, width: 1.2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timer_outlined, color: color, size: 14),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

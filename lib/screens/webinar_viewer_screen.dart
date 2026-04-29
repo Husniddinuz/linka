@@ -6,8 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../services/api_constants.dart';
+import '../services/api_service.dart';
 import '../services/token_service.dart';
 import '../widgets/cached_avatar.dart';
+import 'tutor_profile_screen.dart';
 
 // ─── Model ─────────────────────────────────────────────────────────────────────
 
@@ -16,11 +18,13 @@ class WebinarData {
   final String title;
   final String tutorName;
   final String? tutorImage;
+  final int? tutorId;
   final DateTime? scheduledAt;
-  final String status; // "live" | "upcoming" | "ended"
-  final String? playbackUrl;
+  final DateTime? endAt;
+  final String status; // "scheduled" | "live" | "ended"
+  final String? muxPlaybackId;
   final int viewerCount;
-  final bool isAvailable;
+  final bool joinEnabled;
   final String? vodUrl;
 
   const WebinarData({
@@ -28,35 +32,54 @@ class WebinarData {
     required this.title,
     required this.tutorName,
     this.tutorImage,
+    this.tutorId,
     this.scheduledAt,
+    this.endAt,
     required this.status,
-    this.playbackUrl,
+    this.muxPlaybackId,
     this.viewerCount = 0,
-    this.isAvailable = false,
+    this.joinEnabled = false,
     this.vodUrl,
   });
 
   factory WebinarData.fromJson(Map<String, dynamic> j) {
-    final rawAt = (j['scheduled_at'] ?? j['starts_at'] ?? '').toString();
+    final tutorMap = j['tutor'] as Map<String, dynamic>?;
+    final rawStart = (j['start_at'] ?? j['scheduled_at'] ?? j['starts_at'] ?? '').toString();
+    final rawEnd = (j['end_at'] ?? '').toString();
+    final tutorName = tutorMap?['display_name']?.toString() ??
+        [j['tutor_first_name'] ?? '', j['tutor_last_name'] ?? '']
+            .where((s) => (s as String).isNotEmpty)
+            .join(' ');
+    // tutor_profile_id / profile_id take priority over the generic 'id' field
+    // because 'id' inside a nested tutor map may be the user ID, not the profile ID.
+    final tutorProfileId =
+        tutorMap?['tutor_profile_id'] as int? ??
+        tutorMap?['profile_id'] as int? ??
+        j['tutor_profile_id'] as int? ??
+        j['tutor_id'] as int? ??
+        tutorMap?['id'] as int?;
     return WebinarData(
       id: j['id'] as int? ?? 0,
       title: (j['title'] ?? '').toString(),
-      tutorName: [
-        j['tutor_first_name'] ?? '',
-        j['tutor_last_name'] ?? '',
-      ].where((s) => (s as String).isNotEmpty).join(' '),
-      tutorImage: j['tutor_profile_image'] as String?,
-      scheduledAt: DateTime.tryParse(rawAt)?.toLocal(),
-      status: (j['status'] ?? 'upcoming').toString(),
-      playbackUrl: (j['playback_url'] ?? j['stream_url'] ?? '') as String?,
+      tutorName: tutorName,
+      tutorImage: tutorMap?['image']?.toString() ?? j['tutor_profile_image'] as String?,
+      tutorId: tutorProfileId,
+      scheduledAt: DateTime.tryParse(rawStart)?.toLocal(),
+      endAt: DateTime.tryParse(rawEnd)?.toLocal(),
+      status: (j['status'] ?? 'scheduled').toString(),
+      muxPlaybackId: j['mux_playback_id']?.toString(),
       viewerCount: (j['viewer_count'] ?? j['viewers_count'] ?? 0) as int,
-      isAvailable: j['is_available'] as bool? ?? false,
+      joinEnabled: j['join_enabled'] as bool? ?? j['is_live'] as bool? ?? false,
       vodUrl: j['vod_url']?.toString() ?? j['recording_url']?.toString(),
     );
   }
 
   bool get isLive => status == 'live';
+  bool get isScheduled => status == 'scheduled';
   bool get hasVod => (vodUrl?.isNotEmpty ?? false) && status == 'ended';
+  String? get muxPlaybackUrl => (muxPlaybackId?.isNotEmpty ?? false)
+      ? 'https://stream.mux.com/$muxPlaybackId.m3u8'
+      : null;
 }
 
 // ─── Chat message model ────────────────────────────────────────────────────────
@@ -65,11 +88,13 @@ class _ChatMessage {
   final String sender;
   final String text;
   final bool isOwn;
+  final String? avatarUrl;
 
   const _ChatMessage({
     required this.sender,
     required this.text,
     required this.isOwn,
+    this.avatarUrl,
   });
 }
 
@@ -96,24 +121,46 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
   final _scrollController = ScrollController();
   bool _chatExpanded = true;
   bool _sendingMessage = false;
+  bool _wsConnected = false;
+  final Set<String> _pendingOutbound = {};
 
   int _viewerCount = 0;
+  String? _resolvedPlaybackUrl;
 
   @override
   void initState() {
     super.initState();
     _viewerCount = widget.webinar.viewerCount;
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    if (widget.webinar.isLive && widget.webinar.playbackUrl != null && widget.webinar.playbackUrl!.isNotEmpty) {
-      _initVideo(widget.webinar.playbackUrl!);
-    } else if (widget.webinar.hasVod) {
-      _initVideo(widget.webinar.vodUrl!);
-    }
+    _joinAndLoadVideo();
     _connectChat();
   }
 
-  Future<void> _initVideo(String url) async {
-    final kind = widget.webinar.hasVod ? 'VOD' : 'live';
+  Future<void> _joinAndLoadVideo() async {
+    final webinar = widget.webinar;
+    if (webinar.hasVod) {
+      _resolvedPlaybackUrl = webinar.vodUrl;
+      _initVideo(webinar.vodUrl!, kind: 'VOD');
+      return;
+    }
+    if (!webinar.isLive) return;
+
+    String? url;
+    try {
+      dev.log('webinar: joining session ${webinar.id}', name: 'webinar');
+      final data = await ApiService.post('/live/webinar/${webinar.id}/join/', {});
+      url = data['mux_playback_url']?.toString();
+      dev.log('webinar: join OK, mux_playback_url=$url', name: 'webinar');
+    } on ApiException catch (e) {
+      dev.log('webinar: join error — ${e.message}', name: 'webinar');
+      url = webinar.muxPlaybackUrl;
+    }
+    if (url == null || url.isEmpty || !mounted) return;
+    _resolvedPlaybackUrl = url;
+    _initVideo(url, kind: 'live');
+  }
+
+  Future<void> _initVideo(String url, {String kind = 'live'}) async {
     dev.log('webinar: init $kind video — $url', name: 'webinar');
     try {
       final controller = VideoPlayerController.networkUrl(Uri.parse(url));
@@ -144,45 +191,104 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
 
     final apiUri = Uri.parse(apiBaseUrl);
     final wsScheme = apiUri.scheme == 'https' ? 'wss' : 'ws';
-    final wsUrl = '$wsScheme://${apiUri.host}/ws/webinars/${widget.webinar.id}/chat/?token=$token';
+    final wsUrl =
+        '$wsScheme://${apiUri.host}/ws/live/session/${widget.webinar.id}/?token=$token';
     dev.log('webinar: connecting chat WS — $wsUrl', name: 'webinar');
 
     try {
+      await _chatSub?.cancel();
+      await _chatWs?.sink.close();
       _chatWs = WebSocketChannel.connect(Uri.parse(wsUrl));
       await _chatWs!.ready;
-      dev.log('webinar: chat WS connected (id=${widget.webinar.id})', name: 'webinar');
+      dev.log('webinar: chat WS connected', name: 'webinar');
       if (!mounted) return;
+      setState(() => _wsConnected = true);
       _chatSub = _chatWs!.stream.listen(
         _onChatMessage,
-        onError: (e) => dev.log('webinar: chat WS error — $e', name: 'webinar'),
+        onError: (e) {
+          dev.log('webinar: chat WS error — $e', name: 'webinar');
+          if (mounted) setState(() => _wsConnected = false);
+        },
+        onDone: () {
+          dev.log('webinar: chat WS closed', name: 'webinar');
+          if (mounted) setState(() { _wsConnected = false; _chatWs = null; });
+        },
         cancelOnError: false,
       );
     } catch (e) {
       dev.log('webinar: chat WS connect failed — $e', name: 'webinar');
+      _chatWs = null;
+      if (mounted) setState(() => _wsConnected = false);
     }
   }
 
   void _onChatMessage(dynamic raw) {
+    dev.log('webinar: WS ← $raw', name: 'webinar');
     try {
       final data = json.decode(raw as String) as Map<String, dynamic>;
-      final type = data['type'] as String? ?? '';
+      final type = (data['type'] as String? ?? '').toLowerCase();
 
-      if (type == 'chat_message' || type == 'message') {
-        final sender = (data['sender_name'] ?? data['sender'] ?? 'User').toString();
-        final text = (data['message'] ?? data['text'] ?? '').toString();
-        if (text.isEmpty) return;
+      // Chat — backend sends:
+      // {"type":"chat_message","message":{"text":"...","user":{"display_name":"..."}}}
+      if (type == 'chat_message') {
+        final msgObj = data['message'];
+        final String msgText;
+        final String msgSender;
+        String? avatarUrl;
+        if (msgObj is Map<String, dynamic>) {
+          msgText = (msgObj['text'] ?? '').toString();
+          final userObj = msgObj['user'];
+          if (userObj is Map<String, dynamic>) {
+            msgSender =
+                (userObj['display_name'] ?? userObj['username'] ?? 'User')
+                    .toString();
+            final rawImg = userObj['image']?.toString() ?? '';
+            if (rawImg.isNotEmpty) {
+              final base = Uri.parse(apiBaseUrl);
+              avatarUrl = rawImg.startsWith('http')
+                  ? rawImg
+                  : '${base.scheme}://${base.host}$rawImg';
+            }
+          } else {
+            msgSender = 'User';
+          }
+        } else {
+          // fallback for plain-text format
+          msgText = (data['text'] ?? data['content'] ?? '').toString();
+          msgSender =
+              (data['sender_name'] ?? data['sender'] ?? 'User').toString();
+        }
+        if (msgText.isEmpty) return;
+        if (_pendingOutbound.remove(msgText)) return;
         if (!mounted) return;
         setState(() {
-          _messages.add(_ChatMessage(sender: sender, text: text, isOwn: false));
+          _messages.add(_ChatMessage(
+            sender: msgSender,
+            text: msgText,
+            isOwn: false,
+            avatarUrl: avatarUrl,
+          ));
         });
         _scrollToBottom();
-      } else if (type == 'viewer_count') {
-        final count = data['count'] as int? ?? _viewerCount;
-        if (!mounted) return;
-        setState(() => _viewerCount = count);
+      }
+
+      // Viewer count — handle all common field/type names
+      final rawCount = data['count'] ??
+          data['viewer_count'] ??
+          data['viewers_count'] ??
+          data['viewers'];
+      if (type == 'viewer_count' ||
+          type == 'viewer_update' ||
+          type == 'viewer_joined' ||
+          type == 'viewer_left' ||
+          rawCount is int) {
+        final count = rawCount is int
+            ? rawCount
+            : (rawCount as num?)?.toInt();
+        if (count != null && mounted) setState(() => _viewerCount = count);
       }
     } catch (e) {
-      dev.log('Chat parse error: $e');
+      dev.log('webinar: WS parse error — $e', name: 'webinar');
     }
   }
 
@@ -203,6 +309,8 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
     if (text.isEmpty || _sendingMessage || _chatWs == null) return;
 
     _chatController.clear();
+    FocusScope.of(context).unfocus();
+    _pendingOutbound.add(text); // track before WS echo arrives
     setState(() {
       _sendingMessage = true;
       _messages.add(_ChatMessage(sender: 'You', text: text, isOwn: true));
@@ -210,10 +318,11 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
     _scrollToBottom();
 
     try {
-      _chatWs!.sink.add(json.encode({'type': 'chat_message', 'message': text}));
+      _chatWs!.sink.add(json.encode({'type': 'chat_message', 'text': text}));
       dev.log('webinar: chat → sent "$text"', name: 'webinar');
     } catch (e) {
       dev.log('webinar: chat send error — $e', name: 'webinar');
+      _pendingOutbound.remove(text); // send failed, no echo will arrive
     } finally {
       if (mounted) setState(() => _sendingMessage = false);
     }
@@ -232,8 +341,10 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.white,
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
             _buildTopBar(),
@@ -288,23 +399,61 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
     if (_videoError) {
       return _VideoErrorPlaceholder(onRetry: () {
         setState(() => _videoError = false);
-        final url = widget.webinar.isLive
-            ? widget.webinar.playbackUrl
-            : widget.webinar.vodUrl;
-        if (url != null && url.isNotEmpty) _initVideo(url);
+        final url = _resolvedPlaybackUrl;
+        if (url != null && url.isNotEmpty) {
+          _initVideo(url, kind: widget.webinar.hasVod ? 'VOD' : 'live');
+        } else {
+          _joinAndLoadVideo();
+        }
       });
     }
     if (!_videoInitialized || _videoController == null) {
       return const _VideoLoadingPlaceholder();
     }
 
-    return AspectRatio(
-      aspectRatio: _videoController!.value.aspectRatio,
-      child: VideoPlayer(_videoController!),
+    return GestureDetector(
+      onTap: () => _openFullscreen(),
+      child: Stack(
+        alignment: Alignment.bottomRight,
+        children: [
+          AspectRatio(
+            aspectRatio: _videoController!.value.aspectRatio,
+            child: VideoPlayer(_videoController!),
+          ),
+          const Padding(
+            padding: EdgeInsets.all(8),
+            child: Icon(
+              Icons.fullscreen_rounded,
+              color: Colors.white,
+              size: 28,
+              shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
+  Future<void> _openFullscreen() async {
+    if (_videoController == null) return;
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _FullscreenVideoScreen(controller: _videoController!),
+      ),
+    );
+    if (mounted) {
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    }
+  }
+
   Widget _buildWebinarInfo() {
+    final tutorId = widget.webinar.tutorId;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
@@ -333,27 +482,52 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color(0xFF272942).withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.mic_off_rounded, size: 14, color: Color(0xFFAAAAAA)),
-                const SizedBox(width: 4),
-                Text(
-                  'View only',
+          const SizedBox(width: 8),
+          if (tutorId != null)
+            GestureDetector(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => TutorProfileScreen(tutorId: tutorId),
+                ),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5C542),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'Book lesson',
                   style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF272942),
                   ),
                 ),
-              ],
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF272942).withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.mic_off_rounded, size: 14, color: Color(0xFFAAAAAA)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'View only',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -376,6 +550,31 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
                 letterSpacing: 0.5,
               ),
             ),
+            const SizedBox(width: 6),
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _wsConnected
+                    ? const Color(0xFF27AE60)
+                    : const Color(0xFFCCCCCC),
+              ),
+            ),
+            if (!_wsConnected && widget.webinar.isLive) ...[
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: _connectChat,
+                child: const Text(
+                  'Reconnect',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF2B85DB),
+                  ),
+                ),
+              ),
+            ],
             const Spacer(),
             Icon(
               _chatExpanded
@@ -391,9 +590,11 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
   }
 
   Widget _buildChat() {
-    return Column(
+    final keyboardH = MediaQuery.of(context).viewInsets.bottom;
+    const inputH = 64.0; // top-pad + TextField + bottom-pad when no keyboard
+    return Stack(
       children: [
-        Expanded(
+        Positioned.fill(
           child: _messages.isEmpty
               ? const Center(
                   child: Text(
@@ -408,24 +609,27 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
                 )
               : ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, inputH + keyboardH),
                   itemCount: _messages.length,
                   itemBuilder: (_, i) => _ChatBubble(message: _messages[i]),
                 ),
         ),
-        _buildChatInput(),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: keyboardH,
+          child: _buildChatInput(),
+        ),
       ],
     );
   }
 
   Widget _buildChatInput() {
+    final safeBottom = MediaQuery.of(context).viewInsets.bottom > 0
+        ? 8.0
+        : MediaQuery.of(context).viewPadding.bottom + 8.0;
     return Container(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        8,
-        16,
-        MediaQuery.of(context).viewInsets.bottom + 12,
-      ),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, safeBottom),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
@@ -637,73 +841,134 @@ class _UpcomingVideoPlaceholder extends StatelessWidget {
   }
 }
 
+class _FullscreenVideoScreen extends StatefulWidget {
+  final VideoPlayerController controller;
+  const _FullscreenVideoScreen({required this.controller});
+
+  @override
+  State<_FullscreenVideoScreen> createState() => _FullscreenVideoScreenState();
+}
+
+class _FullscreenVideoScreenState extends State<_FullscreenVideoScreen> {
+  bool _controlsVisible = true;
+
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  @override
+  void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: GestureDetector(
+        onTap: () => setState(() => _controlsVisible = !_controlsVisible),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Center(
+              child: AspectRatio(
+                aspectRatio: widget.controller.value.aspectRatio,
+                child: VideoPlayer(widget.controller),
+              ),
+            ),
+            if (_controlsVisible)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(
+                          Icons.fullscreen_exit_rounded,
+                          color: Colors.white,
+                          size: 28,
+                          shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ChatBubble extends StatelessWidget {
   final _ChatMessage message;
   const _ChatBubble({required this.message});
 
   @override
   Widget build(BuildContext context) {
+    final isOwn = message.isOwn;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment:
+            isOwn ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: message.isOwn
-                  ? const Color(0xFFF5C542)
-                  : const Color(0xFF272942).withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                message.sender.isNotEmpty ? message.sender[0].toUpperCase() : '?',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: message.isOwn
-                      ? const Color(0xFF272942)
-                      : const Color(0xFF272942),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
+          if (!isOwn) ...[
+            CachedAvatar(imageUrl: message.avatarUrl, size: 30),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  isOwn ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
-                Text(
-                  message.isOwn ? 'You' : message.sender,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF272942),
+                if (!isOwn)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 3),
+                    child: Text(
+                      message.sender,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF272942),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: message.isOwn
-                        ? const Color(0xFFF5C542).withValues(alpha: 0.15)
+                    color: isOwn
+                        ? const Color(0xFF272942)
                         : const Color(0xFFF2F2F2),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(16),
+                      topRight: const Radius.circular(16),
+                      bottomLeft: Radius.circular(isOwn ? 16 : 4),
+                      bottomRight: Radius.circular(isOwn ? 4 : 16),
+                    ),
                   ),
                   child: Text(
                     message.text,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF272942),
-                      height: 1.35,
+                      color: isOwn ? Colors.white : const Color(0xFF272942),
+                      height: 1.4,
                     ),
                   ),
                 ),
               ],
             ),
           ),
+          if (isOwn) const SizedBox(width: 8),
         ],
       ),
     );

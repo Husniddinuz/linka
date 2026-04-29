@@ -4,11 +4,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio_background/just_audio_background.dart';
-// import 'screens/splash_screen.dart'; // restore for release
-import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/role_selection_screen.dart';
 import 'services/api_service.dart';
-import 'services/notification_service.dart';
 import 'services/token_service.dart';
 import 'services/update_service.dart';
 import 'services/user_service.dart';
@@ -47,41 +45,20 @@ void main() async {
     );
   };
 
-  final isLoggedIn = await TokenService.isLoggedIn();
+  // Fire-and-forget — must not block runApp.
+  JustAudioBackground.init(
+    androidNotificationChannelId: 'com.linka.app.channel.audio',
+    androidNotificationChannelName: 'Linka Podcasts',
+    androidNotificationOngoing: true,
+  ).catchError((e) => debugPrint('JustAudioBackground init failed: $e'));
 
-  runApp(LinkaApp(isLoggedIn: isLoggedIn));
-}
-
-// Runs deferred startup work after the first frame so a hanging plugin
-// (e.g. JustAudioBackground on Android 16, or a slow FCM token fetch) can
-// never freeze the native splash.
-Future<void> _initDeferredServices({required bool isLoggedIn}) async {
-  try {
-    await JustAudioBackground.init(
-      androidNotificationChannelId: 'com.linka.app.channel.audio',
-      androidNotificationChannelName: 'Linka Podcasts',
-      androidNotificationOngoing: true,
-    );
-  } catch (e) {
-    debugPrint('JustAudioBackground init failed: $e');
-  }
-
-  if (isLoggedIn) {
-    try {
-      await NotificationService.registerDevice();
-      NotificationService.listenTokenRefresh();
-    } catch (e) {
-      debugPrint('FCM registration skipped: $e');
-    }
-  }
+  runApp(const LinkaApp());
 }
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class LinkaApp extends StatefulWidget {
-  final bool isLoggedIn;
-
-  const LinkaApp({super.key, required this.isLoggedIn});
+  const LinkaApp({super.key});
 
   @override
   State<LinkaApp> createState() => _LinkaAppState();
@@ -96,20 +73,15 @@ class _LinkaAppState extends State<LinkaApp> {
     super.initState();
     _appLinks = AppLinks();
     _initDeepLinks();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initDeferredServices(isLoggedIn: widget.isLoggedIn);
-      _checkForUpdate();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
   }
 
   Future<void> _initDeepLinks() {
-    // Handle link when app is already running
     _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
       debugPrint('Deep link received: $uri');
       _handleDeepLink(uri);
     });
 
-    // Handle link that launched the app
     return _appLinks.getInitialLink().then((uri) {
       if (uri != null) {
         debugPrint('Initial deep link: $uri');
@@ -134,7 +106,6 @@ class _LinkaAppState extends State<LinkaApp> {
   }
 
   void _handleDeepLink(Uri uri) {
-    // linka://tutor/123 → host=tutor, pathSegments=[123]
     final host = uri.host;
     final segments = uri.pathSegments;
     debugPrint('Deep link: host=$host, segments=$segments');
@@ -178,7 +149,7 @@ class _LinkaAppState extends State<LinkaApp> {
         value: SystemUiOverlayStyle.dark,
         child: ConnectivityWrapper(child: child ?? const SizedBox.shrink()),
       ),
-      home: widget.isLoggedIn ? const HomeScreen() : const RoleSelectionScreen(),
+      home: const SplashScreen(),
     );
   }
 }
