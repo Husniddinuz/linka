@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as dev;
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'api_constants.dart';
@@ -56,15 +55,6 @@ class ApiService {
         if (token != null) 'Authorization': 'Bearer $token',
       };
 
-  static void _logRequest(String method, String path, {String? body}) {
-    dev.log('┌── $method $path', name: 'ApiService');
-    if (body != null) dev.log('│ body: $body', name: 'ApiService');
-  }
-
-  static void _logResponse(String method, String path, int statusCode, String body) {
-    dev.log('└── $method $path → $statusCode\n$body', name: 'ApiService');
-  }
-
   /// Attempts to refresh the access token. Returns the new token or null.
   static Future<String?> _tryRefreshToken() async {
     if (_refreshing) return null;
@@ -91,7 +81,6 @@ class ApiService {
 
   /// Makes an authenticated GET request. Throws [ApiException] on failure.
   static Future<Map<String, dynamic>> get(String path) async {
-    _logRequest('GET', path);
     var token = await TokenService.getAccessToken();
     var response = await _guard(() => http.get(
       Uri.parse('$_baseUrl$path'),
@@ -111,8 +100,6 @@ class ApiService {
         await _handleAuthFailure();
       }
     }
-
-    _logResponse('GET', path, response.statusCode, response.body);
     final data = jsonDecode(response.body) as Map<String, dynamic>;
 
     if (response.statusCode == 200) {
@@ -129,7 +116,6 @@ class ApiService {
 
   /// Makes an authenticated GET request that returns a JSON array.
   static Future<List<dynamic>> getList(String path) async {
-    _logRequest('GET', path);
     var token = await TokenService.getAccessToken();
     var response = await _guard(() => http.get(
       Uri.parse('$_baseUrl$path'),
@@ -149,8 +135,6 @@ class ApiService {
       }
     }
 
-    _logResponse('GET', path, response.statusCode, response.body);
-
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as List<dynamic>;
     }
@@ -169,7 +153,6 @@ class ApiService {
     UploadProgressCallback? onProgress,
   }) async {
     final encodedBody = jsonEncode(body);
-    _logRequest('PUT', path, body: encodedBody);
 
     Future<http.StreamedResponse> send(String? t) {
       final request = onProgress != null
@@ -193,7 +176,6 @@ class ApiService {
     }
 
     final bodyStr = await response.stream.bytesToString();
-    _logResponse('PUT', path, response.statusCode, bodyStr);
     final data = jsonDecode(bodyStr) as Map<String, dynamic>;
 
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -229,7 +211,6 @@ class ApiService {
     UploadProgressCallback? onProgress,
   }) async {
     final encodedBody = jsonEncode(body);
-    _logRequest('POST', path, body: encodedBody);
 
     Future<http.StreamedResponse> send(String? t) {
       final request = onProgress != null
@@ -252,7 +233,6 @@ class ApiService {
     }
 
     final bodyStr = await response.stream.bytesToString();
-    _logResponse('POST', path, response.statusCode, bodyStr);
     final data = jsonDecode(bodyStr) as Map<String, dynamic>;
 
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -283,7 +263,6 @@ class ApiService {
     Map<String, dynamic> body = const {},
   ]) async {
     final encodedBody = jsonEncode(body);
-    _logRequest('PATCH', path, body: encodedBody);
     var token = await TokenService.getAccessToken();
     var response = await _guard(() => http.patch(
       Uri.parse('$_baseUrl$path'),
@@ -304,8 +283,6 @@ class ApiService {
         await _handleAuthFailure();
       }
     }
-
-    _logResponse('PATCH', path, response.statusCode, response.body);
     final data = jsonDecode(response.body) as Map<String, dynamic>;
 
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -332,7 +309,6 @@ class ApiService {
 
   /// Makes an authenticated DELETE request. Throws [ApiException] on failure.
   static Future<void> delete(String path) async {
-    _logRequest('DELETE', path);
     var token = await TokenService.getAccessToken();
     var response = await _guard(() => http.delete(
       Uri.parse('$_baseUrl$path'),
@@ -351,8 +327,6 @@ class ApiService {
         await _handleAuthFailure();
       }
     }
-
-    _logResponse('DELETE', path, response.statusCode, response.body);
 
     if (response.statusCode == 200 || response.statusCode == 204) {
       return;
@@ -381,7 +355,6 @@ class ApiService {
     Map<String, String> fields = const {},
     UploadProgressCallback? onProgress,
   }) async {
-    _logRequest('POST(multipart)', path, body: 'fields=$fields, files=${files.keys}');
     var token = await TokenService.getAccessToken();
 
     Future<http.StreamedResponse> send(String? t) async {
@@ -410,7 +383,6 @@ class ApiService {
     }
 
     final body = await response.stream.bytesToString();
-    _logResponse('POST(multipart)', path, response.statusCode, body);
 
     Map<String, dynamic>? data;
     try {

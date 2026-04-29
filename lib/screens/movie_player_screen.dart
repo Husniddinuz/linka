@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../services/api_service.dart';
@@ -59,7 +58,6 @@ class _MoviePlayerScreenState extends State<MoviePlayerScreen> {
         _description = movie['description'] as String? ?? '';
         playbackUrl = movie['playback_url'] as String? ?? playbackUrl;
       } catch (e) {
-        dev.log('Movie detail error: $e');
       }
     }
 
@@ -85,7 +83,6 @@ class _MoviePlayerScreenState extends State<MoviePlayerScreen> {
       });
       _scheduleHideControls();
     } catch (e) {
-      dev.log('Video init error: $e');
       controller.dispose();
       if (!mounted) return;
       setState(() => _loading = false);

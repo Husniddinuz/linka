@@ -1,4 +1,3 @@
-import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
@@ -51,7 +50,6 @@ class _TutorScheduleScreenState extends State<TutorScheduleScreen> {
     });
     try {
       final data = await ApiService.getList('/tutors/$_tutorId/availability/');
-      dev.log('availability response: $data', name: 'schedule');
       if (!mounted) return;
       setState(() {
         _slots = data.cast<Map<String, dynamic>>();
@@ -473,9 +471,7 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
         'available_time': _fmtTime(_startHour, _startMinuteIdx),
         'available_time_end': _fmtTime(_endHour, _endMinuteIdx),
       };
-      dev.log('add slot request: $body', name: 'schedule');
       final result = await ApiService.post('/tutor/availability/', body);
-      dev.log('add slot response: $result', name: 'schedule');
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {

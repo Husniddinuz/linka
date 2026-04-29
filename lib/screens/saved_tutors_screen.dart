@@ -1,4 +1,3 @@
-import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
@@ -32,7 +31,6 @@ class _SavedTutorsScreenState extends State<SavedTutorsScreen> {
         _loading = false;
       });
     } catch (e) {
-      dev.log('SAVED TUTORS ERROR: $e');
       if (!mounted) return;
       setState(() => _loading = false);
     }
@@ -43,7 +41,6 @@ class _SavedTutorsScreenState extends State<SavedTutorsScreen> {
       await ApiService.delete('/student/saved-tutors/$tutorId/');
       setState(() => _tutors.removeWhere((t) => t['id'] == tutorId));
     } catch (e) {
-      dev.log('REMOVE BOOKMARK ERROR: $e');
     }
   }
 

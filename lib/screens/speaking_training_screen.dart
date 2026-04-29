@@ -84,7 +84,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   }
 
   Future<void> _init() async {
-    dev.log('INIT → starting');
     WakelockPlus.enable();
 
     await _localRenderer.initialize();
@@ -97,7 +96,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       final last = data?['last_name'] as String? ?? '';
       _localName = '$first $last'.trim();
     } catch (e) {
-      dev.log('INIT → profile failed: $e');
     }
     if (!mounted) return;
     setState(() {});
@@ -106,7 +104,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     if (!mounted) return;
 
     _connectWaitingRoom();
-    dev.log('INIT → done');
   }
 
   Future<bool> _ensurePermissions() async {
@@ -114,7 +111,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     final camOk = statuses[Permission.camera]?.isGranted ?? false;
     final micOk = statuses[Permission.microphone]?.isGranted ?? false;
     if (!camOk || !micOk) {
-      dev.log('PERM → camera=$camOk, mic=$micOk');
       if (mounted) _showError('Camera and microphone permissions are required.');
       return false;
     }
@@ -136,9 +132,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       _localRenderer.srcObject = stream;
       await Helper.setSpeakerphoneOn(true);
       if (mounted) setState(() {});
-      dev.log('MEDIA → local stream ready');
     } catch (e) {
-      dev.log('MEDIA → getUserMedia failed: $e');
       if (mounted) _showError('Camera/microphone unavailable.');
     }
   }
@@ -147,13 +141,10 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 
   Future<void> _connectWaitingRoom() async {
     if (_reconnecting) {
-      dev.log('MATCH → skip (already reconnecting)');
       return;
     }
     _reconnecting = true;
     try {
-      dev.log('══════════════════════════════════════');
-      dev.log('MATCH → connecting waiting room');
       await _teardownSession();
 
       if (!mounted) return;
@@ -169,7 +160,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 
       final token = await TokenService.getAccessToken();
       if (token == null) {
-        dev.log('MATCH → no access token');
         return;
       }
       if (!mounted) return;
@@ -187,22 +177,18 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       final ws = WebSocketChannel.connect(Uri.parse(url));
       _matchWs = ws;
       await ws.ready;
-      dev.log('MATCH → connected');
       _matchSub = ws.stream.listen(
         _handleMatchMessage,
         onError: (e) {
-          dev.log('MATCH → error: $e');
           if (mounted) _showError('Connection error. Please try again.');
         },
         onDone: () {
-          dev.log('MATCH → closed (code=${ws.closeCode})');
           if (mounted && ws.closeCode == 4001) {
             _showError('Authentication failed. Please re-login.');
           }
         },
       );
     } catch (e) {
-      dev.log('MATCH → connect failed: $e');
       if (mounted) _showError('Could not connect to server.');
     } finally {
       _reconnecting = false;
@@ -241,7 +227,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   }
 
   Future<void> _handleMatchMessage(dynamic raw) async {
-    dev.log('MATCH ← $raw');
     final data = jsonDecode(raw as String) as Map<String, dynamic>;
     final type = data['type'] as String?;
 
@@ -256,7 +241,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         final inlineSignalingToken = data['signaling_token'] as String?;
         final inlineIce = data['ice_servers'];
         if (roomId == null) {
-          dev.log('MATCH ← missing room_id in match_found');
           _showError('Invalid match payload.');
           return;
         }
@@ -268,26 +252,29 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
           _offerInFlight = false;
         });
         if (inlineSignalingUrl != null && inlineSignalingToken != null) {
-          // Use credentials already present in match_found — avoids an extra
-          // REST round-trip that would mint a conflicting token.
           if (inlineIce is List) {
             _iceServers = inlineIce
                 .whereType<Map>()
                 .map((e) => Map<String, dynamic>.from(e))
                 .toList();
           }
-          dev.log('SIG → using inline signaling data from match_found');
-          final inlineExpiresAt = data['signaling_expires_at'] as String?;
-          final inlineServerNow = data['server_now'] as String?;
-          int inlineSeconds = data['signaling_seconds_left'] as int? ??
-              data['signaling_token_ttl_seconds'] as int? ?? 0;
-          if (inlineExpiresAt != null && inlineServerNow != null) {
-            final exp = DateTime.tryParse(inlineExpiresAt);
-            final now = DateTime.tryParse(inlineServerNow);
-            if (exp != null && now != null) inlineSeconds = exp.difference(now).inSeconds;
+
+          // Always hit REST to get limit even when inline credentials are present.
+          try {
+            final sigRes = await ApiService.post('/video/signaling/', {'room_id': roomId});
+            final limit = sigRes['limit'] as int?;
+            dev.log('PLUS → [inline REST] limit=$limit');
+            if (limit != null && limit <= 0) {
+              dev.log('PLUS → [inline REST] firing popup (limit exhausted)');
+              if (mounted) {
+                await showFreeMinutesDialog(context, dismissible: false);
+                if (mounted) Navigator.of(context).pop();
+              }
+              return;
+            }
+            if (limit != null && limit > 0) _startCountdown(limit);
+          } catch (e) {
           }
-          dev.log('SIG → inline countdown=${inlineSeconds}s');
-          if (inlineSeconds > 0) _startCountdown(inlineSeconds);
           await _createPeerConnection();
           await _connectSignalingWs(inlineSignalingUrl, inlineSignalingToken);
         } else {
@@ -297,12 +284,10 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 
       case 'error':
         final detail = data['detail'] as String? ?? 'Matchmaking failed';
-        dev.log('MATCH ← error: $detail');
         if (mounted) _showError('Matchmaking error. Please try again.');
         break;
 
       default:
-        dev.log('MATCH ← unknown type: $type');
     }
   }
 
@@ -315,6 +300,18 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       if (!success) {
         throw ApiException(res['message']?.toString() ?? 'Signaling request failed');
       }
+
+      final limit = res['limit'] as int?;
+      dev.log('PLUS → [_startSignaling REST] limit=$limit');
+      if (limit != null && limit <= 0) {
+        dev.log('PLUS → [_startSignaling REST] firing popup (limit exhausted)');
+        if (mounted) {
+          await showFreeMinutesDialog(context, dismissible: false);
+          if (mounted) Navigator.of(context).pop();
+        }
+        return;
+      }
+
       final signalingUrl = res['signaling_url'] as String;
       final signalingToken = res['signaling_token'] as String;
       final ice = res['ice_servers'];
@@ -324,33 +321,17 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
             .map((e) => Map<String, dynamic>.from(e))
             .toList();
       }
-      dev.log('SIG → signaling_url=$signalingUrl');
-      dev.log('SIG → ice_servers (${_iceServers.length}):');
       for (var i = 0; i < _iceServers.length; i++) {
         final srv = _iceServers[i];
         final urls = srv['urls'] ?? srv['url'];
         final hasCred = srv['username'] != null || srv['credential'] != null;
-        dev.log('SIG →   [$i] urls=$urls${hasCred ? ' (with credentials)' : ''}');
       }
 
-      final expiresAtStr = res['signaling_expires_at'] as String?;
-      final serverNowStr = res['server_now'] as String?;
-      int secondsLeft = res['signaling_seconds_left'] as int? ??
-          res['signaling_token_ttl_seconds'] as int? ?? 0;
-      if (expiresAtStr != null && serverNowStr != null) {
-        final expiresAt = DateTime.tryParse(expiresAtStr);
-        final serverNow = DateTime.tryParse(serverNowStr);
-        if (expiresAt != null && serverNow != null) {
-          secondsLeft = expiresAt.difference(serverNow).inSeconds;
-        }
-      }
-      dev.log('SIG → countdown=${secondsLeft}s');
-      if (secondsLeft > 0) _startCountdown(secondsLeft);
+      if (limit != null && limit > 0) _startCountdown(limit);
 
       await _createPeerConnection();
       await _connectSignalingWs(signalingUrl, signalingToken);
     } catch (e) {
-      dev.log('SIG → failed: $e');
       if (mounted) _showError('Failed to start call. Retrying...');
       _connectWaitingRoom();
     }
@@ -369,7 +350,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       // prflx (peer reflexive). Seeing only `host` means STUN is not reachable.
       final candStr = candidate.candidate!;
       final typ = RegExp(r'typ (\w+)').firstMatch(candStr)?.group(1) ?? '?';
-      dev.log('ICE → local candidate typ=$typ | $candStr');
       _sendSig({
         'type': 'ice',
         'candidate': {
@@ -381,15 +361,12 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     };
 
     pc.onIceGatheringState = (state) {
-      dev.log('ICE → gatheringState=$state');
     };
 
     pc.onIceConnectionState = (state) {
-      dev.log('ICE → connectionState=$state');
     };
 
     pc.onTrack = (event) {
-      dev.log('PC → onTrack kind=${event.track.kind}, streams=${event.streams.length}');
       if (event.streams.isNotEmpty) {
         _remoteRenderer.srcObject = event.streams.first;
         if (mounted) {
@@ -402,12 +379,10 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     };
 
     pc.onConnectionState = (state) {
-      dev.log('PC → connectionState=$state');
       if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
           state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected ||
           state == RTCPeerConnectionState.RTCPeerConnectionStateClosed) {
         if (!_isStopping && !_reconnecting && mounted) {
-          dev.log('PC → peer lost, returning to waiting room');
           _connectWaitingRoom();
         }
       }
@@ -427,15 +402,11 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     try {
       _sigWs = WebSocketChannel.connect(Uri.parse(url));
       await _sigWs!.ready;
-      dev.log('SIG WS → connected');
       _sigSub = _sigWs!.stream.listen(
         _handleSigMessage,
-        onError: (e) => dev.log('SIG WS → error: $e'),
-        onDone: () => dev.log('SIG WS → closed (code=${_sigWs?.closeCode})'),
       );
       _sendSig({'type': 'auth', 'token': token});
     } catch (e) {
-      dev.log('SIG WS → connect failed: $e');
       if (mounted) _showError('Signaling connection failed.');
     }
   }
@@ -444,7 +415,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     try {
       _sigWs?.sink.add(jsonEncode(msg));
     } catch (e) {
-      dev.log('SIG WS → send failed: $e');
     }
   }
 
@@ -453,11 +423,9 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     try {
       msg = jsonDecode(raw as String) as Map<String, dynamic>;
     } catch (e) {
-      dev.log('SIG WS ← bad json: $raw');
       return;
     }
     final type = msg['type'] as String?;
-    dev.log('SIG WS ← $type | $msg');
 
     switch (type) {
       case 'auth_ok':
@@ -470,9 +438,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         final peersOnJoin = msg['peers'];
         final peerProfiles = msg['peer_profiles'];
         if (peersOnJoin is List && peersOnJoin.isNotEmpty) {
-          dev.log('PC → joined as second peer, waiting for offer');
         } else {
-          dev.log('PC → joined as first peer, waiting for peer-joined');
         }
         if (peerProfiles is List && peerProfiles.isNotEmpty) {
           final profile = peerProfiles.first as Map<String, dynamic>?;
@@ -492,7 +458,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       case 'peers':
         // Explicit list of existing peers — we joined second, wait for offer.
         final peerList = msg['peers'];
-        dev.log('PC → peers list=${peerList is List ? peerList.length : '?'} (answerer)');
         break;
 
       case 'peer-joined':
@@ -527,12 +492,10 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         break;
 
       case 'peer-left':
-        dev.log('SIG WS ← peer-left, re-matching');
         if (!_isStopping && mounted) _connectWaitingRoom();
         break;
 
       case 'limit finished':
-        dev.log('SIG WS ← limit finished');
         if (!_isStopping && mounted) {
           _isStopping = true;
           _sessionSecondsLeft = null;
@@ -547,6 +510,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
           }
           _localRenderer.srcObject = null;
           if (mounted) {
+            dev.log('PLUS → [limit finished WS] firing popup');
             await showFreeMinutesDialog(context);
             if (mounted) Navigator.of(context).pop();
           }
@@ -554,7 +518,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         break;
 
       case 'error':
-        dev.log('SIG WS ← error: ${msg['detail']}');
         break;
     }
   }
@@ -567,9 +530,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       final offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       _sendSig({'type': 'offer', 'sdp': offer.sdp, 'sdpType': offer.type});
-      dev.log('PC → offer sent');
     } catch (e) {
-      dev.log('PC → makeOffer failed: $e');
       _offerInFlight = false;
     }
   }
@@ -587,9 +548,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       final answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       _sendSig({'type': 'answer', 'sdp': answer.sdp, 'sdpType': answer.type});
-      dev.log('PC → answer sent');
     } catch (e) {
-      dev.log('PC → handleOffer failed: $e');
     }
   }
 
@@ -603,9 +562,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       await pc.setRemoteDescription(RTCSessionDescription(sdp, sdpType));
       _remoteDescSet = true;
       await _flushPendingCandidates();
-      dev.log('PC → remote answer set');
     } catch (e) {
-      dev.log('PC → handleAnswer failed: $e');
     }
   }
 
@@ -618,7 +575,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     final typ = candStr == null
         ? '?'
         : RegExp(r'typ (\w+)').firstMatch(candStr)?.group(1) ?? '?';
-    dev.log('ICE ← remote candidate typ=$typ | $candStr');
     final candidate = RTCIceCandidate(
       candStr,
       c['sdpMid'] as String?,
@@ -631,7 +587,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     try {
       await pc.addCandidate(candidate);
     } catch (e) {
-      dev.log('PC → addCandidate failed: $e');
     }
   }
 
@@ -642,7 +597,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       try {
         await pc.addCandidate(c);
       } catch (e) {
-        dev.log('PC → flush candidate failed: $e');
       }
     }
     _pendingRemoteCandidates.clear();
@@ -693,7 +647,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 
   Future<void> _onStop() async {
     if (_isStopping) return;
-    dev.log('ACTION → stop');
     _isStopping = true;
     _sessionSecondsLeft = null;
     await _teardownSession();
@@ -712,12 +665,10 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 
   Future<void> _onNext() async {
     final sessionId = _sessionId;
-    dev.log('ACTION → next (session_id=$sessionId)');
     if (sessionId != null) {
       try {
         await ApiService.post('/skip/', {'session_id': sessionId});
       } catch (e) {
-        dev.log('ACTION → skip failed: $e');
       }
     }
     _connectWaitingRoom();
@@ -798,14 +749,12 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         'reason': reason,
       });
     } catch (e) {
-      dev.log('ACTION → report failed: $e');
     }
     _connectWaitingRoom();
   }
 
   @override
   void dispose() {
-    dev.log('DISPOSE → start');
     _isStopping = true;
     _countdownTimer?.cancel();
     WakelockPlus.disable();

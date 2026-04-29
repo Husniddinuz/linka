@@ -3,17 +3,18 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../screens/plus_subscription_screen.dart';
 
-Future<void> showFreeMinutesDialog(BuildContext context) {
+Future<void> showFreeMinutesDialog(BuildContext context, {bool dismissible = true}) {
   return showDialog(
     context: context,
-    barrierDismissible: true,
+    barrierDismissible: dismissible,
     barrierColor: Colors.black.withValues(alpha: 0.6),
-    builder: (_) => const _FreeMinutesDialog(),
+    builder: (_) => _FreeMinutesDialog(dismissible: dismissible),
   );
 }
 
 class _FreeMinutesDialog extends StatelessWidget {
-  const _FreeMinutesDialog();
+  final bool dismissible;
+  const _FreeMinutesDialog({this.dismissible = true});
 
   @override
   Widget build(BuildContext context) {
@@ -21,10 +22,10 @@ class _FreeMinutesDialog extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 28),
+          margin: const EdgeInsets.symmetric(horizontal: 36),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -32,17 +33,16 @@ class _FreeMinutesDialog extends StatelessWidget {
               // Header
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
                 decoration: const BoxDecoration(
                   color: Color(0xFF272942),
-                  borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(24)),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
                 child: Column(
                   children: [
                     Container(
-                      width: 64,
-                      height: 64,
+                      width: 48,
+                      height: 48,
                       decoration: BoxDecoration(
                         color: const Color(0xFFF5C542).withValues(alpha: 0.15),
                         shape: BoxShape.circle,
@@ -50,8 +50,8 @@ class _FreeMinutesDialog extends StatelessWidget {
                       child: Center(
                         child: SvgPicture.asset(
                           'assets/images/icons/notification_empty.svg',
-                          width: 32,
-                          height: 32,
+                          width: 24,
+                          height: 24,
                           colorFilter: const ColorFilter.mode(
                             Color(0xFFF5C542),
                             BlendMode.srcIn,
@@ -59,12 +59,12 @@ class _FreeMinutesDialog extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     const Text(
                       'Free minutes are over!',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 17,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                         height: 1.25,
@@ -76,25 +76,25 @@ class _FreeMinutesDialog extends StatelessWidget {
 
               // Body
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
                 child: Column(
                   children: [
                     const Text(
                       'You have spent all of your free minutes for chatting with friends. Join Linka PLUS to get unlimited chat time!',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 13,
                         fontWeight: FontWeight.w400,
                         color: Color(0xFF6C6C6C),
-                        height: 1.5,
+                        height: 1.45,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 18),
 
                     // Join Plus button
                     SizedBox(
                       width: double.infinity,
-                      height: 52,
+                      height: 46,
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.of(context).pop();
@@ -109,41 +109,42 @@ class _FreeMinutesDialog extends StatelessWidget {
                           foregroundColor: const Color(0xFF272942),
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                         child: const Text(
                           'Join PLUS',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
                     ),
 
-                    const SizedBox(height: 12),
-
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFFAAAAAA),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                    if (dismissible) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 46,
+                        child: TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFFAAAAAA),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                        ),
-                        child: const Text(
-                          'Maybe Later',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
+                          child: const Text(
+                            'Maybe Later',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),

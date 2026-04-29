@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as dev;
 import 'package:daily_flutter/daily_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -91,7 +90,6 @@ class _LessonMeetingScreenState extends State<LessonMeetingScreen> {
         token: widget.token.isEmpty ? null : widget.token,
       );
     } catch (e, st) {
-      dev.log('join failed: $e', error: e, stackTrace: st, name: 'meeting');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to join: $e')),
@@ -143,7 +141,6 @@ class _LessonMeetingScreenState extends State<LessonMeetingScreen> {
         }
       },
       appMessageReceived: (data, from) {
-        dev.log('appMessage from=$from raw=$data', name: 'meeting');
         String? text;
         try {
           final decoded = jsonDecode(data);
@@ -196,10 +193,6 @@ class _LessonMeetingScreenState extends State<LessonMeetingScreen> {
     final media = p?.media;
     final screenTrack = media?.screenVideo.track;
     final camTrack = media?.camera.track;
-    dev.log(
-      'remote tracks: screen=${screenTrack != null}, cam=${camTrack != null}, camMuted=${p?.isCameraMuted}, micMuted=${p?.isMicrophoneMuted}',
-      name: 'meeting',
-    );
     _remoteCtrl.setTrack(screenTrack ?? camTrack);
     setState(() {
       _remoteCamera = screenTrack != null || !(p?.isCameraMuted ?? true);
@@ -225,13 +218,11 @@ class _LessonMeetingScreenState extends State<LessonMeetingScreen> {
     final payload = jsonEncode({'kind': 'chat', 'text': text.trim()});
     try {
       await client.sendAppMessage(payload, null);
-      dev.log('sent chat: $payload', name: 'meeting');
       _messages.value = [
         ..._messages.value,
         _ChatEntry(widget.localName, text.trim(), true),
       ];
     } catch (e, st) {
-      dev.log('sendAppMessage failed: $e', error: e, stackTrace: st, name: 'meeting');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to send: $e')),

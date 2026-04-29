@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -147,12 +146,9 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
 
     String? url;
     try {
-      dev.log('webinar: joining session ${webinar.id}', name: 'webinar');
       final data = await ApiService.post('/live/webinar/${webinar.id}/join/', {});
       url = data['mux_playback_url']?.toString();
-      dev.log('webinar: join OK, mux_playback_url=$url', name: 'webinar');
     } on ApiException catch (e) {
-      dev.log('webinar: join error — ${e.message}', name: 'webinar');
       url = webinar.muxPlaybackUrl;
     }
     if (url == null || url.isEmpty || !mounted) return;
@@ -161,7 +157,6 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
   }
 
   Future<void> _initVideo(String url, {String kind = 'live'}) async {
-    dev.log('webinar: init $kind video — $url', name: 'webinar');
     try {
       final controller = VideoPlayerController.networkUrl(Uri.parse(url));
       await controller.initialize();
@@ -169,7 +164,6 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
         controller.dispose();
         return;
       }
-      dev.log('webinar: $kind video ready (duration=${controller.value.duration})', name: 'webinar');
       setState(() {
         _videoController = controller;
         _videoInitialized = true;
@@ -177,7 +171,6 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
       controller.play();
       controller.setLooping(false);
     } catch (e) {
-      dev.log('webinar: $kind video init error — $e', name: 'webinar');
       if (!mounted) return;
       setState(() => _videoError = true);
     }
@@ -193,37 +186,31 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
     final wsScheme = apiUri.scheme == 'https' ? 'wss' : 'ws';
     final wsUrl =
         '$wsScheme://${apiUri.host}/ws/live/session/${widget.webinar.id}/?token=$token';
-    dev.log('webinar: connecting chat WS — $wsUrl', name: 'webinar');
 
     try {
       await _chatSub?.cancel();
       await _chatWs?.sink.close();
       _chatWs = WebSocketChannel.connect(Uri.parse(wsUrl));
       await _chatWs!.ready;
-      dev.log('webinar: chat WS connected', name: 'webinar');
       if (!mounted) return;
       setState(() => _wsConnected = true);
       _chatSub = _chatWs!.stream.listen(
         _onChatMessage,
         onError: (e) {
-          dev.log('webinar: chat WS error — $e', name: 'webinar');
           if (mounted) setState(() => _wsConnected = false);
         },
         onDone: () {
-          dev.log('webinar: chat WS closed', name: 'webinar');
           if (mounted) setState(() { _wsConnected = false; _chatWs = null; });
         },
         cancelOnError: false,
       );
     } catch (e) {
-      dev.log('webinar: chat WS connect failed — $e', name: 'webinar');
       _chatWs = null;
       if (mounted) setState(() => _wsConnected = false);
     }
   }
 
   void _onChatMessage(dynamic raw) {
-    dev.log('webinar: WS ← $raw', name: 'webinar');
     try {
       final data = json.decode(raw as String) as Map<String, dynamic>;
       final type = (data['type'] as String? ?? '').toLowerCase();
@@ -288,7 +275,6 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
         if (count != null && mounted) setState(() => _viewerCount = count);
       }
     } catch (e) {
-      dev.log('webinar: WS parse error — $e', name: 'webinar');
     }
   }
 
@@ -319,9 +305,7 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
 
     try {
       _chatWs!.sink.add(json.encode({'type': 'chat_message', 'text': text}));
-      dev.log('webinar: chat → sent "$text"', name: 'webinar');
     } catch (e) {
-      dev.log('webinar: chat send error — $e', name: 'webinar');
       _pendingOutbound.remove(text); // send failed, no echo will arrive
     } finally {
       if (mounted) setState(() => _sendingMessage = false);

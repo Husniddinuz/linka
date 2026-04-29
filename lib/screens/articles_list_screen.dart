@@ -1,4 +1,3 @@
-import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
@@ -65,7 +64,6 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
         setState(() => _savedArticleIds.add(articleId));
       }
     } catch (e) {
-      dev.log('ARTICLE BOOKMARK ERROR: $e');
     }
   }
 

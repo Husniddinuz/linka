@@ -1,4 +1,3 @@
-import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
@@ -32,7 +31,6 @@ class _SavedArticlesScreenState extends State<SavedArticlesScreen> {
         _loading = false;
       });
     } catch (e) {
-      dev.log('SAVED ARTICLES ERROR: $e');
       if (!mounted) return;
       setState(() => _loading = false);
     }
@@ -43,7 +41,6 @@ class _SavedArticlesScreenState extends State<SavedArticlesScreen> {
       await ApiService.delete('/student/saved-articles/$articleId/');
       setState(() => _articles.removeWhere((a) => a['id'] == articleId));
     } catch (e) {
-      dev.log('REMOVE ARTICLE BOOKMARK ERROR: $e');
     }
   }
 

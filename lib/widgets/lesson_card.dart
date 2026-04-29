@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -608,20 +607,17 @@ class _RateSheetState extends State<_RateSheet> {
       'rating': _rating,
       'comment': comment,
     };
-    dev.log('submitting review: $payload', name: 'RateSheet');
     try {
       await ApiService.post('/reviews/', payload);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
-      dev.log('review error [${e.statusCode}]: ${e.message}', name: 'RateSheet');
       if (!mounted) return;
       setState(() {
         _error = e.message;
         _saving = false;
       });
     } catch (e) {
-      dev.log('review unexpected error: $e', name: 'RateSheet');
       if (!mounted) return;
       setState(() {
         _error = e.toString();

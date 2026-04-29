@@ -1,4 +1,3 @@
-import 'dart:developer' as dev;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 
@@ -42,26 +41,16 @@ class UserService {
 
   /// Fetches /users/me/ and caches the result.
   static Future<UserMe> fetchMe() async {
-    dev.log('GET /users/me/', name: 'user');
     try {
       final result = await ApiService.get('/users/me/');
-      dev.log('GET /users/me/ -> $result', name: 'user');
       final payload = (result['data'] is Map<String, dynamic>)
           ? result['data'] as Map<String, dynamic>
           : result;
       final me = UserMe.fromJson(payload);
-      dev.log(
-        'parsed: id=${me.id} role=${me.role} '
-        'isTeacher=${me.isTeacher} isStudent=${me.isStudent} '
-        'isProfileComplete=${me.isProfileComplete} '
-        'tutorAccountStatus=${me.tutorAccountStatus}',
-        name: 'user',
-      );
       _current = me;
       await _cache(me);
       return me;
     } catch (e, st) {
-      dev.log('GET /users/me/ failed: $e', name: 'user', error: e, stackTrace: st);
       rethrow;
     }
   }

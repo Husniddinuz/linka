@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:developer' as developer;
 import 'api_service.dart';
 
 class EarningsService {
@@ -18,33 +17,15 @@ class EarningsService {
     };
     final query = qp.entries.map((e) => '${e.key}=${e.value}').join('&');
     final path = '/payments/tutor-earnings/?$query';
-    developer.log('GET $path', name: 'EarningsService');
     final result = await ApiService.get(path);
-    developer.log(
-      'raw response: ${jsonEncode(result)}',
-      name: 'EarningsService',
-    );
     final parsed = EarningsPage.fromJson(result);
-    developer.log(
-      'parsed: completed=${parsed.totalCompletedUzs} UZS, '
-      'pending=${parsed.totalPendingUzs} UZS, '
-      'entries=${parsed.entries.length}, '
-      'page=${parsed.page}/${parsed.totalPages}',
-      name: 'EarningsService',
-    );
     return parsed;
   }
 
   /// Fetches the tutor's current wallet balance in UZS.
   static Future<int> fetchWalletBalance() async {
-    developer.log('GET /payments/tutor-wallet/', name: 'EarningsService');
     final result = await ApiService.get('/payments/tutor-wallet/');
-    developer.log(
-      'wallet raw: ${jsonEncode(result)}',
-      name: 'EarningsService',
-    );
     final balance = EarningsPage._parseInt(result['balance_uzs']);
-    developer.log('wallet balance: $balance UZS', name: 'EarningsService');
     return balance;
   }
 

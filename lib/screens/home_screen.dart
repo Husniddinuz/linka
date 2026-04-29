@@ -1,4 +1,3 @@
-import 'dart:developer' as dev;
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -273,7 +272,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadingPodcasts = false;
       });
     } catch (e) {
-      dev.log('Podcasts error: $e');
       if (!mounted) return;
       setState(() => _loadingPodcasts = false);
     }
@@ -290,7 +288,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadingArticles = false;
       });
     } catch (e) {
-      dev.log('Articles error: $e');
       if (!mounted) return;
       setState(() => _loadingArticles = false);
     }
@@ -307,7 +304,6 @@ class _HomeScreenState extends State<HomeScreen> {
             .toSet();
       });
     } catch (e) {
-      dev.log('Saved articles error: $e');
     }
   }
 
@@ -327,7 +323,6 @@ class _HomeScreenState extends State<HomeScreen> {
         await ApiService.post('/student/saved-articles/', {'article_id': articleId});
       }
     } catch (e) {
-      dev.log('ARTICLE BOOKMARK ERROR: $e');
       if (!mounted) return;
       setState(() {
         if (wasSaved) {
@@ -440,7 +435,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadingLessons = false;
       });
     } catch (e) {
-      dev.log('TODAYS LESSONS ERROR: $e');
       if (!mounted) return;
       setState(() => _loadingLessons = false);
     }
