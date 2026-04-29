@@ -27,6 +27,7 @@ import 'tutor_earnings_screen.dart';
 import 'tutor_stories_screen.dart';
 import 'profile_setup_screen.dart';
 import 'webinar_viewer_screen.dart';
+import 'debate_screen.dart';
 
 // ─── Data models ───────────────────────────────────────────────────────────────
 
@@ -478,6 +479,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // Webinar block
                   const _WebinarBlock(),
+                  const SizedBox(height: 16),
+
+                  // Debate block
+                  const _DebateBlock(),
                   const SizedBox(height: 28),
 
                   // Speaking practice button
@@ -1524,6 +1529,226 @@ class _WebinarBlockState extends State<_WebinarBlock> {
                       ),
                     ),
                   ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Debate block (today's session) ───────────────────────────────────────────
+
+class _DebateBlock extends StatefulWidget {
+  const _DebateBlock();
+
+  @override
+  State<_DebateBlock> createState() => _DebateBlockState();
+}
+
+class _DebateBlockState extends State<_DebateBlock> {
+  Map<String, dynamic>? _data;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchToday();
+  }
+
+  Future<void> _fetchToday() async {
+    try {
+      final data = await ApiService.get('/live/debate/today/');
+      if (!mounted) return;
+      setState(() {
+        _data = data;
+        _loading = false;
+      });
+    } on ApiException {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          height: 96,
+          decoration: BoxDecoration(
+            color: const Color(0xFF272942),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                color: Color(0xFFF5C542),
+                strokeWidth: 2,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final data = _data;
+    if (data == null || data['has_session'] != true) return const SizedBox.shrink();
+
+    final status = data['status'] as String? ?? 'scheduled';
+    final title = data['title'] as String? ?? 'Debate';
+    final topic = data['topic'] as String?;
+    final sessionId = data['id'] as int? ?? 0;
+    final joinEnabled = data['join_enabled'] as bool? ?? false;
+
+    final (String badgeLabel, Color badgeColor) = switch (status) {
+      'live' => ('LIVE', const Color(0xFFE53935)),
+      'ended' => ('ENDED', const Color(0xFF6C6C6C)),
+      _ => ('UPCOMING', const Color(0xFFF5C542)),
+    };
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DebateScreen(
+            sessionId: sessionId,
+            title: title,
+            status: status,
+            topic: topic,
+          ),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF272942),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5C542).withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.record_voice_over_rounded,
+                      color: Color(0xFFF5C542),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: badgeColor.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                badgeLabel,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: badgeColor,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'DEBATE',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFF5C542),
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withValues(alpha: 0.85),
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (topic != null && topic.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.format_quote_rounded,
+                      size: 13,
+                      color: Colors.white.withValues(alpha: 0.3),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        topic,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.white.withValues(alpha: 0.45),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  const Spacer(),
+                  if (joinEnabled)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5C542),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'Join',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF272942),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ],

@@ -48,6 +48,14 @@ post_install do |installer|
         'PERMISSION_MICROPHONE=1',
         'PERMISSION_PHOTOS=1',
       ]
+
+      # zego_express_engine uses static_framework = true with a vendored xcframework,
+      # but CocoaPods doesn't add the extracted xcframework headers to the pod's own
+      # FRAMEWORK_SEARCH_PATHS. Add it manually so the plugin's ObjC source can find
+      # <ZegoExpressEngine/ZegoExpressEngine.h> at compile time.
+      if target.name == 'zego_express_engine'
+        config.build_settings['FRAMEWORK_SEARCH_PATHS'] = '$(inherited) $(PODS_XCFRAMEWORKS_BUILD_DIR)/ZegoExpressEngine'
+      end
     end
   end
 end

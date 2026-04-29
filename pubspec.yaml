@@ -52,6 +52,7 @@ dependencies:
   path_provider: ^2.1.5
   daily_flutter: ^0.37.0
   wakelock_plus: ^1.2.10
+  zego_express_engine: ^3.10.0
 
 dependency_overrides:
   path_provider_foundation: "2.5.1"
