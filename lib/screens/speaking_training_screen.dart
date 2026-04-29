@@ -275,6 +275,8 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
             if (limit != null && limit > 0) _startCountdown(limit);
           } catch (e) {
           }
+          dev.log('SIGNALING URL → $inlineSignalingUrl');
+          dev.log('SIGNALING TOKEN → $inlineSignalingToken');
           await _createPeerConnection();
           await _connectSignalingWs(inlineSignalingUrl, inlineSignalingToken);
         } else {
@@ -329,6 +331,8 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 
       if (limit != null && limit > 0) _startCountdown(limit);
 
+      dev.log('SIGNALING URL → $signalingUrl');
+      dev.log('SIGNALING TOKEN → $signalingToken');
       await _createPeerConnection();
       await _connectSignalingWs(signalingUrl, signalingToken);
     } catch (e) {
@@ -419,6 +423,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   }
 
   Future<void> _handleSigMessage(dynamic raw) async {
+    dev.log('WS ← SERVER RAW: $raw');
     Map<String, dynamic> msg;
     try {
       msg = jsonDecode(raw as String) as Map<String, dynamic>;

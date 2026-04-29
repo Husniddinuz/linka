@@ -377,14 +377,18 @@ class _DebateScreenState extends State<DebateScreen> {
           onMicTap: _toggleMic,
           onChatTap: () => setState(() => _chatVisible = !_chatVisible),
         ),
-        if (_chatVisible)
-          _ChatPanel(
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          height: _chatVisible ? 260.0 : 0.0,
+          child: _ChatPanel(
             messages: _messages,
             controller: _chatController,
             scrollController: _scrollController,
             sending: _sendingMessage,
             onSend: _sendMessage,
           ),
+        ),
       ],
     );
   }
@@ -816,7 +820,6 @@ class _ChatPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 300,
       decoration: BoxDecoration(
         color: const Color(0xFF161828),
         border: Border(
