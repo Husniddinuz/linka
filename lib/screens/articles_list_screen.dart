@@ -12,6 +12,15 @@ class ArticlesListScreen extends StatefulWidget {
 }
 
 class _ArticlesListScreenState extends State<ArticlesListScreen> {
+  static const _accents = [
+    Color(0xFF4776E6),
+    Color(0xFF11998E),
+    Color(0xFFEB3349),
+    Color(0xFFF7971E),
+    Color(0xFF8E54E9),
+    Color(0xFF1D976C),
+  ];
+
   List<Map<String, dynamic>> _articles = [];
   List<Map<String, dynamic>> _filtered = [];
   Set<int> _savedArticleIds = {};
@@ -152,91 +161,172 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
                             style: TextStyle(color: Color(0xFFAAAAAA), fontSize: 16),
                           ),
                         )
-                      : GridView.builder(
-                          padding: const EdgeInsets.all(16),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 0.75,
-                          ),
-                          itemCount: _filtered.length,
-                          itemBuilder: (context, i) {
-                            final article = _filtered[i];
-                            final title = article['title'] as String? ?? '';
-                            final id = article['id'] as int;
-                            final isSaved = _savedArticleIds.contains(id);
+                      : LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isTablet = MediaQuery.of(context).size.width >= 600;
+                            final cols = isTablet ? 3 : 2;
+                            const spacing = 12.0;
+                            const hPad = 16.0;
+                            final cardWidth = (constraints.maxWidth - hPad * 2 - spacing * (cols - 1)) / cols;
+                            final imageHeight = cardWidth * (110 / 140);
+                            const textSection = 52.0;
+                            final aspectRatio = cardWidth / (imageHeight + textSection);
 
-                            return GestureDetector(
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ArticleDetailScreen(articleId: id),
-                                ),
+                            return GridView.builder(
+                              padding: const EdgeInsets.all(hPad),
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: cols,
+                                mainAxisSpacing: spacing,
+                                crossAxisSpacing: spacing,
+                                childAspectRatio: aspectRatio,
                               ),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF6F6F6),
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                clipBehavior: Clip.hardEdge,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Stack(
-                                        children: [
-                                          Image.asset(
-                                            'assets/images/article.png',
-                                            width: double.infinity,
-                                            height: double.infinity,
-                                            fit: BoxFit.cover,
-                                            cacheWidth: 280,
-                                          ),
-                                          Positioned(
-                                            top: 8,
-                                            right: 8,
-                                            child: GestureDetector(
-                                              onTap: () => _toggleBookmark(id),
-                                              child: Container(
-                                                width: 28,
-                                                height: 28,
-                                                decoration: const BoxDecoration(
-                                                  color: Colors.white,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: Center(
-                                                  child: SvgPicture.asset(
-                                                    isSaved
-                                                        ? 'assets/images/icons/bookmarked.svg'
-                                                        : 'assets/images/icons/bookmark_outline_16.svg',
-                                                    width: 14,
-                                                    height: 14,
+                              itemCount: _filtered.length,
+                              itemBuilder: (context, i) {
+                                final article = _filtered[i];
+                                final title = article['title'] as String? ?? '';
+                                final id = article['id'] as int;
+                                final isSaved = _savedArticleIds.contains(id);
+                                final accent = _accents[i % _accents.length];
+
+                                return GestureDetector(
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ArticleDetailScreen(articleId: id),
+                                    ),
+                                  ),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: const Color(0xFFEEEEEE)),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: accent.withValues(alpha: 0.10),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    clipBehavior: Clip.hardEdge,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        AspectRatio(
+                                          aspectRatio: 140 / 110,
+                                          child: Stack(
+                                            fit: StackFit.expand,
+                                            clipBehavior: Clip.hardEdge,
+                                            children: [
+                                              Container(color: accent),
+                                              Positioned(
+                                                top: -28,
+                                                right: -28,
+                                                child: Container(
+                                                  width: 100,
+                                                  height: 100,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: Colors.white.withValues(alpha: 0.10),
                                                   ),
                                                 ),
                                               ),
+                                              Positioned(
+                                                bottom: -18,
+                                                left: -18,
+                                                child: Container(
+                                                  width: 72,
+                                                  height: 72,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: Colors.white.withValues(alpha: 0.08),
+                                                  ),
+                                                ),
+                                              ),
+                                              Center(
+                                                child: SvgPicture.asset(
+                                                  'assets/images/branding/white-logo.svg',
+                                                  height: 28,
+                                                  colorFilter: ColorFilter.mode(
+                                                    Colors.white.withValues(alpha: 0.90),
+                                                    BlendMode.srcIn,
+                                                  ),
+                                                ),
+                                              ),
+                                              Positioned(
+                                                top: 10,
+                                                right: 10,
+                                                child: GestureDetector(
+                                                  behavior: HitTestBehavior.opaque,
+                                                  onTap: () => _toggleBookmark(id),
+                                                  child: Container(
+                                                    width: 30,
+                                                    height: 30,
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white.withValues(alpha: 0.20),
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: Center(
+                                                      child: SvgPicture.asset(
+                                                        isSaved
+                                                            ? 'assets/images/icons/bookmarked.svg'
+                                                            : 'assets/images/icons/bookmark_outline_16.svg',
+                                                        width: 14,
+                                                        height: 14,
+                                                        colorFilter: const ColorFilter.mode(
+                                                          Colors.white,
+                                                          BlendMode.srcIn,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              Positioned(
+                                                bottom: 10,
+                                                right: 12,
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white.withValues(alpha: 0.20),
+                                                    borderRadius: BorderRadius.circular(20),
+                                                  ),
+                                                  child: const Text(
+                                                    'ARTICLE',
+                                                    style: TextStyle(
+                                                      fontSize: 9,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: Colors.white,
+                                                      letterSpacing: 0.8,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: Padding(
+                                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                                            child: Text(
+                                              title,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF272942),
+                                                height: 1.35,
+                                              ),
+                                              maxLines: 3,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
-                                        ],
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(10),
-                                      child: Text(
-                                        title,
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          color: Color(0xFF272942),
-                                          height: 1.3,
                                         ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                                        Container(height: 3, color: accent),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              ),
+                                  ),
+                                );
+                              },
                             );
                           },
                         ),

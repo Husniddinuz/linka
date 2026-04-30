@@ -3,7 +3,6 @@ import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:just_audio_background/just_audio_background.dart';
 import 'screens/splash_screen.dart';
 import 'screens/role_selection_screen.dart';
 import 'services/api_service.dart';
@@ -44,13 +43,6 @@ void main() async {
       (route) => false,
     );
   };
-
-  // Fire-and-forget — must not block runApp.
-  JustAudioBackground.init(
-    androidNotificationChannelId: 'com.linka.app.channel.audio',
-    androidNotificationChannelName: 'Linka Podcasts',
-    androidNotificationOngoing: true,
-  ).catchError((e) => debugPrint('JustAudioBackground init failed: $e'));
 
   runApp(const LinkaApp());
 }

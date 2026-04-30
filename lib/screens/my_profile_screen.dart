@@ -33,6 +33,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
   Map<String, dynamic>? _profile;
   bool _loading = true;
   bool _isTeacher = false;
+  bool _isExemptFromPlus = false;
   PlusStatus? _plusStatus;
 
   @override
@@ -123,10 +124,12 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
           ? result['data'] as Map<String, dynamic>
           : result;
       profile.putIfAbsent('phone_number', () => me.phone);
+      final exempt = me.phone.replaceAll(RegExp(r'[^\d]'), '') == '998101002233';
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _loading = false;
+        _isExemptFromPlus = exempt;
       });
     } catch (_) {
       if (!mounted) return;
@@ -217,17 +220,19 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                     // Gray section: rest of content
                     const SizedBox(height: 16),
                     if (!_isTeacher) ...[
-                      if (_plusStatus?.isActive == true)
-                        PlusMemberCard(
-                          plan: _plusPlanLabel(_plusStatus),
-                          memberSince: _formatDate(_plusStatus?.since),
-                          nextRenewal: _formatDate(_plusStatus?.plusUntil),
-                          priceLabel: _plusPriceLabel(_plusStatus),
-                          onTap: null,
-                        )
-                      else
-                        _JoinPlusBanner(onTap: _openPlusSubscription),
-                      const SizedBox(height: 16),
+                      if (!_isExemptFromPlus) ...[
+                        if (_plusStatus?.isActive == true)
+                          PlusMemberCard(
+                            plan: _plusPlanLabel(_plusStatus),
+                            memberSince: _formatDate(_plusStatus?.since),
+                            nextRenewal: _formatDate(_plusStatus?.plusUntil),
+                            priceLabel: _plusPriceLabel(_plusStatus),
+                            onTap: null,
+                          )
+                        else
+                          _JoinPlusBanner(onTap: _openPlusSubscription),
+                        const SizedBox(height: 16),
+                      ],
                       _CardGroup(children: [_BalanceRow()]),
                       const SizedBox(height: 16),
                     ],

@@ -1,4 +1,3 @@
-import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../widgets/cached_avatar.dart';
@@ -27,7 +26,6 @@ import 'tutor_earnings_screen.dart';
 import 'tutor_stories_screen.dart';
 import 'profile_setup_screen.dart';
 import 'webinar_viewer_screen.dart';
-import 'debate_screen.dart';
 
 // ─── Data models ───────────────────────────────────────────────────────────────
 
@@ -115,13 +113,15 @@ class _Podcast {
 class _Article {
   final int id;
   final String title;
+  final String? category;
 
-  const _Article({required this.id, required this.title});
+  const _Article({required this.id, required this.title, this.category});
 
   factory _Article.fromJson(Map<String, dynamic> json) {
     return _Article(
       id: json['id'] as int,
       title: json['title'] as String? ?? '',
+      category: json['category'] as String?,
     );
   }
 }
@@ -450,131 +450,136 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Header(profileImage: _profileImage, isTutor: false, onLogoLongPress: _showTestUpdateDialog),
+          _Header(
+            profileImage: _profileImage,
+            isTutor: false,
+            onLogoLongPress: _showTestUpdateDialog,
+            onAvatarTap: () => setState(() => _selectedTab = 3),
+          ),
           Expanded(
             child: _isInitialLoading
-                ? const _StudentHomeSkeleton()
+                ? Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 680),
+                      child: const _StudentHomeSkeleton(),
+                    ),
+                  )
                 : RefreshIndicator(
-              color: const Color(0xFF272942),
-              onRefresh: _refreshStudentHome,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (_loadingStories) ...[
-                    const SizedBox(height: 24),
-                    const _StoriesSkeleton(),
-                    const SizedBox(height: 28),
-                  ] else if (_storyTutors.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    _TutorsList(
-                      tutors: _storyTutors,
-                      viewedStories: _viewedStories,
-                      onStoryViewed: _onStoryViewed,
-                    ),
-                    const SizedBox(height: 28),
-                  ] else
-                    const SizedBox(height: 20),
+                    color: const Color(0xFF272942),
+                    onRefresh: _refreshStudentHome,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 680),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (_loadingStories) ...[
+                                const SizedBox(height: 24),
+                                const _StoriesSkeleton(),
+                                const SizedBox(height: 28),
+                              ] else if (_storyTutors.isNotEmpty) ...[
+                                const SizedBox(height: 24),
+                                _TutorsList(
+                                  tutors: _storyTutors,
+                                  viewedStories: _viewedStories,
+                                  onStoryViewed: _onStoryViewed,
+                                ),
+                                const SizedBox(height: 28),
+                              ] else
+                                const SizedBox(height: 20),
 
-                  // Webinar block
-                  const _WebinarBlock(),
-                  const SizedBox(height: 16),
+                              const _WebinarBlock(),
+                              const SizedBox(height: 16),
 
-                  // Debate block
-                  const _DebateBlock(),
-                  const SizedBox(height: 28),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 21),
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _selectedTab = 2),
+                                  child: LayoutBuilder(
+                                    builder: (context, constraints) => SvgPicture.asset(
+                                      'assets/images/buttons/speaking-practice.svg',
+                                      width: constraints.maxWidth,
+                                    ),
+                                  ),
+                                ),
+                              ),
 
-                  // Speaking practice button
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 21),
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedTab = 2),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) => SvgPicture.asset(
-                          'assets/images/buttons/speaking-practice.svg',
-                          width: constraints.maxWidth,
+                              const SizedBox(height: 32),
+
+                              _LessonsSection(
+                                lessons: _todaysLessons,
+                                loading: _loadingLessons,
+                                onSeeAll: () => setState(() => _selectedTab = 1),
+                                onStartLesson: _joinLesson,
+                                onCancelLesson: _cancelLesson,
+                                onRatedLesson: _loadTodaysLessons,
+                              ),
+
+                              const SizedBox(height: 28),
+
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 21),
+                                child: GestureDetector(
+                                  onTap: () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const SpeakingTrainingScreen(),
+                                    ),
+                                  ),
+                                  child: LayoutBuilder(
+                                    builder: (context, constraints) => SvgPicture.asset(
+                                      'assets/images/buttons/video-chat.svg',
+                                      width: constraints.maxWidth,
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 32),
+
+                              const _SectionHeader(title: 'WATCH A MOVIE'),
+                              const SizedBox(height: 12),
+                              const _ComingSoonBanner(),
+
+                              const SizedBox(height: 28),
+
+                              _SectionHeader(
+                                title: 'PODCASTS',
+                                onSeeAll: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const PodcastsListScreen()),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              _PodcastsSection(podcasts: _podcasts, loading: _loadingPodcasts),
+
+                              const SizedBox(height: 28),
+
+                              _SectionHeader(
+                                title: 'ARTICLES',
+                                onSeeAll: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const ArticlesListScreen()),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              _ArticlesSection(
+                                articles: _articles,
+                                loading: _loadingArticles,
+                                savedArticleIds: _savedArticleIds,
+                                onToggleBookmark: _toggleArticleBookmark,
+                              ),
+
+                              const SizedBox(height: 32),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-
-                  const SizedBox(height: 32),
-
-                  // Today's lessons
-                  _LessonsSection(
-                    lessons: _todaysLessons,
-                    loading: _loadingLessons,
-                    onSeeAll: () => setState(() => _selectedTab = 1),
-                    onStartLesson: _joinLesson,
-                    onCancelLesson: _cancelLesson,
-                    onRatedLesson: _loadTodaysLessons,
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // Video chat button
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 21),
-                    child: GestureDetector(
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const SpeakingTrainingScreen(),
-                        ),
-                      ),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) =>
-                            SvgPicture.asset(
-                              'assets/images/buttons/video-chat.svg',
-                              width: constraints.maxWidth,
-                            ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // Watch a movie section — coming soon
-                  const _SectionHeader(title: 'WATCH A MOVIE'),
-                  const SizedBox(height: 12),
-                  const _ComingSoonBanner(),
-
-                  const SizedBox(height: 28),
-
-                  // Podcasts section
-                  _SectionHeader(
-                    title: 'PODCASTS',
-                    onSeeAll: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const PodcastsListScreen()),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _PodcastsSection(podcasts: _podcasts, loading: _loadingPodcasts),
-
-                  const SizedBox(height: 28),
-
-                  // Articles section
-                  _SectionHeader(
-                    title: 'ARTICLES',
-                    onSeeAll: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ArticlesListScreen()),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _ArticlesSection(
-                    articles: _articles,
-                    loading: _loadingArticles,
-                    savedArticleIds: _savedArticleIds,
-                    onToggleBookmark: _toggleArticleBookmark,
-                  ),
-
-                  const SizedBox(height: 32),
-                ],
-              ),
-              ),
-            ),
           ),
         ],
       ),
@@ -583,6 +588,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = MediaQuery.of(context).size.width >= 600;
     final navItems = _isTeacher ? _tutorNavItems : _studentNavItems;
     final children = _isTeacher
         ? <Widget>[
@@ -593,6 +599,7 @@ class _HomeScreenState extends State<HomeScreen> {
               loadingStories: _loadingStories,
               onStoryViewed: _onStoryViewed,
               tutorAccountStatus: _tutorAccountStatus,
+              onAvatarTap: () => setState(() => _selectedTab = 3),
             ),
             const TutorStoriesScreen(),
             // Earnings is opened as a full-screen push, not an IndexedStack
@@ -611,6 +618,41 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ];
 
+    void handleNavTap(int i) {
+      if (_isTeacher && i == 2) {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const TutorEarningsScreen()),
+        );
+        return;
+      }
+      setState(() => _selectedTab = i);
+    }
+
+    if (isTablet) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Row(
+          children: [
+            _SideNav(
+              items: navItems,
+              selectedIndex: _selectedTab,
+              onTap: handleNavTap,
+            ),
+            Expanded(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: IndexedStack(index: _selectedTab, children: children),
+                  ),
+                  const MiniPlayerBar(),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: IndexedStack(index: _selectedTab, children: children),
@@ -621,17 +663,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _BottomNav(
             items: navItems,
             selectedIndex: _selectedTab,
-            onTap: (i) {
-              if (_isTeacher && i == 2) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const TutorEarningsScreen(),
-                  ),
-                );
-                return;
-              }
-              setState(() => _selectedTab = i);
-            },
+            onTap: handleNavTap,
           ),
         ],
       ),
@@ -704,7 +736,8 @@ class _Header extends StatefulWidget {
   final String? profileImage;
   final bool isTutor;
   final VoidCallback? onLogoLongPress;
-  const _Header({this.profileImage, this.isTutor = false, this.onLogoLongPress});
+  final VoidCallback? onAvatarTap;
+  const _Header({this.profileImage, this.isTutor = false, this.onLogoLongPress, this.onAvatarTap});
 
   @override
   State<_Header> createState() => _HeaderState();
@@ -735,14 +768,16 @@ class _HeaderState extends State<_Header> {
 
   @override
   Widget build(BuildContext context) {
-    final avatar = CachedAvatar(imageUrl: widget.profileImage, size: 44);
-
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
         children: [
-          avatar,
+          GestureDetector(
+            onTap: widget.onAvatarTap,
+            behavior: HitTestBehavior.opaque,
+            child: CachedAvatar(imageUrl: widget.profileImage, size: 44),
+          ),
 
           // Logo centered
           Expanded(
@@ -886,18 +921,20 @@ class _StudentHomeSkeleton extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 98,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: 2,
-              itemBuilder: (_, i) => Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: SizedBox(
-                  width: MediaQuery.of(context).size.width - 52,
-                  child: const Skeleton(height: 98, borderRadius: 16),
+          LayoutBuilder(
+            builder: (context, constraints) => SizedBox(
+              height: 98,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: 2,
+                itemBuilder: (_, i) => Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: SizedBox(
+                    width: constraints.maxWidth - 52,
+                    child: const Skeleton(height: 98, borderRadius: 16),
+                  ),
                 ),
               ),
             ),
@@ -972,7 +1009,7 @@ class _StudentHomeSkeleton extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 180,
+            height: 210,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               physics: const NeverScrollableScrollPhysics(),
@@ -981,8 +1018,8 @@ class _StudentHomeSkeleton extends StatelessWidget {
               itemBuilder: (_, _) => const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 6),
                 child: SizedBox(
-                  width: 140,
-                  child: Skeleton(height: 180, borderRadius: 14),
+                  width: 160,
+                  child: Skeleton(height: 210, borderRadius: 16),
                 ),
               ),
             ),
@@ -1141,8 +1178,8 @@ class _LessonsSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Builder(builder: (context) {
-          final cardWidth = MediaQuery.of(context).size.width - 52;
+        LayoutBuilder(builder: (context, constraints) {
+          final cardWidth = constraints.maxWidth - 52;
           if (loading) {
             return SizedBox(
               height: 114,
@@ -1253,68 +1290,173 @@ class _SectionHeader extends StatelessWidget {
 class _ComingSoonBanner extends StatelessWidget {
   const _ComingSoonBanner();
 
-  static const _posters = [
-    'assets/images/movies/joker.png',
-    'assets/images/movies/little-women.png',
-    'assets/images/movies/thor.png',
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         child: SizedBox(
           height: 160,
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Blurred movie posters row
-              ImageFiltered(
-                imageFilter: ImageFilter.blur(sigmaX: 2.5, sigmaY: 2.5),
-                child: Row(
-                  children: _posters.map((path) => Expanded(
-                    child: Image.asset(
-                      path,
-                      fit: BoxFit.cover,
-                      height: double.infinity,
-                    ),
-                  )).toList(),
+              // Gradient background
+              Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF1E2040), Color(0xFF272942), Color(0xFF323566)],
+                  ),
                 ),
               ),
-              // Dark overlay
-              Container(color: const Color(0xFF272942).withValues(alpha: 0.55)),
-              // Coming soon badge
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+              // Decorative circles
+              Positioned(
+                right: -30,
+                top: -30,
+                child: Container(
+                  width: 130,
+                  height: 130,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFF5C542).withValues(alpha: 0.08),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 30,
+                bottom: -40,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFF5C542).withValues(alpha: 0.06),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: -20,
+                bottom: -20,
+                child: Container(
+                  width: 90,
+                  height: 90,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.04),
+                  ),
+                ),
+              ),
+              // Content
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
                   children: [
-                    const Icon(
-                      Icons.movie_outlined,
-                      color: Color(0xFFF5C542),
-                      size: 32,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Coming soon',
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        height: 1.2,
+                    // Left: text
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF5C542).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: const Color(0xFFF5C542).withValues(alpha: 0.4),
+                                width: 1,
+                              ),
+                            ),
+                            child: const Text(
+                              'COMING SOON',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFF5C542),
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Watch & Learn\nin English',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              height: 1.25,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Movies with subtitles\nto boost your skills',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                              color: Colors.white.withValues(alpha: 0.6),
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Movies will be available shortly',
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                        color: Colors.white.withValues(alpha: 0.75),
-                        height: 1.3,
+                    // Right: icon stack
+                    SizedBox(
+                      width: 90,
+                      height: 110,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          // Back card
+                          Positioned(
+                            right: 0,
+                            top: 10,
+                            child: Transform.rotate(
+                              angle: 0.18,
+                              child: Container(
+                                width: 62,
+                                height: 88,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF5C542).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: const Color(0xFFF5C542).withValues(alpha: 0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Front card
+                          Positioned(
+                            left: 0,
+                            top: 8,
+                            child: Transform.rotate(
+                              angle: -0.1,
+                              child: Container(
+                                width: 62,
+                                height: 88,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.07),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.play_circle_rounded,
+                                    color: Color(0xFFF5C542),
+                                    size: 28,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -1539,226 +1681,6 @@ class _WebinarBlockState extends State<_WebinarBlock> {
   }
 }
 
-// ─── Debate block (today's session) ───────────────────────────────────────────
-
-class _DebateBlock extends StatefulWidget {
-  const _DebateBlock();
-
-  @override
-  State<_DebateBlock> createState() => _DebateBlockState();
-}
-
-class _DebateBlockState extends State<_DebateBlock> {
-  Map<String, dynamic>? _data;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchToday();
-  }
-
-  Future<void> _fetchToday() async {
-    try {
-      final data = await ApiService.get('/live/debate/today/');
-      if (!mounted) return;
-      setState(() {
-        _data = data;
-        _loading = false;
-      });
-    } on ApiException {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Container(
-          height: 96,
-          decoration: BoxDecoration(
-            color: const Color(0xFF272942),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Center(
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                color: Color(0xFFF5C542),
-                strokeWidth: 2,
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    final data = _data;
-    if (data == null || data['has_session'] != true) return const SizedBox.shrink();
-
-    final status = data['status'] as String? ?? 'scheduled';
-    final title = data['title'] as String? ?? 'Debate';
-    final topic = data['topic'] as String?;
-    final sessionId = data['id'] as int? ?? 0;
-    final joinEnabled = data['join_enabled'] as bool? ?? false;
-
-    final (String badgeLabel, Color badgeColor) = switch (status) {
-      'live' => ('LIVE', const Color(0xFFE53935)),
-      'ended' => ('ENDED', const Color(0xFF6C6C6C)),
-      _ => ('UPCOMING', const Color(0xFFF5C542)),
-    };
-
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => DebateScreen(
-            sessionId: sessionId,
-            title: title,
-            status: status,
-            topic: topic,
-          ),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF272942),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF5C542).withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.record_voice_over_rounded,
-                      color: Color(0xFFF5C542),
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: badgeColor.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                badgeLabel,
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: badgeColor,
-                                  letterSpacing: 0.8,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Text(
-                              'DEBATE',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFFF5C542),
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white.withValues(alpha: 0.85),
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              if (topic != null && topic.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.format_quote_rounded,
-                      size: 13,
-                      color: Colors.white.withValues(alpha: 0.3),
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        topic,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.white.withValues(alpha: 0.45),
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  const Spacer(),
-                  if (joinEnabled)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5C542),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        'Join',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF272942),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 // ─── Podcasts section ──────────────────────────────────────────────────────────
 
 class _PodcastsSection extends StatelessWidget {
@@ -1879,6 +1801,7 @@ class _PodcastCard extends StatelessWidget {
 
 // ─── Articles section ──────────────────────────────────────────────────────────
 
+
 class _ArticlesSection extends StatelessWidget {
   final List<_Article> articles;
   final bool loading;
@@ -1895,7 +1818,7 @@ class _ArticlesSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (loading) {
       return SizedBox(
-        height: 180,
+        height: 210,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1903,21 +1826,22 @@ class _ArticlesSection extends StatelessWidget {
           itemBuilder: (_, _) => const Padding(
             padding: EdgeInsets.symmetric(horizontal: 6),
             child: SizedBox(
-              width: 140,
-              child: Skeleton(height: 180, borderRadius: 14),
+              width: 160,
+              child: Skeleton(height: 210, borderRadius: 16),
             ),
           ),
         ),
       );
     }
     return SizedBox(
-      height: 180,
+      height: 210,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: articles.length,
         itemBuilder: (_, i) => _ArticleCard(
           article: articles[i],
+          index: i,
           isSaved: savedArticleIds.contains(articles[i].id),
           onToggleBookmark: onToggleBookmark,
         ),
@@ -1928,16 +1852,29 @@ class _ArticlesSection extends StatelessWidget {
 
 class _ArticleCard extends StatelessWidget {
   final _Article article;
+  final int index;
   final bool isSaved;
   final void Function(int articleId) onToggleBookmark;
   const _ArticleCard({
     required this.article,
+    required this.index,
     required this.isSaved,
     required this.onToggleBookmark,
   });
 
+  static const _accents = [
+    Color(0xFF4776E6),
+    Color(0xFF11998E),
+    Color(0xFFEB3349),
+    Color(0xFFF7971E),
+    Color(0xFF8E54E9),
+    Color(0xFF1D976C),
+  ];
+
   @override
   Widget build(BuildContext context) {
+    final accent = _accents[index % _accents.length];
+
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -1946,67 +1883,206 @@ class _ArticleCard extends StatelessWidget {
         ),
       ),
       child: Container(
-        width: 140,
+        width: 160,
         margin: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFFF6F6F6),
-          borderRadius: BorderRadius.circular(14),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFEEEEEE)),
+          boxShadow: [
+            BoxShadow(
+              color: accent.withValues(alpha: 0.10),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         clipBehavior: Clip.hardEdge,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Stack(
-              children: [
-                Image.asset(
-                  'assets/images/article.png',
-                  width: double.infinity,
-                  height: 110,
-                  fit: BoxFit.cover,
-                  cacheWidth: 280,
-                  cacheHeight: 220,
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => onToggleBookmark(article.id),
+            // Colored top band with decorative shapes
+            SizedBox(
+              height: 110,
+              child: Stack(
+                fit: StackFit.expand,
+                clipBehavior: Clip.hardEdge,
+                children: [
+                  Container(color: accent),
+                  // Large decorative circle top-right
+                  Positioned(
+                    top: -28,
+                    right: -28,
                     child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.10),
                       ),
-                      child: Center(
-                        child: SvgPicture.asset(
-                          isSaved
-                              ? 'assets/images/icons/bookmarked.svg'
-                              : 'assets/images/icons/bookmark_outline_16.svg',
-                          width: 14,
-                          height: 14,
+                    ),
+                  ),
+                  // Small decorative circle bottom-left
+                  Positioned(
+                    bottom: -18,
+                    left: -18,
+                    child: Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
+                    ),
+                  ),
+                  // Bookmark button
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onToggleBookmark(article.id),
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.20),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: SvgPicture.asset(
+                            isSaved
+                                ? 'assets/images/icons/bookmarked.svg'
+                                : 'assets/images/icons/bookmark_outline_16.svg',
+                            width: 14,
+                            height: 14,
+                            colorFilter: const ColorFilter.mode(
+                              Colors.white,
+                              BlendMode.srcIn,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Text(
-                article.title,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF272942),
-                  height: 1.3,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                  // Linka logo centered in the band
+                  Center(
+                    child: SvgPicture.asset(
+                      'assets/images/branding/white-logo.svg',
+                      height: 28,
+                      colorFilter: ColorFilter.mode(
+                        Colors.white.withValues(alpha: 0.90),
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                  ),
+                  // Article number badge
+                  Positioned(
+                    bottom: 10,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.20),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'ARTICLE',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
+            // Title area
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                child: Text(
+                  article.title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF272942),
+                    height: 1.35,
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            // Colored bottom accent line
+            Container(height: 3, color: accent),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Side navigation rail (tablet) ────────────────────────────────────────────
+
+class _SideNav extends StatelessWidget {
+  final List<_NavItem> items;
+  final int selectedIndex;
+  final void Function(int) onTap;
+  const _SideNav({
+    required this.items,
+    required this.selectedIndex,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 82,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(right: BorderSide(color: Color(0xFFEEEEEE), width: 1)),
+      ),
+      child: SafeArea(
+        right: false,
+        child: Column(
+          children: [
+            const SizedBox(height: 16),
+            ...List.generate(items.length, (i) {
+              final selected = i == selectedIndex;
+              final item = items[i];
+              return GestureDetector(
+                onTap: () => onTap(i),
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SvgPicture.asset(
+                        selected ? item.activeIcon : item.inactiveIcon,
+                        width: 26,
+                        height: 26,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                          color: selected
+                              ? const Color(0xFF272942)
+                              : const Color(0xFFCCCCCC),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
           ],
         ),
       ),
@@ -2085,6 +2161,7 @@ class TutorHomeBody extends StatefulWidget {
   final bool loadingStories;
   final void Function(String) onStoryViewed;
   final String? tutorAccountStatus;
+  final VoidCallback? onAvatarTap;
 
   const TutorHomeBody({
     super.key,
@@ -2094,6 +2171,7 @@ class TutorHomeBody extends StatefulWidget {
     required this.loadingStories,
     required this.onStoryViewed,
     this.tutorAccountStatus,
+    this.onAvatarTap,
   });
 
   @override
@@ -2257,7 +2335,7 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Header(profileImage: widget.profileImage),
+          _Header(profileImage: widget.profileImage, onAvatarTap: widget.onAvatarTap),
           if (showPendingBanner) _PendingActivationBanner(status: status),
           Expanded(
             child: RefreshIndicator(
@@ -2265,75 +2343,81 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
               onRefresh: _fetch,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (widget.loadingStories) ...[
-                      const SizedBox(height: 24),
-                      const _StoriesSkeleton(),
-                      const SizedBox(height: 28),
-                    ] else if (widget.storyTutors.isNotEmpty) ...[
-                      const SizedBox(height: 24),
-                      _TutorsList(
-                        tutors: widget.storyTutors,
-                        viewedStories: widget.viewedStories,
-                        onStoryViewed: widget.onStoryViewed,
-                      ),
-                      const SizedBox(height: 20),
-                    ] else
-                      const SizedBox(height: 20),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Row(
-                        children: [
-                          const Text(
-                            'MY LESSONS',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF272942),
-                              letterSpacing: 0.5,
-                            ),
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 680),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (widget.loadingStories) ...[
+                          const SizedBox(height: 24),
+                          const _StoriesSkeleton(),
+                          const SizedBox(height: 28),
+                        ] else if (widget.storyTutors.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          _TutorsList(
+                            tutors: widget.storyTutors,
+                            viewedStories: widget.viewedStories,
+                            onStoryViewed: widget.onStoryViewed,
                           ),
-                          const Spacer(),
-                          GestureDetector(
-                            onTap: () =>
-                                setState(() => _calendarMode = !_calendarMode),
-                            child: SvgPicture.asset(
-                              _calendarMode
-                                  ? 'assets/images/icons/calendar_off.svg'
-                                  : 'assets/images/icons/calendar_on.svg',
-                              width: 22,
-                              height: 22,
-                            ),
+                          const SizedBox(height: 20),
+                        ] else
+                          const SizedBox(height: 20),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Row(
+                            children: [
+                              const Text(
+                                'MY LESSONS',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF272942),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const Spacer(),
+                              GestureDetector(
+                                onTap: () =>
+                                    setState(() => _calendarMode = !_calendarMode),
+                                child: SvgPicture.asset(
+                                  _calendarMode
+                                      ? 'assets/images/icons/calendar_off.svg'
+                                      : 'assets/images/icons/calendar_on.svg',
+                                  width: 22,
+                                  height: 22,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (_calendarMode)
+                          _TutorCalendarMode(
+                            loading: _loading,
+                            focusedMonth: _focusedMonth,
+                            selectedDay: _selectedDay,
+                            busyDays: _busyDays,
+                            dayLessons: _selectedDayLessons,
+                            onPrevMonth: () => _changeMonth(-1),
+                            onNextMonth: () => _changeMonth(1),
+                            onDayTap: (d) => setState(() => _selectedDay = d),
+                            onStartLesson: _joinLesson,
+                          )
+                        else
+                          _TutorListMode(
+                            tab: _listTab,
+                            loading: _loading,
+                            upcoming: _upcomingLessons,
+                            past: _pastLessons,
+                            onTabChange: (t) => setState(() => _listTab = t),
+                            onStartLesson: _joinLesson,
+                          ),
+                        const SizedBox(height: 32),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    if (_calendarMode)
-                      _TutorCalendarMode(
-                        loading: _loading,
-                        focusedMonth: _focusedMonth,
-                        selectedDay: _selectedDay,
-                        busyDays: _busyDays,
-                        dayLessons: _selectedDayLessons,
-                        onPrevMonth: () => _changeMonth(-1),
-                        onNextMonth: () => _changeMonth(1),
-                        onDayTap: (d) => setState(() => _selectedDay = d),
-                        onStartLesson: _joinLesson,
-                      )
-                    else
-                      _TutorListMode(
-                        tab: _listTab,
-                        loading: _loading,
-                        upcoming: _upcomingLessons,
-                        past: _pastLessons,
-                        onTabChange: (t) => setState(() => _listTab = t),
-                        onStartLesson: _joinLesson,
-                      ),
-                    const SizedBox(height: 32),
-                  ],
+                  ),
                 ),
               ),
             ),

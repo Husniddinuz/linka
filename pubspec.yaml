@@ -46,13 +46,11 @@ dependencies:
   app_links: ^7.0.0
   video_player: ^2.9.2
   just_audio: ^0.10.5
-  just_audio_background: ^0.0.1-beta.17
   url_launcher: ^6.3.0
   package_info_plus: ^9.0.1
   path_provider: ^2.1.5
   daily_flutter: ^0.37.0
   wakelock_plus: ^1.2.10
-  zego_express_engine: ^3.10.0
 
 dependency_overrides:
   path_provider_foundation: "2.5.1"
@@ -106,7 +104,6 @@ flutter:
     - assets/images/buttons/
     - assets/images/onboarding/
     - assets/images/tutors/
-    - assets/images/movies/
     - assets/images/branding/
 
   # To add custom fonts to your application, add a fonts section here,

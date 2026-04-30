@@ -12,6 +12,7 @@ import '../services/api_constants.dart';
 import '../services/api_service.dart';
 import '../services/plus_service.dart';
 import '../services/token_service.dart';
+import '../services/user_service.dart';
 import '../widgets/free_minutes_dialog.dart';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -99,10 +100,14 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       _localName = '$first $last'.trim();
     } catch (e) {
     }
-    try {
-      final status = await PlusService.getMyStatus();
-      _isPlus = status.isActive;
-    } catch (e) {
+    if (UserService.isExemptFromPlus) {
+      _isPlus = true;
+    } else {
+      try {
+        final status = await PlusService.getMyStatus();
+        _isPlus = status.isActive;
+      } catch (e) {
+      }
     }
     if (!mounted) return;
     setState(() {});

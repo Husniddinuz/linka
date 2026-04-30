@@ -126,19 +126,24 @@ class _TutorsScreenState extends State<TutorsScreen> {
           .map((e) => (e as Map<String, dynamic>)['id'] as int? ?? 0)
           .toSet();
 
+      var tutors = list.map((e) {
+        final json = e as Map<String, dynamic>;
+        final card = _TutorCard.fromJson(json);
+        return _TutorCard(
+          id: card.id,
+          name: card.name,
+          image: card.image,
+          experience: card.experience,
+          score: card.score,
+          isBookmarked: _savedTutorIds.contains(card.id),
+        );
+      }).toList();
+      if (_filters.search != null && _filters.search!.isNotEmpty) {
+        final q = _filters.search!.toLowerCase();
+        tutors = tutors.where((t) => t.name.toLowerCase().contains(q)).toList();
+      }
       setState(() {
-        _tutors = list.map((e) {
-          final json = e as Map<String, dynamic>;
-          final card = _TutorCard.fromJson(json);
-          return _TutorCard(
-            id: card.id,
-            name: card.name,
-            image: card.image,
-            experience: card.experience,
-            score: card.score,
-            isBookmarked: _savedTutorIds.contains(card.id),
-          );
-        }).toList();
+        _tutors = tutors;
         _loading = false;
       });
     } catch (e) {
@@ -225,6 +230,22 @@ class _TutorsScreenState extends State<TutorsScreen> {
 
   List<Widget> _buildActiveFilterChips() {
     final chips = <Widget>[];
+
+    if (_filters.search != null && _filters.search!.isNotEmpty) {
+      chips.add(
+        _activeFilterChip(
+          '"${_filters.search!}"',
+          () => _applyFilters(
+            _TutorFilters(
+              gender: _filters.gender,
+              ieltsScores: _filters.ieltsScores,
+              experienceMin: _filters.experienceMin,
+              experienceMax: _filters.experienceMax,
+            ),
+          ),
+        ),
+      );
+    }
 
     if (_filters.gender != null) {
       chips.add(
@@ -328,6 +349,21 @@ class _TutorsScreenState extends State<TutorsScreen> {
           _searchController.clear();
         }),
         onRemove: (i) => setState(() => _recentSearches.removeAt(i)),
+        onSearch: (query) {
+          if (!_recentSearches.contains(query)) {
+            setState(() => _recentSearches.insert(0, query));
+          }
+          _filters = _TutorFilters(
+            gender: _filters.gender,
+            ieltsScores: _filters.ieltsScores,
+            experienceMin: _filters.experienceMin,
+            experienceMax: _filters.experienceMax,
+            search: query,
+          );
+          setState(() => _showSearch = false);
+          _searchController.clear();
+          _loadTutors();
+        },
       );
     }
 
@@ -535,33 +571,36 @@ class _TutorsScreenState extends State<TutorsScreen> {
                       ),
                     )],
                     )
-                  : GridView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: () {
-                          final cardWidth =
-                              (MediaQuery.of(context).size.width - 52) / 2;
-                          final imageHeight = cardWidth * 2 / 3;
-                          return cardWidth / (imageHeight + 100);
-                        }(),
-                      ),
-                      itemCount: _tutors.length,
-                      itemBuilder: (_, i) => GestureDetector(
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                TutorProfileScreen(tutorId: _tutors[i].id),
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isTablet = MediaQuery.of(context).size.width >= 600;
+                        final cols = isTablet ? 3 : 2;
+                        final cardWidth = (constraints.maxWidth - 40 - (cols - 1) * 12) / cols;
+                        final imageHeight = cardWidth * 2 / 3;
+                        return GridView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: cols,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: cardWidth / (imageHeight + 114),
                           ),
-                        ),
-                        child: _TutorGridCard(
-                          tutor: _tutors[i],
-                          onBookmark: () => _toggleBookmark(_tutors[i]),
-                        ),
-                      ),
+                          itemCount: _tutors.length,
+                          itemBuilder: (_, i) => GestureDetector(
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    TutorProfileScreen(tutorId: _tutors[i].id),
+                              ),
+                            ),
+                            child: _TutorGridCard(
+                              tutor: _tutors[i],
+                              onBookmark: () => _toggleBookmark(_tutors[i]),
+                            ),
+                          ),
+                        );
+                      },
                     ),
               ),
             ),
@@ -717,12 +756,14 @@ class _SearchView extends StatelessWidget {
   final List<String> recentSearches;
   final VoidCallback onClose;
   final void Function(int) onRemove;
+  final void Function(String) onSearch;
 
   const _SearchView({
     required this.controller,
     required this.recentSearches,
     required this.onClose,
     required this.onRemove,
+    required this.onSearch,
   });
 
   @override
@@ -750,6 +791,10 @@ class _SearchView extends StatelessWidget {
                     child: TextField(
                       controller: controller,
                       autofocus: true,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (value) {
+                        if (value.trim().isNotEmpty) onSearch(value.trim());
+                      },
                       style: const TextStyle(
                         fontFamily: 'SF Pro',
                         fontSize: 15,
@@ -784,7 +829,7 @@ class _SearchView extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 12, 20, 12),
               child: Text(
-                'Вы недавно искали',
+                'Recent searches',
                 style: TextStyle(
                   fontFamily: 'SF Pro',
                   fontSize: 13,
@@ -811,12 +856,16 @@ class _SearchView extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        recentSearches[i],
-                        style: const TextStyle(
-                          fontFamily: 'SF Pro',
-                          fontSize: 15,
-                          color: Color(0xFF2B2B2B),
+                      child: GestureDetector(
+                        onTap: () => onSearch(recentSearches[i]),
+                        behavior: HitTestBehavior.opaque,
+                        child: Text(
+                          recentSearches[i],
+                          style: const TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontSize: 15,
+                            color: Color(0xFF2B2B2B),
+                          ),
                         ),
                       ),
                     ),
@@ -1312,27 +1361,30 @@ class _SavedTutorsView extends StatelessWidget {
                             ],
                           ),
                         )
-                      : GridView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: () {
-                              final cardWidth =
-                                  (MediaQuery.of(context).size.width - 52) / 2;
-                              final imageHeight = cardWidth * 2 / 3;
-                              return cardWidth / (imageHeight + 100);
-                            }(),
-                          ),
-                          itemCount: tutors.length,
-                          itemBuilder: (_, i) => GestureDetector(
-                            onTap: () => onTutorTap(tutors[i].id),
-                            child: _TutorGridCard(
-                              tutor: tutors[i],
-                              onBookmark: () => onToggleBookmark(tutors[i]),
-                            ),
-                          ),
+                      : LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isTablet = MediaQuery.of(context).size.width >= 600;
+                            final cols = isTablet ? 3 : 2;
+                            final cardWidth = (constraints.maxWidth - 40 - (cols - 1) * 12) / cols;
+                            final imageHeight = cardWidth * 2 / 3;
+                            return GridView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: cols,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                                childAspectRatio: cardWidth / (imageHeight + 114),
+                              ),
+                              itemCount: tutors.length,
+                              itemBuilder: (_, i) => GestureDetector(
+                                onTap: () => onTutorTap(tutors[i].id),
+                                child: _TutorGridCard(
+                                  tutor: tutors[i],
+                                  onBookmark: () => onToggleBookmark(tutors[i]),
+                                ),
+                              ),
+                            );
+                          },
                         ),
             ),
           ],
