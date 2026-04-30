@@ -79,10 +79,11 @@ class _CropScreenState extends State<CropScreen> {
           baseColor: Colors.black,
           maskColor: Colors.black.withValues(alpha: 0.7),
           cornerDotBuilder: (size, edgeAlignment) => const SizedBox.shrink(),
-          onCropped: (croppedBytes) async {
+          onCropped: (result) async {
+            if (result is! CropSuccess) return;
             final tempDir = Directory.systemTemp;
             final file = File('${tempDir.path}/cropped_${DateTime.now().millisecondsSinceEpoch}.jpg');
-            await file.writeAsBytes(croppedBytes);
+            await file.writeAsBytes(result.croppedImage);
             if (mounted) Navigator.pop(context, file);
           },
         ),

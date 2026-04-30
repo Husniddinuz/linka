@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'otp_screen.dart';
+import 'public_offer_screen.dart';
 import '../services/auth_service.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/num_key.dart';
@@ -245,7 +246,11 @@ class _AuthScreenState extends State<AuthScreen> {
                                   ),
                                   recognizer: _publicOfferRecognizer
                                     ..onTap = () {
-                                      // TODO: open Public Offer URL
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => const PublicOfferScreen(),
+                                        ),
+                                      );
                                     },
                                 ),
                               ],

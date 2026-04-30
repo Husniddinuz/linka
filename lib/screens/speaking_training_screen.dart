@@ -10,6 +10,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../services/api_constants.dart';
 import '../services/api_service.dart';
+import '../services/plus_service.dart';
 import '../services/token_service.dart';
 import '../widgets/free_minutes_dialog.dart';
 
@@ -43,6 +44,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   int? _secondsLeft;
   int? _sessionSecondsLeft; // persists across matches so the budget doesn't reset on Next
   Timer? _countdownTimer;
+  bool _isPlus = false;
 
   String _localName = '';
   String? _remoteName;
@@ -95,6 +97,11 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       final first = data?['first_name'] as String? ?? '';
       final last = data?['last_name'] as String? ?? '';
       _localName = '$first $last'.trim();
+    } catch (e) {
+    }
+    try {
+      final status = await PlusService.getMyStatus();
+      _isPlus = status.isActive;
     } catch (e) {
     }
     if (!mounted) return;
@@ -263,8 +270,8 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
           try {
             final sigRes = await ApiService.post('/video/signaling/', {'room_id': roomId});
             final limit = sigRes['limit'] as int?;
-            dev.log('PLUS → [inline REST] limit=$limit');
-            if (limit != null && limit <= 0) {
+            dev.log('PLUS → [inline REST] limit=$limit isPlus=$_isPlus');
+            if (!_isPlus && limit != null && limit <= 0) {
               dev.log('PLUS → [inline REST] firing popup (limit exhausted)');
               if (mounted) {
                 await showFreeMinutesDialog(context, dismissible: false);
@@ -272,7 +279,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
               }
               return;
             }
-            if (limit != null && limit > 0) _startCountdown(limit);
+            if (!_isPlus && limit != null && limit > 0) _startCountdown(limit);
           } catch (e) {
           }
           dev.log('SIGNALING URL → $inlineSignalingUrl');
@@ -304,8 +311,8 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       }
 
       final limit = res['limit'] as int?;
-      dev.log('PLUS → [_startSignaling REST] limit=$limit');
-      if (limit != null && limit <= 0) {
+      dev.log('PLUS → [_startSignaling REST] limit=$limit isPlus=$_isPlus');
+      if (!_isPlus && limit != null && limit <= 0) {
         dev.log('PLUS → [_startSignaling REST] firing popup (limit exhausted)');
         if (mounted) {
           await showFreeMinutesDialog(context, dismissible: false);
@@ -329,7 +336,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         final hasCred = srv['username'] != null || srv['credential'] != null;
       }
 
-      if (limit != null && limit > 0) _startCountdown(limit);
+      if (!_isPlus && limit != null && limit > 0) _startCountdown(limit);
 
       dev.log('SIGNALING URL → $signalingUrl');
       dev.log('SIGNALING TOKEN → $signalingToken');
@@ -501,7 +508,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         break;
 
       case 'limit finished':
-        if (!_isStopping && mounted) {
+        if (!_isStopping && mounted && !_isPlus) {
           _isStopping = true;
           _sessionSecondsLeft = null;
           await _teardownSession();

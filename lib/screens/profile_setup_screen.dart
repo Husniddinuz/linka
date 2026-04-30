@@ -188,7 +188,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _pickPhoto() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    final result = await FilePicker.pickFiles(type: FileType.image);
     if (result == null || !mounted) return;
     final path = result.files.single.path;
     if (path == null) return;
@@ -208,7 +208,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _pickCertificate() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
     );

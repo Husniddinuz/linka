@@ -1,7 +1,12 @@
 import 'api_service.dart';
 
 class WalletService {
-  /// Fetches the current wallet balance in UZS.
+  static int? _cachedBalance;
+
+  /// Last known balance, available instantly without a network call.
+  static int? get cachedBalance => _cachedBalance;
+
+  /// Fetches the current wallet balance in UZS and updates the in-memory cache.
   /// Returns 0 on error so callers can render gracefully.
   static Future<int> getBalance() async {
     final result = await ApiService.get('/payments/wallet/');
@@ -12,7 +17,9 @@ class WalletService {
     final raw = payload['balance_uzs'];
     if (raw == null) return 0;
     // balance_uzs is a decimal string like "100000.00"
-    return double.tryParse(raw.toString())?.toInt() ?? 0;
+    final balance = double.tryParse(raw.toString())?.toInt() ?? 0;
+    _cachedBalance = balance;
+    return balance;
   }
 
   /// Creates a Paylov checkout for top-up.

@@ -223,7 +223,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                           memberSince: _formatDate(_plusStatus?.since),
                           nextRenewal: _formatDate(_plusStatus?.plusUntil),
                           priceLabel: _plusPriceLabel(_plusStatus),
-                          onTap: () => _openPlusSubscription(),
+                          onTap: null,
                         )
                       else
                         _JoinPlusBanner(onTap: _openPlusSubscription),
@@ -547,6 +547,11 @@ class _BalanceRowState extends State<_BalanceRow> {
   @override
   void initState() {
     super.initState();
+    final cached = WalletService.cachedBalance;
+    if (cached != null) {
+      _balance = cached;
+      _loading = false;
+    }
     _loadBalance();
   }
 
