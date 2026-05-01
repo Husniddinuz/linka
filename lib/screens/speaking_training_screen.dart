@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as dev;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -48,6 +49,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   bool _isPlus = false;
 
   String _localName = '';
+  String? _localProfileImage;
   String? _remoteName;
   String? _remoteGender;
   String? _remoteProfileImage;
@@ -98,6 +100,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       final first = data?['first_name'] as String? ?? '';
       final last = data?['last_name'] as String? ?? '';
       _localName = '$first $last'.trim();
+      _localProfileImage = data?['profile_image'] as String?;
     } catch (e) {
     }
     if (UserService.isExemptFromPlus) {
@@ -711,47 +714,159 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   }
 
   void _showReportDialog() {
-    String selectedReason = 'harassment';
-    final reasons = ['harassment', 'spam', 'inappropriate', 'other'];
+    const reasons = [
+      ('harassment', Icons.do_not_disturb_on_outlined, 'Harassment'),
+      ('spam',       Icons.mark_email_unread_outlined,  'Spam'),
+      ('inappropriate', Icons.visibility_off_outlined,  'Inappropriate content'),
+      ('other',      Icons.flag_outlined,               'Other'),
+    ];
+    String selected = 'harassment';
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (_) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Report'),
-          content: Column(
+        builder: (ctx, setState) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1C1F3A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            20, 12, 20,
+            MediaQuery.of(ctx).padding.bottom + 20,
+          ),
+          child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Why are you reporting this user?'),
-              const SizedBox(height: 12),
-              RadioGroup<String>(
-                groupValue: selectedReason,
-                onChanged: (v) => setDialogState(() => selectedReason = v!),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: reasons.map((r) => RadioListTile<String>(
-                    title: Text(r[0].toUpperCase() + r.substring(1)),
-                    value: r,
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                  )).toList(),
+              // Handle
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white12,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Report',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Why are you reporting this person?',
+                style: TextStyle(color: Colors.white54, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              ...reasons.map((r) {
+                final isSelected = selected == r.$1;
+                return GestureDetector(
+                  onTap: () => setState(() => selected = r.$1),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFF252844)
+                          : const Color(0xFF161830),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isSelected
+                            ? const Color(0xFF4A4F85)
+                            : const Color(0xFF252844),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(r.$2, size: 20,
+                            color: isSelected ? Colors.white70 : Colors.white30),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            r.$3,
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : Colors.white54,
+                              fontSize: 14,
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          width: 18,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isSelected
+                                ? const Color(0xFF4A4F85)
+                                : Colors.transparent,
+                            border: Border.all(
+                              color: isSelected
+                                  ? const Color(0xFF4A4F85)
+                                  : Colors.white24,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: isSelected
+                              ? const Icon(Icons.check, size: 11, color: Colors.white)
+                              : null,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx),
+                      child: Container(
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF161830),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(color: Colors.white54, fontSize: 14, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _submitReport(selected);
+                      },
+                      child: Container(
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF28192A),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Send Report',
+                            style: TextStyle(color: Color(0xFFCF6679), fontSize: 14, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _submitReport(selectedReason);
-              },
-              child: const Text('Report', style: TextStyle(color: Colors.red)),
-            ),
-          ],
         ),
       ),
     );
@@ -794,417 +909,110 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final topPad = MediaQuery.of(context).padding.top;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.dark,
+      value: SystemUiOverlayStyle.light,
       child: Scaffold(
-      backgroundColor: const Color(0xFF13152A),
-      body: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            height: MediaQuery.of(context).padding.top,
-          ),
-          Expanded(
-            child: _isConnected
-                ? _remoteCameraOn
-                    ? _RemoteVideoArea(
-                        renderer: _remoteRenderer,
-                        name: _remoteName ?? 'Partner',
-                        gender: _remoteGender,
-                        profileImage: _remoteProfileImage,
-                        onReport: _showReportDialog,
-                      )
-                    : _RemoteCameraOffView(
-                        name: _remoteName ?? 'Partner',
-                        gender: _remoteGender,
-                        profileImage: _remoteProfileImage,
-                        onReport: _showReportDialog,
-                      )
-                : const _SearchingView(),
-          ),
-
-          _LinkaBanner(secondsLeft: _secondsLeft),
-
-          Expanded(
-            child: _isCameraOn
-                ? _LocalVideoArea(renderer: _localRenderer)
-                : _LocalPreviewView(
-                    name: _localName.isNotEmpty ? _localName : 'You',
-                    isCameraOn: _isCameraOn,
-                  ),
-          ),
-
-          _BottomControls(
-            isCameraOn: _isCameraOn,
-            isConnected: _isConnected,
-            onToggleCamera: _toggleCamera,
-            onGenderFilter: _showGenderFilter,
-            onStop: _onStop,
-            onNext: _onNext,
-          ),
-        ],
-      ),
-    ),
-    );
-  }
-}
-
-// ─── Searching view (TV static noise + loader) ─────────────────────────────
-
-class _SearchingView extends StatefulWidget {
-  const _SearchingView();
-
-  @override
-  State<_SearchingView> createState() => _SearchingViewState();
-}
-
-class _SearchingViewState extends State<_SearchingView>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 100),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFF0A0A0A),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          AnimatedBuilder(
-            animation: _controller,
-            builder: (context, _) {
-              return CustomPaint(
-                painter: _StaticNoisePainter(
-                  seed: (_controller.value * 1000).toInt(),
-                ),
-              );
-            },
-          ),
-          const Center(
-            child: SizedBox(
-              width: 36,
-              height: 36,
-              child: CircularProgressIndicator(
-                color: Colors.white,
-                strokeWidth: 2.5,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StaticNoisePainter extends CustomPainter {
-  final int seed;
-  _StaticNoisePainter({required this.seed});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint();
-    int rng = seed;
-    const step = 6.0;
-    for (double y = 0; y < size.height; y += step) {
-      for (double x = 0; x < size.width; x += step) {
-        rng = ((rng * 1103515245 + 12345) & 0x7fffffff);
-        final grey = (rng % 40);
-        paint.color = Color.fromARGB(80, grey, grey, grey);
-        canvas.drawRect(Rect.fromLTWH(x, y, step, step), paint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_StaticNoisePainter old) => old.seed != seed;
-}
-
-// ─── Remote video area ──────────────────────────────────────────────────────
-
-class _RemoteVideoArea extends StatelessWidget {
-  final RTCVideoRenderer renderer;
-  final String name;
-  final String? gender;
-  final String? profileImage;
-  final VoidCallback onReport;
-
-  const _RemoteVideoArea({
-    required this.renderer,
-    required this.name,
-    this.gender,
-    this.profileImage,
-    required this.onReport,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        RTCVideoView(
-          renderer,
-          objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-        ),
-
-        Positioned(
-          top: 8,
-          left: 12,
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.grey.shade300,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child: ClipOval(
-                  child: profileImage != null
-                      ? Image.network(
-                          _resolveImageUrl(profileImage!),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) =>
-                              const Icon(Icons.person, size: 20, color: Colors.white),
-                        )
-                      : const Icon(Icons.person, size: 20, color: Colors.white),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      shadows: [
-                        Shadow(blurRadius: 4, color: Colors.black54),
-                      ],
-                    ),
-                  ),
-                  Row(
+        backgroundColor: const Color(0xFF0D0F1F),
+        body: Stack(
+          children: [
+            // ── Split screen: remote (top) / local (bottom) ───────────────
+            Column(
+              children: [
+                // Top half — remote video or searching state
+                Expanded(
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      Icon(
-                        gender == 'Female' ? Icons.female : Icons.male,
-                        size: 14,
-                        color: gender == 'Female'
-                            ? Colors.pinkAccent
-                            : const Color(0xFF6C6CFF),
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        gender ?? 'Male',
-                        style: TextStyle(
-                          color: gender == 'Female'
-                              ? Colors.pinkAccent
-                              : const Color(0xFF6C6CFF),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
+                      if (_isConnected)
+                        _remoteCameraOn
+                            ? RTCVideoView(
+                                _remoteRenderer,
+                                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                              )
+                            : _RemoteCameraOffBackground(
+                                name: _remoteName ?? 'Partner',
+                                gender: _remoteGender,
+                                profileImage: _remoteProfileImage,
+                              )
+                      else ...[
+                        Container(color: const Color(0xFF0D0F1F)),
+                        const _WaitingRoomOverlay(),
+                      ],
+                      // Partner info — bottom of remote half
+                      if (_isConnected)
+                        Positioned(
+                          left: 16,
+                          bottom: 12,
+                          child: _PartnerInfoPill(
+                            name: _remoteName ?? 'Partner',
+                            gender: _remoteGender,
+                            profileImage: _remoteProfileImage,
+                          ),
                         ),
-                      ),
                     ],
                   ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        Positioned(
-          top: 8,
-          right: 12,
-          child: GestureDetector(
-            onTap: onReport,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white, width: 1.5),
-              ),
-              child: const Text(
-                'Report',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
                 ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Remote camera off view ─────────────────────────────────────────────────
-
-class _RemoteCameraOffView extends StatelessWidget {
-  final String name;
-  final String? gender;
-  final String? profileImage;
-  final VoidCallback onReport;
-
-  const _RemoteCameraOffView({
-    required this.name,
-    this.gender,
-    this.profileImage,
-    required this.onReport,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFF13152A),
-      child: Stack(
-        children: [
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SvgPicture.asset(
-                  'assets/images/branding/meeting-umbrella.svg',
-                  width: 140,
-                ),
+                // Middle logo bar
                 Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.grey.shade400,
-                    border: Border.all(color: Colors.white, width: 3),
-                  ),
-                  child: ClipOval(
-                    child: profileImage != null
-                        ? Image.network(
-                            _resolveImageUrl(profileImage!),
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) =>
-                                Icon(Icons.person, size: 50, color: Colors.grey.shade300),
-                          )
-                        : Icon(Icons.person, size: 50, color: Colors.grey.shade300),
+                  width: double.infinity,
+                  color: const Color(0xFF272942),
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SvgPicture.asset(
+                        'assets/images/branding/white-logo.svg',
+                        height: 24,
+                      ),
+                      if (_secondsLeft != null)
+                        Positioned(
+                          right: 16,
+                          child: _CountdownBadge(seconds: _secondsLeft!),
+                        ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w400,
-                  ),
+                // Bottom half — local camera
+                Expanded(
+                  child: _isCameraOn
+                      ? RTCVideoView(
+                          _localRenderer,
+                          mirror: true,
+                          objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                        )
+                      : _CameraOffPlaceholder(
+                          name: _localName.isNotEmpty ? _localName : 'You',
+                          profileImage: _localProfileImage,
+                        ),
                 ),
               ],
             ),
-          ),
-          Positioned(
-            top: 8,
-            right: 12,
-            child: GestureDetector(
-              onTap: onReport,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white, width: 1.5),
-                ),
-                child: const Text(
-                  'Report',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
+
+            // ── Top bar (always) ──────────────────────────────────────────
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: _TopBar(
+                topPad: topPad,
+                onReport: _isConnected ? _showReportDialog : null,
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
-// ─── Local video area (in-call) ─────────────────────────────────────────────
-
-class _LocalVideoArea extends StatelessWidget {
-  final RTCVideoRenderer renderer;
-
-  const _LocalVideoArea({required this.renderer});
-
-  @override
-  Widget build(BuildContext context) {
-    return RTCVideoView(
-      renderer,
-      mirror: true,
-      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-    );
-  }
-}
-
-// ─── Local preview (searching state) ────────────────────────────────────────
-
-class _LocalPreviewView extends StatelessWidget {
-  final String name;
-  final bool isCameraOn;
-
-  const _LocalPreviewView({
-    required this.name,
-    required this.isCameraOn,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: isCameraOn ? const Color(0xFF272942) : const Color(0xFF13152A),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SvgPicture.asset(
-              'assets/images/branding/meeting-umbrella.svg',
-              width: 140,
-            ),
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey.shade400,
-                border: Border.all(color: Colors.white, width: 3),
-              ),
-              child: Icon(
-                Icons.person,
-                size: 50,
-                color: Colors.grey.shade300,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
+            // ── Bottom controls (always) ──────────────────────────────────
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _BottomControls(
+                isCameraOn: _isCameraOn,
+                isConnected: _isConnected,
+                onToggleCamera: _toggleCamera,
+                onGenderFilter: _showGenderFilter,
+                onStop: _onStop,
+                onNext: _onNext,
               ),
             ),
           ],
@@ -1214,35 +1022,387 @@ class _LocalPreviewView extends StatelessWidget {
   }
 }
 
-// ─── Linka banner bar ───────────────────────────────────────────────────────
+// ─── Top bar (gradient overlay, always visible) ──────────────────────────────
 
-class _LinkaBanner extends StatelessWidget {
-  final int? secondsLeft;
-  const _LinkaBanner({this.secondsLeft});
+class _TopBar extends StatelessWidget {
+  final double topPad;
+  final VoidCallback? onReport;
+
+  const _TopBar({required this.topPad, this.onReport});
 
   @override
   Widget build(BuildContext context) {
+    if (onReport == null) return const SizedBox.shrink();
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      color: const Color(0xFF272942),
-      child: Stack(
-        alignment: Alignment.center,
+      padding: EdgeInsets.only(
+        top: topPad + 12,
+        left: 20,
+        right: 20,
+        bottom: 24,
+      ),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.black.withValues(alpha: 0.65), Colors.transparent],
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          SvgPicture.asset(
-            'assets/images/branding/white-logo.svg',
-            height: 26,
-          ),
-          if (secondsLeft != null)
-            Positioned(
-              right: 16,
-              child: _CountdownBadge(seconds: secondsLeft!),
-            ),
+          _ReportChip(onTap: onReport!),
         ],
       ),
     );
   }
 }
+
+// ─── Waiting room overlay (sits on top of local camera preview) ───────────────
+
+class _WaitingRoomOverlay extends StatefulWidget {
+  const _WaitingRoomOverlay();
+
+  @override
+  State<_WaitingRoomOverlay> createState() => _WaitingRoomOverlayState();
+}
+
+class _WaitingRoomOverlayState extends State<_WaitingRoomOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  Widget _ring(double progress) {
+    final size = 52.0 + progress * 60.0;
+    final opacity = ((1.0 - progress) * 0.55).clamp(0.0, 1.0);
+    return Opacity(
+      opacity: opacity,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFF5C542), width: 1.5),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Vignette top — logo sits here
+        Positioned(
+          top: 0, left: 0, right: 0,
+          height: 180,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.black.withValues(alpha: 0.75), Colors.transparent],
+              ),
+            ),
+          ),
+        ),
+        // Pulsing search indicator — centre of screen
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 112,
+                height: 112,
+                child: AnimatedBuilder(
+                  animation: _pulse,
+                  builder: (_, __) => Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      _ring(_pulse.value),
+                      _ring((_pulse.value + 0.35) % 1.0),
+                      _ring((_pulse.value + 0.7) % 1.0),
+                      // Core circle
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFFF5C542).withValues(alpha: 0.18),
+                          border: Border.all(
+                            color: const Color(0xFFF5C542),
+                            width: 1.8,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.mic,
+                          color: Color(0xFFF5C542),
+                          size: 26,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Finding a partner...',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Get ready to speak English!',
+                style: TextStyle(color: Colors.white60, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Camera off placeholder (waiting room, local camera disabled) ─────────────
+
+class _CameraOffPlaceholder extends StatelessWidget {
+  final String name;
+  final String? profileImage;
+  const _CameraOffPlaceholder({required this.name, this.profileImage});
+
+  @override
+  Widget build(BuildContext context) {
+    final dockOffset = MediaQuery.of(context).padding.bottom + 66;
+    return Container(
+      color: const Color(0xFF13152A),
+      padding: EdgeInsets.only(bottom: dockOffset),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SvgPicture.asset(
+              'assets/images/branding/meeting-umbrella.svg',
+              width: 130,
+            ),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.grey.shade700,
+                border: Border.all(color: Colors.white30, width: 2.5),
+              ),
+              child: ClipOval(
+                child: profileImage != null
+                    ? Image.network(
+                        _resolveImageUrl(profileImage!),
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            const Icon(Icons.person, size: 40, color: Colors.white38),
+                      )
+                    : const Icon(Icons.person, size: 40, color: Colors.white38),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              name,
+              style: const TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+// ─── Partner info pill (connected state, bottom-left) ────────────────────────
+
+class _PartnerInfoPill extends StatelessWidget {
+  final String name;
+  final String? gender;
+  final String? profileImage;
+
+  const _PartnerInfoPill({required this.name, this.gender, this.profileImage});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(40),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          color: Colors.black.withValues(alpha: 0.38),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey.shade700,
+                  border: Border.all(color: Colors.white38, width: 1.5),
+                ),
+                child: ClipOval(
+                  child: profileImage != null
+                      ? Image.network(
+                          _resolveImageUrl(profileImage!),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) =>
+                              const Icon(Icons.person, size: 20, color: Colors.white60),
+                        )
+                      : const Icon(Icons.person, size: 20, color: Colors.white60),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (gender != null)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          gender == 'Female' ? Icons.female : Icons.male,
+                          size: 12,
+                          color: gender == 'Female' ? Colors.pinkAccent : const Color(0xFF6C6CFF),
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          gender!,
+                          style: TextStyle(
+                            color: gender == 'Female' ? Colors.pinkAccent : const Color(0xFF6C6CFF),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Report chip (connected state, top-right) ─────────────────────────────────
+
+class _ReportChip extends StatelessWidget {
+  final VoidCallback onTap;
+  const _ReportChip({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            color: Colors.black.withValues(alpha: 0.38),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.flag_outlined, color: Colors.white60, size: 14),
+                SizedBox(width: 5),
+                Text(
+                  'Report',
+                  style: TextStyle(color: Colors.white60, fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Remote camera off background (connected state) ───────────────────────────
+
+class _RemoteCameraOffBackground extends StatelessWidget {
+  final String name;
+  final String? gender;
+  final String? profileImage;
+
+  const _RemoteCameraOffBackground({required this.name, this.gender, this.profileImage});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF13152A),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SvgPicture.asset(
+              'assets/images/branding/meeting-umbrella.svg',
+              width: 130,
+            ),
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.grey.shade700,
+                border: Border.all(color: Colors.white30, width: 3),
+              ),
+              child: ClipOval(
+                child: profileImage != null
+                    ? Image.network(
+                        _resolveImageUrl(profileImage!),
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            Icon(Icons.person, size: 46, color: Colors.grey.shade400),
+                      )
+                    : Icon(Icons.person, size: 46, color: Colors.grey.shade400),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              name,
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Countdown badge ──────────────────────────────────────────────────────────
 
 class _CountdownBadge extends StatelessWidget {
   final int seconds;
@@ -1272,11 +1432,7 @@ class _CountdownBadge extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(
-              color: color,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -1284,7 +1440,7 @@ class _CountdownBadge extends StatelessWidget {
   }
 }
 
-// ─── Bottom controls ────────────────────────────────────────────────────────
+// ─── Bottom controls — floating dock ─────────────────────────────────────────
 
 class _BottomControls extends StatelessWidget {
   final bool isCameraOn;
@@ -1305,128 +1461,139 @@ class _BottomControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 12,
-        bottom: MediaQuery.of(context).padding.bottom + 12,
-      ),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: onToggleCamera,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF6F6F6),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: SvgPicture.asset(
-                  isCameraOn
-                      ? 'assets/images/buttons/camera-on.svg'
-                      : 'assets/images/buttons/camera-off.svg',
-                  width: 22,
-                  height: 22,
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPad + 16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1C1F3A),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFF2C2F52), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.45),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Camera
+            _DockBtn(
+              onTap: onToggleCamera,
+              child: SvgPicture.asset(
+                isCameraOn
+                    ? 'assets/images/buttons/camera-on.svg'
+                    : 'assets/images/buttons/camera-off.svg',
+                width: 20,
+                height: 20,
+                colorFilter: ColorFilter.mode(
+                  isCameraOn ? Colors.white : Colors.white38,
+                  BlendMode.srcIn,
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-
-          GestureDetector(
-            onTap: onGenderFilter,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF6F6F6),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: SvgPicture.asset(
-                  'assets/images/buttons/gender-selection.svg',
-                  width: 22,
-                  height: 22,
-                ),
+            const SizedBox(width: 8),
+            // Gender filter
+            _DockBtn(
+              onTap: onGenderFilter,
+              child: SvgPicture.asset(
+                'assets/images/buttons/gender-selection.svg',
+                width: 20,
+                height: 20,
+                colorFilter: const ColorFilter.mode(Colors.white70, BlendMode.srcIn),
               ),
             ),
-          ),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: GestureDetector(
-              onTap: onStop,
-              child: Container(
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF6F6F6),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(3),
+            const SizedBox(width: 12),
+            // Stop
+            Expanded(
+              child: GestureDetector(
+                onTap: onStop,
+                child: Container(
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF28192A),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.stop_rounded, color: Color(0xFFCF6679), size: 17),
+                      SizedBox(width: 6),
+                      Text(
+                        'Stop',
+                        style: TextStyle(
+                          color: Color(0xFFCF6679),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'Stop',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: GestureDetector(
-              onTap: onNext,
-              child: Container(
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF272942),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Next',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w400,
+            const SizedBox(width: 8),
+            // Next
+            Expanded(
+              child: GestureDetector(
+                onTap: onNext,
+                child: Container(
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF252844),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Next',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    SizedBox(width: 6),
-                    Icon(Icons.chevron_right, color: Colors.white, size: 20),
-                  ],
+                      SizedBox(width: 5),
+                      Icon(Icons.arrow_forward_rounded, color: Colors.white54, size: 16),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
+
+class _DockBtn extends StatelessWidget {
+  final VoidCallback onTap;
+  final Widget child;
+
+  const _DockBtn({required this.onTap, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0xFF252844),
+        ),
+        child: Center(child: child),
+      ),
+    );
+  }
+}
+
 
 // ─── Gender filter bottom sheet ─────────────────────────────────────────────
 
