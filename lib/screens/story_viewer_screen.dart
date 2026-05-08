@@ -228,13 +228,13 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                       child: CircularProgressIndicator(color: Colors.white),
                     )
             else
-              Image.network(
-                _current.mediaFile,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                errorBuilder: (_, _, _) => const Center(
-                  child: Icon(Icons.broken_image, color: Colors.white54, size: 64),
+              Center(
+                child: Image.network(
+                  _current.mediaFile,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) => const Center(
+                    child: Icon(Icons.broken_image, color: Colors.white54, size: 64),
+                  ),
                 ),
               ),
 

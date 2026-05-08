@@ -36,7 +36,90 @@ target 'Runner' do
   end
 end
 
+def patch_dk_image_picker_controller
+  # DKImagePickerController 4.3.9 uses the deprecated UIApplication.shared.keyWindow
+  # (deprecated iOS 15). Apple's binary scanner flags this. Patch all occurrences to use
+  # the modern connectedScenes API (requires iOS 13+, our minimum).
+  files = {
+    'Pods/DKImagePickerController/Sources/DKImagePickerController/DKImagePickerController.swift' => [
+      [
+        "targetVC = UIApplication.shared.keyWindow!.rootViewController!",
+        "targetVC = UIApplication.shared.connectedScenes\n" \
+        "                .compactMap { $0 as? UIWindowScene }\n" \
+        "                .flatMap { $0.windows }\n" \
+        "                .first { $0.isKeyWindow }?.rootViewController ?? UIApplication.shared.windows.first?.rootViewController ?? self"
+      ],
+      [
+        "UIApplication.shared.keyWindow!.rootViewController!.dismiss(animated: true,\n" \
+        "                                                                        completion: completion)",
+        "let keyVC = UIApplication.shared.connectedScenes\n" \
+        "                .compactMap { $0 as? UIWindowScene }\n" \
+        "                .flatMap { $0.windows }\n" \
+        "                .first { $0.isKeyWindow }?.rootViewController\n" \
+        "            keyVC?.dismiss(animated: true, completion: completion)"
+      ]
+    ],
+    'Pods/DKImagePickerController/Sources/DKImagePickerController/DKPopoverViewController.swift' => [
+      [
+        "let window = UIApplication.shared.keyWindow!\n" \
+        "        \n" \
+        "        let popoverViewController = DKPopoverViewController()\n" \
+        "        \n" \
+        "        popoverViewController.arrowColor = arrowColor\n" \
+        "        popoverViewController.contentViewController = viewController\n" \
+        "        popoverViewController.fromView = fromView\n" \
+        "        \n" \
+        "        popoverViewController.showInView(window)\n" \
+        "        window.rootViewController!.addChild(popoverViewController)",
+        "guard let window = UIApplication.shared.connectedScenes\n" \
+        "            .compactMap({ $0 as? UIWindowScene })\n" \
+        "            .flatMap({ $0.windows })\n" \
+        "            .first(where: { $0.isKeyWindow }) else { return }\n\n" \
+        "        let popoverViewController = DKPopoverViewController()\n\n" \
+        "        popoverViewController.arrowColor = arrowColor\n" \
+        "        popoverViewController.contentViewController = viewController\n" \
+        "        popoverViewController.fromView = fromView\n\n" \
+        "        popoverViewController.showInView(window)\n" \
+        "        window.rootViewController?.addChild(popoverViewController)"
+      ],
+      [
+        "let window = UIApplication.shared.keyWindow!\n" \
+        "        \n" \
+        "        for vc in window.rootViewController!.children {",
+        "guard let window = UIApplication.shared.connectedScenes\n" \
+        "            .compactMap({ $0 as? UIWindowScene })\n" \
+        "            .flatMap({ $0.windows })\n" \
+        "            .first(where: { $0.isKeyWindow }) else { return }\n\n" \
+        "        for vc in window.rootViewController?.children ?? [] {"
+      ]
+    ],
+    'Pods/DKImagePickerController/Sources/Extensions/DKImageExtensionGallery.swift' => [
+      [
+        "UIApplication.shared.keyWindow!.rootViewController!.present(photoGallery: gallery)",
+        "let keyVC = UIApplication.shared.connectedScenes\n" \
+        "                    .compactMap { $0 as? UIWindowScene }\n" \
+        "                    .flatMap { $0.windows }\n" \
+        "                    .first { $0.isKeyWindow }?.rootViewController\n" \
+        "                keyVC?.present(photoGallery: gallery)"
+      ]
+    ]
+  }
+
+  files.each do |relative_path, replacements|
+    file_path = File.join(File.dirname(__FILE__), relative_path)
+    next unless File.exist?(file_path)
+    File.chmod(0644, file_path)
+    content = File.read(file_path)
+    replacements.each do |old_str, new_str|
+      content = content.gsub(old_str, new_str)
+    end
+    File.write(file_path, content)
+  end
+end
+
 post_install do |installer|
+  patch_dk_image_picker_controller
+
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
 
@@ -48,6 +131,14 @@ post_install do |installer|
         'PERMISSION_MICROPHONE=1',
         'PERMISSION_PHOTOS=1',
       ]
+
+      # Ensure all pods compile for iOS 13+ so modern UIWindowScene APIs are available
+      # without #available guards. Without this, pods with lower podspec minimums
+      # (e.g. DKImagePickerController targeting iOS 9) would fail to compile against
+      # connectedScenes / UIWindowScene APIs.
+      if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 13.0
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      end
 
       # zego_express_engine uses static_framework = true with a vendored xcframework,
       # but CocoaPods doesn't add the extracted xcframework headers to the pod's own

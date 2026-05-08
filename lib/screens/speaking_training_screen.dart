@@ -388,6 +388,8 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     pc.onTrack = (event) {
       if (event.streams.isNotEmpty) {
         _remoteRenderer.srcObject = event.streams.first;
+        // iOS resets AVAudioSession when remote audio arrives — re-route to speaker.
+        Helper.setSpeakerphoneOn(true);
         if (mounted) {
           setState(() {
             _isConnected = true;

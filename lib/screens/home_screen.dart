@@ -26,6 +26,8 @@ import 'tutor_earnings_screen.dart';
 import 'tutor_stories_screen.dart';
 import 'profile_setup_screen.dart';
 import 'webinar_viewer_screen.dart';
+import 'debate_room_screen.dart';
+import 'debate_admin_screen.dart';
 
 // ─── Data models ───────────────────────────────────────────────────────────────
 
@@ -257,9 +259,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _onStoryViewed(String tutorId) async {
-    await PrefsService.markStoryViewed(tutorId);
+    final tutor = _storyTutors.firstWhere(
+      (t) => '${t.tutorId}' == tutorId,
+      orElse: () => const StoryTutor(tutorId: 0, name: '', stories: []),
+    );
+    for (final story in tutor.stories) {
+      await PrefsService.markStoryViewed('story_${story.id}');
+    }
     if (!mounted) return;
-    setState(() => _viewedStories.add(tutorId));
+    setState(() {
+      for (final story in tutor.stories) {
+        _viewedStories.add('story_${story.id}');
+      }
+    });
   }
 
   Future<void> _loadPodcasts() async {
@@ -493,6 +505,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 const SizedBox(height: 20),
 
                               const _WebinarBlock(),
+                              const SizedBox(height: 16),
+
+                              const _DebateBlock(),
                               const SizedBox(height: 16),
 
                               Padding(
@@ -1052,7 +1067,9 @@ class _TutorsList extends StatelessWidget {
         itemBuilder: (_, i) => _TutorItem(
           tutorIndex: i,
           tutors: tutors,
-          isStoryViewed: viewedStories.contains('${tutors[i].tutorId}'),
+          isStoryViewed: tutors[i].stories.every(
+            (s) => viewedStories.contains('story_${s.id}'),
+          ),
           onStoryViewed: onStoryViewed,
         ),
       ),
@@ -1737,63 +1754,63 @@ class _PodcastCard extends StatelessWidget {
         ),
       ),
       child: Container(
-      width: 240,
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF6F6F6),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: const BoxDecoration(
-              color: Color(0xFF272942),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: SvgPicture.asset(
-                'assets/images/icons/podcast.svg',
-                width: 28,
-                height: 28,
+        width: 240,
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF6F6F6),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: const BoxDecoration(
+                color: Color(0xFF272942),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: SvgPicture.asset(
+                  'assets/images/icons/podcast.svg',
+                  width: 28,
+                  height: 28,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  podcast.title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF272942),
-                    height: 1.3,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (podcast.formattedDuration.isNotEmpty) ...[
-                  const SizedBox(height: 4),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
                   Text(
-                    podcast.formattedDuration,
+                    podcast.title,
                     style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                      color: Color(0xFF6C6C6C),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF272942),
+                      height: 1.3,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  if (podcast.formattedDuration.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      podcast.formattedDuration,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        color: Color(0xFF6C6C6C),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -2414,6 +2431,8 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
                             onTabChange: (t) => setState(() => _listTab = t),
                             onStartLesson: _joinLesson,
                           ),
+                        const SizedBox(height: 24),
+                        const _DebateBlock(),
                         const SizedBox(height: 32),
                       ],
                     ),
@@ -2987,6 +3006,238 @@ class _TutorCalendarCard extends StatelessWidget {
             );
           }),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Debate block ──────────────────────────────────────────────────────────────
+
+class _DebateBlock extends StatefulWidget {
+  const _DebateBlock();
+
+  @override
+  State<_DebateBlock> createState() => _DebateBlockState();
+}
+
+class _DebateBlockState extends State<_DebateBlock> {
+  Map<String, dynamic>? _data;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    try {
+      final data = await ApiService.get('/live/debate/today/');
+      if (!mounted) return;
+      final hasSession = data['has_session'] as bool? ?? false;
+      setState(() {
+        _data = hasSession ? data : null;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          height: 96,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E2141),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                  color: Color(0xFFF5C542), strokeWidth: 2),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final data = _data;
+    if (data == null) return const SizedBox.shrink();
+
+    final status = (data['status'] as String? ?? 'scheduled');
+    final title =
+        (data['title'] ?? data['topic'] ?? 'Live Debate').toString();
+    final topic = (data['topic'] ?? '').toString();
+    final sessionId = data['id'] as int?;
+    final joinEnabled = data['join_enabled'] as bool? ?? false;
+    final participantCount =
+        (data['participants'] as List<dynamic>?)?.length ?? 0;
+    final isTeacher = UserService.current?.isTeacher ?? false;
+
+    final (String badge, Color badgeColor) = switch (status) {
+      'live' => ('LIVE', const Color(0xFFE53935)),
+      'ended' => ('ENDED', const Color(0xFF6C6C6C)),
+      _ => ('UPCOMING', const Color(0xFFF5C542)),
+    };
+
+    void handleTap() {
+      if (sessionId == null || status == 'ended') return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => isTeacher
+              ? DebateAdminScreen(
+                  sessionId: sessionId,
+                  title: title,
+                  topic: topic.isNotEmpty ? topic : null,
+                )
+              : DebateRoomScreen(
+                  sessionId: sessionId,
+                  title: title,
+                  topic: topic.isNotEmpty ? topic : null,
+                ),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: sessionId == null || status == 'ended' ||
+              (!joinEnabled && !isTeacher)
+          ? null
+          : handleTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E2141),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: status == 'live'
+                  ? const Color(0xFFE53935).withValues(alpha: 0.4)
+                  : const Color(0xFF2A2D4A),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5C542).withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.record_voice_over_rounded,
+                      color: Color(0xFFF5C542),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: badgeColor.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                badge,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: badgeColor,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'DEBATE',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFF5C542),
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          topic.isNotEmpty ? topic : title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withValues(alpha: 0.85),
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  if (participantCount > 0) ...[
+                    const Icon(Icons.people_outline_rounded,
+                        size: 13, color: Color(0xFFAAAAAA)),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        '$participantCount participant${participantCount == 1 ? '' : 's'}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.white.withValues(alpha: 0.45),
+                        ),
+                      ),
+                    ),
+                  ] else
+                    const Spacer(),
+                  if (joinEnabled || isTeacher) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5C542),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        isTeacher ? 'Manage' : 'Join',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF272942),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
