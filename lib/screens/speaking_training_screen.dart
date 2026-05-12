@@ -71,6 +71,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   // ── WebRTC ──
   RTCPeerConnection? _pc;
   bool _offerInFlight = false;
+  bool _awaitingUserDecision = false;
   // Reentrancy guard: _connectWaitingRoom is triggered from multiple paths
   // (Next button, peer-left, pc state change). Without this, concurrent calls
   // race on _matchWs and throw "Stream has already been listened to".
@@ -252,9 +253,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         final partnerGender = data['partner_gender'] as String?;
         final partnerProfileImage = data['partner_profile_image'] as String?;
         final sessionId = data['session_id'] as int?;
-        final inlineSignalingUrl = data['signaling_url'] as String?;
-        final inlineSignalingToken = data['signaling_token'] as String?;
-        final inlineIce = data['ice_servers'];
         if (roomId == null) {
           _showError('Invalid match payload.');
           return;
@@ -265,46 +263,78 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
           _remoteProfileImage = partnerProfileImage;
           _sessionId = sessionId;
           _offerInFlight = false;
+          _awaitingUserDecision = true;
         });
-        if (inlineSignalingUrl != null && inlineSignalingToken != null) {
-          if (inlineIce is List) {
-            _iceServers = inlineIce
-                .whereType<Map>()
-                .map((e) => Map<String, dynamic>.from(e))
-                .toList();
-          }
-
-          // Always hit REST to get limit even when inline credentials are present.
-          try {
-            final sigRes = await ApiService.post('/video/signaling/', {'room_id': roomId});
-            final limit = sigRes['limit'] as int?;
-            dev.log('PLUS → [inline REST] limit=$limit isPlus=$_isPlus');
-            if (!_isPlus && limit != null && limit <= 0) {
-              dev.log('PLUS → [inline REST] firing popup (limit exhausted)');
-              if (mounted) {
-                await showFreeMinutesDialog(context, dismissible: false);
-                if (mounted) Navigator.of(context).pop();
-              }
-              return;
-            }
-            if (!_isPlus && limit != null && limit > 0) _startCountdown(limit);
-          } catch (e) {
-          }
-          dev.log('SIGNALING URL → $inlineSignalingUrl');
-          dev.log('SIGNALING TOKEN → $inlineSignalingToken');
-          await _createPeerConnection();
-          await _connectSignalingWs(inlineSignalingUrl, inlineSignalingToken);
-        } else {
-          _startSignaling(roomId);
-        }
+        await _showPartnerFoundSheet(data);
         break;
 
       case 'error':
-        final detail = data['detail'] as String? ?? 'Matchmaking failed';
         if (mounted) _showError('Matchmaking error. Please try again.');
         break;
 
       default:
+    }
+  }
+
+  // ─── Partner confirmation ────────────────────────────────────────────────
+
+  Future<void> _showPartnerFoundSheet(Map<String, dynamic> data) async {
+    if (!mounted) return;
+    final accepted = await showModalBottomSheet<bool>(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _PartnerFoundSheet(
+        name: _remoteName ?? 'Partner',
+        gender: _remoteGender,
+        profileImage: _remoteProfileImage,
+      ),
+    );
+    if (mounted) setState(() => _awaitingUserDecision = false);
+    if (!mounted) return;
+    if (accepted == true) {
+      await _startMatchedCall(data);
+    } else {
+      _onNext();
+    }
+  }
+
+  Future<void> _startMatchedCall(Map<String, dynamic> data) async {
+    final roomId = (data['room_id'] ?? data['webrtc_room'] ?? data['webrtc_room_id'] ?? data['room'])?.toString();
+    if (roomId == null) return;
+    final inlineSignalingUrl = data['signaling_url'] as String?;
+    final inlineSignalingToken = data['signaling_token'] as String?;
+    final inlineIce = data['ice_servers'];
+
+    if (inlineSignalingUrl != null && inlineSignalingToken != null) {
+      if (inlineIce is List) {
+        _iceServers = inlineIce
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
+      try {
+        final sigRes = await ApiService.post('/video/signaling/', {'room_id': roomId});
+        final limit = sigRes['limit'] as int?;
+        dev.log('PLUS → [inline REST] limit=$limit isPlus=$_isPlus');
+        if (!_isPlus && limit != null && limit <= 0) {
+          dev.log('PLUS → [inline REST] firing popup (limit exhausted)');
+          if (mounted) {
+            await showFreeMinutesDialog(context, dismissible: false);
+            if (mounted) Navigator.of(context).pop();
+          }
+          return;
+        }
+        if (!_isPlus && limit != null && limit > 0) _startCountdown(limit);
+      } catch (e) {}
+      dev.log('SIGNALING URL → $inlineSignalingUrl');
+      dev.log('SIGNALING TOKEN → $inlineSignalingToken');
+      await _createPeerConnection();
+      await _connectSignalingWs(inlineSignalingUrl, inlineSignalingToken);
+    } else {
+      _startSignaling(roomId);
     }
   }
 
@@ -514,7 +544,12 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         break;
 
       case 'peer-left':
-        if (!_isStopping && mounted) _connectWaitingRoom();
+        if (_awaitingUserDecision && mounted) {
+          Navigator.of(context).maybePop();
+          // _showPartnerFoundSheet will call _onNext() on null result
+        } else if (!_isStopping && mounted) {
+          _connectWaitingRoom();
+        }
         break;
 
       case 'limit finished':
@@ -713,6 +748,50 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         },
       ),
     );
+  }
+
+  void _showBlockDialog() {
+    final name = _remoteName ?? 'this person';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1F3A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Block User',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'Block $name? They won\'t be matched with you again.',
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _submitBlock();
+            },
+            child: const Text(
+              'Block',
+              style: TextStyle(color: Color(0xFFCF6679), fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submitBlock() async {
+    final sessionId = _sessionId;
+    if (sessionId == null) return;
+    try {
+      await ApiService.post('/block/', {'session_id': sessionId});
+    } catch (e) {}
+    _connectWaitingRoom();
   }
 
   void _showReportDialog() {
@@ -1000,6 +1079,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
               child: _TopBar(
                 topPad: topPad,
                 onReport: _isConnected ? _showReportDialog : null,
+                onBlock: _isConnected ? _showBlockDialog : null,
               ),
             ),
 
@@ -1029,12 +1109,13 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 class _TopBar extends StatelessWidget {
   final double topPad;
   final VoidCallback? onReport;
+  final VoidCallback? onBlock;
 
-  const _TopBar({required this.topPad, this.onReport});
+  const _TopBar({required this.topPad, this.onReport, this.onBlock});
 
   @override
   Widget build(BuildContext context) {
-    if (onReport == null) return const SizedBox.shrink();
+    if (onReport == null && onBlock == null) return const SizedBox.shrink();
     return Container(
       padding: EdgeInsets.only(
         top: topPad + 12,
@@ -1052,7 +1133,11 @@ class _TopBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          _ReportChip(onTap: onReport!),
+          if (onBlock != null) ...[
+            _BlockChip(onTap: onBlock!),
+            const SizedBox(width: 8),
+          ],
+          if (onReport != null) _ReportChip(onTap: onReport!),
         ],
       ),
     );
@@ -1699,6 +1784,202 @@ class _GenderOption extends StatelessWidget {
             : null,
       ),
       onTap: onTap,
+    );
+  }
+}
+
+// ─── Block chip (connected state, top-right) ──────────────────────────────────
+
+class _BlockChip extends StatelessWidget {
+  final VoidCallback onTap;
+  const _BlockChip({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            color: Colors.black.withValues(alpha: 0.38),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.block_rounded, color: Colors.white60, size: 14),
+                SizedBox(width: 5),
+                Text(
+                  'Block',
+                  style: TextStyle(color: Colors.white60, fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Partner found confirmation sheet ────────────────────────────────────────
+
+class _PartnerFoundSheet extends StatelessWidget {
+  final String name;
+  final String? gender;
+  final String? profileImage;
+
+  const _PartnerFoundSheet({required this.name, this.gender, this.profileImage});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF1C1F3A),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        24, 12, 24,
+        MediaQuery.of(context).padding.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white12,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF27AE60).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFF27AE60).withValues(alpha: 0.4)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.person_rounded, color: Color(0xFF27AE60), size: 12),
+                SizedBox(width: 4),
+                Text(
+                  'Partner found!',
+                  style: TextStyle(
+                    color: Color(0xFF27AE60),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.grey.shade700,
+              border: Border.all(color: Colors.white24, width: 2.5),
+            ),
+            child: ClipOval(
+              child: profileImage != null
+                  ? Image.network(
+                      _resolveImageUrl(profileImage!),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) =>
+                          const Icon(Icons.person, size: 40, color: Colors.white38),
+                    )
+                  : const Icon(Icons.person, size: 40, color: Colors.white38),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            name,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (gender != null) ...[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  gender == 'Female' ? Icons.female : Icons.male,
+                  size: 14,
+                  color: gender == 'Female' ? Colors.pinkAccent : const Color(0xFF6C6CFF),
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  gender!,
+                  style: TextStyle(
+                    color: gender == 'Female' ? Colors.pinkAccent : const Color(0xFF6C6CFF),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context, false),
+                  child: Container(
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF161830),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Skip',
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context, true),
+                  child: Container(
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5C542),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Connect',
+                        style: TextStyle(
+                          color: Color(0xFF272942),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

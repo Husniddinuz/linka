@@ -584,7 +584,7 @@ class _TutorsScreenState extends State<TutorsScreen> {
                             crossAxisCount: cols,
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
-                            childAspectRatio: cardWidth / (imageHeight + 114),
+                            childAspectRatio: cardWidth / (imageHeight + 116),
                           ),
                           itemCount: _tutors.length,
                           itemBuilder: (_, i) => GestureDetector(
@@ -1373,7 +1373,7 @@ class _SavedTutorsView extends StatelessWidget {
                                 crossAxisCount: cols,
                                 crossAxisSpacing: 12,
                                 mainAxisSpacing: 12,
-                                childAspectRatio: cardWidth / (imageHeight + 114),
+                                childAspectRatio: cardWidth / (imageHeight + 116),
                               ),
                               itemCount: tutors.length,
                               itemBuilder: (_, i) => GestureDetector(

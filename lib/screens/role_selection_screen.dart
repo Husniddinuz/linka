@@ -14,7 +14,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
 
   void _continue() {
     if (_selectedRole == null) return;
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => AuthScreen(role: _selectedRole!),
       ),

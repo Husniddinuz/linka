@@ -1,6 +1,16 @@
 # Uncomment this line to define a global platform for your project
 platform :ios, '15.0'
 
+# livekit_client 2.5.x pins WebRTC-SDK = 137.7151.03 while flutter_webrtc 1.3.1 pins
+# 137.7151.12. Rewrite livekit's podspec to the same M137 patch before resolution so
+# CocoaPods can resolve a single WebRTC-SDK version. Idempotent — no-op if already patched.
+livekit_podspec = File.join(__dir__, '.symlinks/plugins/livekit_client/ios/livekit_client.podspec')
+if File.exist?(livekit_podspec)
+  content = File.read(livekit_podspec)
+  patched = content.gsub("'WebRTC-SDK', '137.7151.03'", "'WebRTC-SDK', '137.7151.12'")
+  File.write(livekit_podspec, patched) if patched != content
+end
+
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
@@ -140,13 +150,6 @@ post_install do |installer|
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
       end
 
-      # zego_express_engine uses static_framework = true with a vendored xcframework,
-      # but CocoaPods doesn't add the extracted xcframework headers to the pod's own
-      # FRAMEWORK_SEARCH_PATHS. Add it manually so the plugin's ObjC source can find
-      # <ZegoExpressEngine/ZegoExpressEngine.h> at compile time.
-      if target.name == 'zego_express_engine'
-        config.build_settings['FRAMEWORK_SEARCH_PATHS'] = '$(inherited) $(PODS_XCFRAMEWORKS_BUILD_DIR)/ZegoExpressEngine'
-      end
     end
   end
 end

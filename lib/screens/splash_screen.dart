@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../services/token_service.dart';
 import 'home_screen.dart';
 import 'role_selection_screen.dart';
@@ -46,7 +45,13 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF272942),
-      body: Center(child: SvgPicture.asset('assets/images/branding/splash.svg')),
+      body: Center(
+        child: Image.asset(
+          'assets/images/branding/new-logo.jpg',
+          width: 180,
+          height: 180,
+        ),
+      ),
     );
   }
 }

@@ -5,6 +5,7 @@ class PrefsService {
   static const _viewedStoriesKey = 'viewed_stories';
   static const _readNotificationsKey = 'read_notifications';
   static const _viewedNewsKey = 'viewed_news';
+  static const _speakingTermsKey = 'speaking_terms_agreed';
 
   static SharedPreferences? _prefs;
 
@@ -54,6 +55,16 @@ class PrefsService {
       list.add(notificationId);
       await prefs.setStringList(_readNotificationsKey, list);
     }
+  }
+
+  static Future<bool> isSpeakingTermsAgreed() async {
+    final prefs = await _instance;
+    return prefs.getBool(_speakingTermsKey) ?? false;
+  }
+
+  static Future<void> setSpeakingTermsAgreed() async {
+    final prefs = await _instance;
+    await prefs.setBool(_speakingTermsKey, true);
   }
 
   // ─── Viewed News ──────────────────────────────────────────────────────

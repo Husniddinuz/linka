@@ -262,7 +262,11 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                           label: 'My reviews',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(
-                                builder: (_) => const MyReviewsScreen()),
+                              builder: (_) => MyReviewsScreen(
+                                isTutor: _isTeacher,
+                                tutorProfileId: UserService.current?.tutorProfileId,
+                              ),
+                            ),
                           ),
                         ),
                         if (!_isTeacher) ...[

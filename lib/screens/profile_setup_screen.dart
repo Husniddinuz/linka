@@ -53,7 +53,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   bool _submitting = false;
   double _progress = 0;
 
-  static const List<String> _bandOptions = ['7.0', '7.5', '8.0', '8.5', '9.0'];
+  static const List<String> _bandOptions = ['6.5', '7.0', '7.5', '8.0', '8.5', '9.0'];
 
   static const Map<int, String> _experienceOptions = {
     3: '1-3 years',
@@ -216,6 +216,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       final picked = result.files.single;
       final path = picked.path;
       if (path == null) return;
+      final fileSize = await File(path).length();
+      if (fileSize > 5 * 1024 * 1024) {
+        if (mounted) AppNotify.show(context, message: 'IELTS certificate must be under 5 MB');
+        return;
+      }
       setState(() {
         _certificateFile = File(path);
         _certificateFileName = picked.name;
@@ -229,6 +234,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       maxDuration: const Duration(minutes: 2),
     );
     if (picked == null || !mounted) return;
+    final fileSize = await File(picked.path).length();
+    if (fileSize > 50 * 1024 * 1024) {
+      if (mounted) AppNotify.show(context, message: 'Intro video must be under 50 MB');
+      return;
+    }
     setState(() {
       _introVideo = File(picked.path);
       _introVideoName = picked.name;

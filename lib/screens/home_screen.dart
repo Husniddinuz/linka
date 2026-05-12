@@ -26,8 +26,6 @@ import 'tutor_earnings_screen.dart';
 import 'tutor_stories_screen.dart';
 import 'profile_setup_screen.dart';
 import 'webinar_viewer_screen.dart';
-import 'debate_room_screen.dart';
-import 'debate_admin_screen.dart';
 
 // ─── Data models ───────────────────────────────────────────────────────────────
 
@@ -347,6 +345,26 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _openSpeakingTraining() async {
+    final agreed = await PrefsService.isSpeakingTermsAgreed();
+    if (!mounted) return;
+    if (!agreed) {
+      final ok = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        isDismissible: false,
+        builder: (_) => const _SpeakingTermsSheet(),
+      );
+      if (ok != true || !mounted) return;
+      await PrefsService.setSpeakingTermsAgreed();
+    }
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SpeakingTrainingScreen()),
+    );
+  }
+
   Future<void> _refreshStudentHome() async {
     await Future.wait([
       _loadStoryTutors(),
@@ -507,9 +525,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               const _WebinarBlock(),
                               const SizedBox(height: 16),
 
-                              const _DebateBlock(),
-                              const SizedBox(height: 16),
-
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 21),
                                 child: GestureDetector(
@@ -534,24 +549,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                 onRatedLesson: _loadTodaysLessons,
                               ),
 
-                              const SizedBox(height: 28),
-
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 21),
-                                child: GestureDetector(
-                                  onTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const SpeakingTrainingScreen(),
-                                    ),
-                                  ),
-                                  child: LayoutBuilder(
-                                    builder: (context, constraints) => SvgPicture.asset(
-                                      'assets/images/buttons/video-chat.svg',
-                                      width: constraints.maxWidth,
+                              if (!UserService.isExemptFromPlus) ...[
+                                const SizedBox(height: 28),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 21),
+                                  child: GestureDetector(
+                                    onTap: _openSpeakingTraining,
+                                    child: LayoutBuilder(
+                                      builder: (context, constraints) => SvgPicture.asset(
+                                        'assets/images/buttons/video-chat.svg',
+                                        width: constraints.maxWidth,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
+                              ],
 
                               const SizedBox(height: 32),
 
@@ -2299,13 +2311,25 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
     }
   }
 
+  DateTime _effectiveEndAt(Map<String, dynamic> b) {
+    final endD = DateTime.tryParse(
+        (b['end_at'] ?? b['end_time'] ?? '').toString());
+    if (endD != null) return endD.toLocal();
+    final startD = DateTime.tryParse(
+        (b['start_at'] ?? b['start_time'] ?? '').toString());
+    if (startD == null) return DateTime(0);
+    final durationMin = (b['duration_minutes'] as num?)?.toInt() ?? 60;
+    return startD.toLocal().add(Duration(minutes: durationMin));
+  }
+
   List<Lesson> get _upcomingLessons {
     final now = DateTime.now();
     final list = _bookings.where((b) {
-      final d = DateTime.tryParse((b['start_at'] ?? b['start_time'] ?? '')
-          .toString());
-      if (d == null) return false;
-      return d.toLocal().isAfter(now) && (b['status'] ?? '') != 'cancelled';
+      if ((b['status'] ?? '') == 'cancelled') return false;
+      final startD = DateTime.tryParse(
+          (b['start_at'] ?? b['start_time'] ?? '').toString());
+      if (startD == null) return false;
+      return _effectiveEndAt(b).isAfter(now);
     }).map((b) => Lesson.fromBooking(b, viewerIsTutor: true)).toList()
       ..sort((a, b) => (a.startAt ?? DateTime(0))
           .compareTo(b.startAt ?? DateTime(0)));
@@ -2315,10 +2339,10 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
   List<Lesson> get _pastLessons {
     final now = DateTime.now();
     final list = _bookings.where((b) {
-      final d = DateTime.tryParse((b['start_at'] ?? b['start_time'] ?? '')
-          .toString());
-      if (d == null) return false;
-      return d.toLocal().isBefore(now);
+      final startD = DateTime.tryParse(
+          (b['start_at'] ?? b['start_time'] ?? '').toString());
+      if (startD == null) return false;
+      return _effectiveEndAt(b).isBefore(now);
     }).map((b) => Lesson.fromBooking(b, viewerIsTutor: true)).toList()
       ..sort((a, b) => (b.startAt ?? DateTime(0))
           .compareTo(a.startAt ?? DateTime(0)));
@@ -2432,8 +2456,6 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
                             onStartLesson: _joinLesson,
                           ),
                         const SizedBox(height: 24),
-                        const _DebateBlock(),
-                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
@@ -3011,233 +3033,113 @@ class _TutorCalendarCard extends StatelessWidget {
   }
 }
 
-// ─── Debate block ──────────────────────────────────────────────────────────────
+// ─── Speaking practice community-guidelines sheet ─────────────────────────────
 
-class _DebateBlock extends StatefulWidget {
-  const _DebateBlock();
-
-  @override
-  State<_DebateBlock> createState() => _DebateBlockState();
-}
-
-class _DebateBlockState extends State<_DebateBlock> {
-  Map<String, dynamic>? _data;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetch();
-  }
-
-  Future<void> _fetch() async {
-    try {
-      final data = await ApiService.get('/live/debate/today/');
-      if (!mounted) return;
-      final hasSession = data['has_session'] as bool? ?? false;
-      setState(() {
-        _data = hasSession ? data : null;
-        _loading = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
+class _SpeakingTermsSheet extends StatelessWidget {
+  const _SpeakingTermsSheet();
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Container(
-          height: 96,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E2141),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Center(
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                  color: Color(0xFFF5C542), strokeWidth: 2),
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF1C1F3A),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        24, 12, 24,
+        MediaQuery.of(context).padding.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white12,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
-        ),
-      );
-    }
-
-    final data = _data;
-    if (data == null) return const SizedBox.shrink();
-
-    final status = (data['status'] as String? ?? 'scheduled');
-    final title =
-        (data['title'] ?? data['topic'] ?? 'Live Debate').toString();
-    final topic = (data['topic'] ?? '').toString();
-    final sessionId = data['id'] as int?;
-    final joinEnabled = data['join_enabled'] as bool? ?? false;
-    final participantCount =
-        (data['participants'] as List<dynamic>?)?.length ?? 0;
-    final isTeacher = UserService.current?.isTeacher ?? false;
-
-    final (String badge, Color badgeColor) = switch (status) {
-      'live' => ('LIVE', const Color(0xFFE53935)),
-      'ended' => ('ENDED', const Color(0xFF6C6C6C)),
-      _ => ('UPCOMING', const Color(0xFFF5C542)),
-    };
-
-    void handleTap() {
-      if (sessionId == null || status == 'ended') return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => isTeacher
-              ? DebateAdminScreen(
-                  sessionId: sessionId,
-                  title: title,
-                  topic: topic.isNotEmpty ? topic : null,
-                )
-              : DebateRoomScreen(
-                  sessionId: sessionId,
-                  title: title,
-                  topic: topic.isNotEmpty ? topic : null,
+          const SizedBox(height: 20),
+          const Text(
+            'Community Guidelines',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Please read and agree to our community standards before joining Speaking Practice.',
+            style: TextStyle(color: Colors.white60, fontSize: 13, height: 1.4),
+          ),
+          const SizedBox(height: 20),
+          _rule(Icons.person_search_rounded,
+              'You will see your partner\'s name and gender before connecting — you can skip any match.'),
+          _rule(Icons.do_not_disturb_on_outlined,
+              'Zero tolerance for harassment, hate speech, or sexually inappropriate content.'),
+          _rule(Icons.flag_outlined,
+              'Use the Report or Block buttons during a call to flag abusive users instantly.'),
+          _rule(Icons.schedule_rounded,
+              'All reports are reviewed and acted upon within 24 hours; violators are suspended.'),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context, true),
+              child: Container(
+                height: 50,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5C542),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-        ),
-      );
-    }
-
-    return GestureDetector(
-      onTap: sessionId == null || status == 'ended' ||
-              (!joinEnabled && !isTeacher)
-          ? null
-          : handleTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E2141),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: status == 'live'
-                  ? const Color(0xFFE53935).withValues(alpha: 0.4)
-                  : const Color(0xFF2A2D4A),
+                child: const Center(
+                  child: Text(
+                    'I Agree — Continue',
+                    style: TextStyle(
+                      color: Color(0xFF272942),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF5C542).withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.record_voice_over_rounded,
-                      color: Color(0xFFF5C542),
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: badgeColor.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                badge,
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: badgeColor,
-                                  letterSpacing: 0.8,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Text(
-                              'DEBATE',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFFF5C542),
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          topic.isNotEmpty ? topic : title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white.withValues(alpha: 0.85),
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+          const SizedBox(height: 12),
+          Center(
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context, false),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white38, fontSize: 14),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  if (participantCount > 0) ...[
-                    const Icon(Icons.people_outline_rounded,
-                        size: 13, color: Color(0xFFAAAAAA)),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        '$participantCount participant${participantCount == 1 ? '' : 's'}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.white.withValues(alpha: 0.45),
-                        ),
-                      ),
-                    ),
-                  ] else
-                    const Spacer(),
-                  if (joinEnabled || isTeacher) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5C542),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        isTeacher ? 'Manage' : 'Join',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF272942),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
+      ),
+    );
+  }
+
+  Widget _rule(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFFF5C542), size: 18),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+            ),
+          ),
+        ],
       ),
     );
   }

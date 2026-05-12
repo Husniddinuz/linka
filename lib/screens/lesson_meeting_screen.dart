@@ -70,7 +70,13 @@ class _LessonMeetingScreenState extends State<LessonMeetingScreen> {
     try {
       final client = await CallClient.create();
       _client = client;
-      client.setUsername(widget.localName);
+      final uri = Uri.parse(widget.roomUrl);
+      final firstName = uri.queryParameters['linka_first_name'] ?? '';
+      final lastName = uri.queryParameters['linka_last_name'] ?? '';
+      final displayName = [firstName, lastName]
+          .where((s) => s.isNotEmpty)
+          .join(' ');
+      client.setUsername(displayName.isNotEmpty ? displayName : widget.localName);
       client.setInputsEnabled(camera: true, microphone: true);
       client.updateSubscriptionProfiles(
         forProfiles: {
@@ -145,10 +151,7 @@ class _LessonMeetingScreenState extends State<LessonMeetingScreen> {
         try {
           final decoded = jsonDecode(data);
           if (decoded is Map) {
-            text = (decoded['kind'] == 'chat'
-                    ? decoded['text']
-                    : decoded['message'] ?? decoded['text'])
-                ?.toString();
+            text = (decoded['message'] ?? decoded['text'])?.toString();
           } else if (decoded is String) {
             text = decoded;
           }
@@ -214,15 +217,22 @@ class _LessonMeetingScreenState extends State<LessonMeetingScreen> {
 
   Future<void> _sendChat(String text) async {
     final client = _client;
-    if (client == null || text.trim().isEmpty) return;
-    final payload = jsonEncode({'kind': 'chat', 'text': text.trim()});
+    if (client == null || !_joined || text.trim().isEmpty) return;
+    final payload = jsonEncode({'message': text.trim()});
     try {
-      await client.sendAppMessage(payload, null);
+      final remotes = client.participants.remote;
+      if (remotes.isEmpty) {
+        await client.sendAppMessage(payload, null);
+      } else {
+        for (final id in remotes.keys) {
+          await client.sendAppMessage(payload, id);
+        }
+      }
       _messages.value = [
         ..._messages.value,
         _ChatEntry(widget.localName, text.trim(), true),
       ];
-    } catch (e, st) {
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to send: $e')),

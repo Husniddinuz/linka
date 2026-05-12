@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'home_screen.dart';
 import 'profile_setup_screen.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import '../services/token_service.dart';
 import '../widgets/app_notify.dart';
-import '../widgets/num_key.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phone;
@@ -32,11 +32,19 @@ class _OtpScreenState extends State<OtpScreen> {
   Timer? _timer;
   late String _verifyId = widget.verifyId;
   bool _submitting = false;
+  final _controller = TextEditingController();
+  final _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _startTimer();
+    // Delay focus until the push animation finishes (~300ms)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 350), () {
+        if (mounted) _focusNode.requestFocus();
+      });
+    });
   }
 
   void _startTimer() {
@@ -54,17 +62,11 @@ class _OtpScreenState extends State<OtpScreen> {
     });
   }
 
-  void _onDigit(String digit) {
-    if (_code.length >= 5) return;
-    setState(() => _code += digit);
-    if (_code.length == 5) {
+  void _onChanged(String value) {
+    setState(() => _code = value);
+    if (value.length == 5) {
       Future.delayed(const Duration(milliseconds: 300), _submit);
     }
-  }
-
-  void _onDelete() {
-    if (_code.isEmpty) return;
-    setState(() => _code = _code.substring(0, _code.length - 1));
   }
 
   Future<void> _resend() async {
@@ -77,6 +79,7 @@ class _OtpScreenState extends State<OtpScreen> {
         _secondsLeft = 57;
         _code = '';
       });
+      _controller.clear();
       _startTimer();
     } on AuthException catch (e) {
       if (!mounted) return;
@@ -100,7 +103,6 @@ class _OtpScreenState extends State<OtpScreen> {
 
       if (!mounted) return;
 
-      // Register FCM token with backend
       NotificationService.registerDevice();
       NotificationService.listenTokenRefresh();
 
@@ -131,6 +133,7 @@ class _OtpScreenState extends State<OtpScreen> {
         _code = '';
         _submitting = false;
       });
+      _controller.clear();
       AppNotify.show(context, message: e.message);
     }
   }
@@ -138,6 +141,8 @@ class _OtpScreenState extends State<OtpScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -168,50 +173,78 @@ class _OtpScreenState extends State<OtpScreen> {
         ),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            // Content area
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 32),
+
+              RichText(
+                text: const TextSpan(
+                  style: TextStyle(
+                    fontSize: 38,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF272942),
+                    height: 1.2,
+                  ),
                   children: [
-                    const SizedBox(height: 32),
+                    TextSpan(text: 'Enter\nthe code'),
+                    TextSpan(
+                      text: '-',
+                      style: TextStyle(color: Color(0xFFF5C542)),
+                    ),
+                  ],
+                ),
+              ),
 
-                    RichText(
-                      text: const TextSpan(
-                        style: TextStyle(
-                          fontSize: 38,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF272942),
-                          height: 1.2,
-                        ),
-                        children: [
-                          TextSpan(text: 'Enter\nthe code'),
-                          TextSpan(
-                            text: '-',
-                            style: TextStyle(color: Color(0xFFF5C542)),
-                          ),
+              const SizedBox(height: 12),
+
+              Text(
+                'To confirm your phone number, send a 5-digit code to ${widget.phone}',
+                style: const TextStyle(
+                  color: Color(0xFFAAAAAA),
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+
+              const Spacer(),
+
+              // Stack: transparent TextField behind the digit dots.
+              // TextField has real height so focus + keyboard work reliably.
+              // Tapping anywhere on the dot row focuses the field.
+              SizedBox(
+                height: 60,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Invisible input captures taps and keyboard events
+                    AutofillGroup(
+                      child: TextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        autofillHints: const [AutofillHints.oneTimeCode],
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(5),
                         ],
+                        onChanged: _onChanged,
+                        showCursor: false,
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        style: const TextStyle(
+                          color: Colors.transparent,
+                          fontSize: 1,
+                        ),
                       ),
                     ),
 
-                    const SizedBox(height: 12),
-
-                    Text(
-                      'To confirm your phone number, send a 5-digit code to ${widget.phone}',
-                      style: const TextStyle(
-                        color: Color(0xFFAAAAAA),
-                        fontSize: 14,
-                        height: 1.5,
-                      ),
-                    ),
-
-                    const Spacer(),
-
-                    // OTP digit display
-                    Center(
+                    // Digit display on top — pointer events fall through to TextField
+                    IgnorePointer(
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(5, (i) {
@@ -246,44 +279,40 @@ class _OtpScreenState extends State<OtpScreen> {
                         }),
                       ),
                     ),
-
-                    const SizedBox(height: 32),
-
-                    // Timer / resend
-                    Center(
-                      child: GestureDetector(
-                        onTap: _resend,
-                        child: Text(
-                          _secondsLeft > 0
-                              ? 'If the code doesn\'t arrive, you can\nget a new one in $_secondsLeft seconds.'
-                              : 'Resend code',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: _secondsLeft > 0
-                                ? const Color(0xFFAAAAAA)
-                                : const Color(0xFF272942),
-                            fontSize: 13,
-                            height: 1.55,
-                            decoration: _secondsLeft == 0
-                                ? TextDecoration.underline
-                                : null,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const Spacer(),
                   ],
                 ),
               ),
-            ),
 
-            // Custom numpad
-            NumPad(onDigit: _onDigit, onDelete: _onDelete),
-          ],
+              const SizedBox(height: 32),
+
+              // Timer / resend
+              Center(
+                child: GestureDetector(
+                  onTap: _resend,
+                  child: Text(
+                    _secondsLeft > 0
+                        ? 'If the code doesn\'t arrive, you can\nget a new one in $_secondsLeft seconds.'
+                        : 'Resend code',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _secondsLeft > 0
+                          ? const Color(0xFFAAAAAA)
+                          : const Color(0xFF272942),
+                      fontSize: 13,
+                      height: 1.55,
+                      decoration: _secondsLeft == 0
+                          ? TextDecoration.underline
+                          : null,
+                    ),
+                  ),
+                ),
+              ),
+
+              const Spacer(),
+            ],
+          ),
         ),
       ),
     );
   }
 }
-

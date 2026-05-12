@@ -35,7 +35,8 @@ class UserService {
   static const _exemptPhone = '+998101002233';
 
   /// True when the current user's phone is exempt from Plus restrictions.
-  /// Used to hide Plus banners and bypass free-minutes limits.
+  /// Used to hide Plus banners, bypass free-minutes limits, and hide the
+  /// random-partner speaking practice button on the student home.
   static bool get isExemptFromPlus => _current?.phone == _exemptPhone;
 
   static Future<void> clear() async {

@@ -4,7 +4,14 @@ import '../widgets/cached_avatar.dart';
 import '../widgets/skeleton.dart';
 
 class MyReviewsScreen extends StatefulWidget {
-  const MyReviewsScreen({super.key});
+  final bool isTutor;
+  final int? tutorProfileId;
+
+  const MyReviewsScreen({
+    super.key,
+    this.isTutor = false,
+    this.tutorProfileId,
+  });
 
   @override
   State<MyReviewsScreen> createState() => _MyReviewsScreenState();
@@ -27,9 +34,14 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
       _error = null;
     });
     try {
-      final data = await ApiService.get('/reviews/my/');
-      final list = (data['data'] as List<dynamic>? ?? [])
-          .cast<Map<String, dynamic>>();
+      List<Map<String, dynamic>> list;
+      if (widget.isTutor && widget.tutorProfileId != null) {
+        final raw = await ApiService.getList('/tutors/${widget.tutorProfileId}/reviews/');
+        list = raw.cast<Map<String, dynamic>>();
+      } else {
+        final data = await ApiService.get('/reviews/my/');
+        list = (data['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      }
       if (!mounted) return;
       setState(() {
         _reviews = list;
@@ -91,7 +103,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
   Widget _body() {
     if (_loading) return const _LoadingList();
     if (_error != null) return _ErrorState(message: _error!, onRetry: _load);
-    if (_reviews.isEmpty) return const _EmptyState();
+    if (_reviews.isEmpty) return _EmptyState(isTutor: widget.isTutor);
     return RefreshIndicator(
       color: const Color(0xFF272942),
       onRefresh: _load,
@@ -101,7 +113,8 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
         separatorBuilder: (_, _) => const SizedBox(height: 12),
         itemBuilder: (_, i) => _ReviewCard(
           review: _reviews[i],
-          onEdit: () => _openEdit(_reviews[i]),
+          isTutor: widget.isTutor,
+          onEdit: widget.isTutor ? null : () => _openEdit(_reviews[i]),
         ),
       ),
     );
@@ -157,17 +170,39 @@ class _Header extends StatelessWidget {
 
 class _ReviewCard extends StatelessWidget {
   final Map<String, dynamic> review;
-  final VoidCallback onEdit;
-  const _ReviewCard({required this.review, required this.onEdit});
+  final bool isTutor;
+  final VoidCallback? onEdit;
+  const _ReviewCard({required this.review, this.isTutor = false, this.onEdit});
 
   @override
   Widget build(BuildContext context) {
     final rating = (review['rating'] as num?)?.toInt() ?? 0;
     final comment = review['comment'] as String? ?? '';
     final createdAt = _formatDate(review['created_at'] as String?);
-    final tutor = review['tutor'] as Map<String, dynamic>?;
-    final tutorName = tutor?['display_name'] as String? ?? '';
-    final imageUrl = tutor?['image'] as String?;
+
+    // For tutors: show the student who wrote the review.
+    // For students: show the tutor being reviewed.
+    final String participantName;
+    final String? imageUrl;
+    final String participantLabel;
+    if (isTutor) {
+      final student = review['student'] as Map<String, dynamic>?;
+      participantLabel = 'Student';
+      imageUrl = (student?['profile_image'] ?? student?['image'] ?? student?['avatar']) as String?;
+      final displayName = (student?['display_name'] ?? student?['full_name'] ?? student?['name'])?.toString().trim() ?? '';
+      if (displayName.isNotEmpty) {
+        participantName = displayName;
+      } else {
+        final first = (student?['first_name'] ?? '').toString().trim();
+        final last = (student?['last_name'] ?? '').toString().trim();
+        participantName = '$first $last'.trim().isNotEmpty ? '$first $last'.trim() : 'Student';
+      }
+    } else {
+      final tutor = review['tutor'] as Map<String, dynamic>?;
+      participantLabel = 'Tutor';
+      participantName = tutor?['display_name'] as String? ?? '';
+      imageUrl = tutor?['image'] as String?;
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -237,7 +272,7 @@ class _ReviewCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Tutor row
+                // Participant row
                 Row(
                   children: [
                     CachedAvatar(imageUrl: imageUrl, size: 40),
@@ -246,18 +281,18 @@ class _ReviewCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (tutorName.isNotEmpty)
+                          if (participantName.isNotEmpty)
                             Text(
-                              tutorName,
+                              participantName,
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
                                 color: Color(0xFF272942),
                               ),
                             ),
-                          const Text(
-                            'Tutor',
-                            style: TextStyle(
+                          Text(
+                            participantLabel,
+                            style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
                               color: Color(0xFFAAAAAA),
@@ -266,6 +301,7 @@ class _ReviewCard extends StatelessWidget {
                         ],
                       ),
                     ),
+                    if (onEdit != null)
                     GestureDetector(
                       onTap: onEdit,
                       behavior: HitTestBehavior.opaque,
@@ -651,7 +687,8 @@ class _LoadingList extends StatelessWidget {
 // ─── Empty state ─────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  final bool isTutor;
+  const _EmptyState({this.isTutor = false});
 
   @override
   Widget build(BuildContext context) {
@@ -684,10 +721,12 @@ class _EmptyState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Reviews you\'ve written for tutors will appear here.',
+            Text(
+              isTutor
+                  ? 'Reviews from your students will appear here.'
+                  : 'Reviews you\'ve written for tutors will appear here.',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
                 color: Color(0xFFAAAAAA),

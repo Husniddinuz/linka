@@ -340,11 +340,9 @@ class _LessonCardState extends State<LessonCard> {
                             ],
                           ),
                         ),
-                        if (!isCancelled && isUpcoming)
+                        if (!isCancelled && isUpcoming && widget.onCancel != null)
                           GestureDetector(
-                            onTap: widget.onCancel != null
-                                ? () => _showOptions(context)
-                                : null,
+                            onTap: () => _showOptions(context),
                             behavior: HitTestBehavior.opaque,
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -444,6 +442,7 @@ class _LessonCardState extends State<LessonCard> {
                 Container(
                   width: double.infinity,
                   height: 46,
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: const Color(0xFFF2F2F4),
                     borderRadius: BorderRadius.circular(10),
@@ -465,6 +464,7 @@ class _LessonCardState extends State<LessonCard> {
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF6C6C6C),
                           height: 1.0,
+                          leadingDistribution: TextLeadingDistribution.even,
                         ),
                       ),
                     ],
@@ -494,7 +494,7 @@ class _LessonCardState extends State<LessonCard> {
                 ),
               ),
             ],
-            if (isFinished) ...[
+            if (isFinished && widget.onRated != null) ...[
               const SizedBox(height: 8),
               if (!widget.lesson.rated)
                 GestureDetector(
