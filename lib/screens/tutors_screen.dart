@@ -107,9 +107,11 @@ class _TutorsScreenState extends State<TutorsScreen> {
     _loadTutors();
   }
 
-  Future<void> _loadTutors() async {
+  Future<void> _loadTutors({bool showSpinner = true}) async {
     setState(() {
-      _loading = true;
+      // On pull-to-refresh keep the current grid visible and let the
+      // RefreshIndicator be the only progress affordance.
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
@@ -503,7 +505,7 @@ class _TutorsScreenState extends State<TutorsScreen> {
             Expanded(
               child: RefreshIndicator(
                 color: const Color(0xFF272942),
-                onRefresh: _loadTutors,
+                onRefresh: () => _loadTutors(showSpinner: false),
                 child: _loading
                   ? ListView(
                       physics: const AlwaysScrollableScrollPhysics(),

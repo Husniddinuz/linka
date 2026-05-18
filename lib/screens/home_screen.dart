@@ -26,6 +26,8 @@ import 'tutor_earnings_screen.dart';
 import 'tutor_stories_screen.dart';
 import 'profile_setup_screen.dart';
 import 'webinar_viewer_screen.dart';
+import 'debate_room_screen.dart';
+import '../services/debate_service.dart';
 
 // ─── Data models ───────────────────────────────────────────────────────────────
 
@@ -523,6 +525,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 const SizedBox(height: 20),
 
                               const _WebinarBlock(),
+                              const SizedBox(height: 16),
+
+                              const _DebateBlock(),
                               const SizedBox(height: 16),
 
                               Padding(
@@ -1705,6 +1710,282 @@ class _WebinarBlockState extends State<_WebinarBlock> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Debate block ──────────────────────────────────────────────────────────────
+
+class _DebateBlock extends StatefulWidget {
+  const _DebateBlock();
+
+  @override
+  State<_DebateBlock> createState() => _DebateBlockState();
+}
+
+class _DebateBlockState extends State<_DebateBlock>
+    with SingleTickerProviderStateMixin {
+  DebateState? _state;
+  String? _topic;
+  bool _loading = true;
+  bool _failed = false;
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat(reverse: true);
+    _fetchState();
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchState() async {
+    try {
+      final results = await Future.wait([
+        DebateService.getState(),
+        DebateService.today().catchError((e) {
+          debugPrint('DEBATE → home today failed: $e');
+          return const DailyDebate(topic: '');
+        }),
+      ]);
+      final state = results[0] as DebateState;
+      final daily = results[1] as DailyDebate;
+      if (!mounted) return;
+      setState(() {
+        _state = state;
+        if (daily.topic.isNotEmpty) _topic = daily.topic;
+        _loading = false;
+      });
+    } on ApiException {
+      if (mounted) {
+        setState(() {
+          _failed = true;
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20),
+        child: Skeleton(height: 168, borderRadius: 16),
+      );
+    }
+
+    final state = _state;
+    if (_failed || state == null) return const SizedBox.shrink();
+
+    // The "main" room is always available in the new flow.
+    final String topic = _topic ?? 'Daily Debate';
+    final int memberCount = state.members.length;
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DebateRoomScreen(title: topic),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF2B2B52), Color(0xFF222241)],
+            ),
+            border: Border.all(
+              color: const Color(0xFFF5C542).withValues(alpha: 0.18),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF5B7FD4).withValues(alpha: 0.30),
+                blurRadius: 24,
+                spreadRadius: -6,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -28,
+                  bottom: -34,
+                  child: Icon(
+                    Icons.forum_rounded,
+                    size: 150,
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          _buildBadge(
+                              'LIVE NOW', const Color(0xFFFF4D4D), true),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'DAILY DEBATE',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFF5C542),
+                              letterSpacing: 1.4,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (memberCount > 0)
+                            Row(
+                              children: [
+                                const Icon(Icons.visibility_rounded,
+                                    size: 13, color: Color(0xFFAEB9D6)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$memberCount',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFFAEB9D6),
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(15),
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Color(0xFFF5C542),
+                                  Color(0xFFE0A92E),
+                                ],
+                              ),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'VS',
+                                style: TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF1B2440),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Text(
+                              topic,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          color: const Color(0xFFF5C542),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Join the debate',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF1B2440),
+                              ),
+                            ),
+                            SizedBox(width: 6),
+                            Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 17,
+                              color: Color(0xFF1B2440),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBadge(String label, Color color, bool animate) {
+    final dot = Container(
+      width: 7,
+      height: 7,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (animate)
+            FadeTransition(opacity: _pulse, child: dot)
+          else
+            dot,
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: color,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ],
       ),
     );
   }
