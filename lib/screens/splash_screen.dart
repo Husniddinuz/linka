@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/app_feature_service.dart';
 import '../services/token_service.dart';
 import 'home_screen.dart';
 import 'role_selection_screen.dart';
@@ -18,6 +19,10 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _init() async {
+    // Load remote feature flags (cached + background refresh) before any
+    // gated screen renders. init() returns once the cache is read; the
+    // network call continues in the background.
+    await AppFeatureService.init();
     final isLoggedIn = await TokenService.isLoggedIn();
     if (!mounted) return;
 

@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../widgets/cached_avatar.dart';
 import '../widgets/plus_member_card.dart';
 import '../services/api_service.dart';
+import '../services/app_feature_service.dart';
 import '../services/auth_service.dart';
 import '../services/plus_service.dart';
 import '../services/token_service.dart';
@@ -19,6 +20,7 @@ import 'notifications_screen.dart';
 import 'my_reviews_screen.dart';
 import 'saved_articles_screen.dart';
 import 'payment_topup_screen.dart';
+import 'public_offer_screen.dart';
 import 'tutor_schedule_screen.dart';
 
 class MyProfileScreen extends StatefulWidget {
@@ -32,7 +34,7 @@ class MyProfileScreen extends StatefulWidget {
 class _MyProfileScreenState extends State<MyProfileScreen> {
   Map<String, dynamic>? _profile;
   bool _loading = true;
-  bool _isTeacher = false;
+  bool _isTeacher = UserService.current?.isTeacher ?? false;
   bool _isExemptFromPlus = false;
   PlusStatus? _plusStatus;
 
@@ -43,8 +45,10 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
   }
 
   Future<void> _init() async {
-    final cached = await UserService.getCachedIsTeacher();
-    if (mounted && cached != null) setState(() => _isTeacher = cached);
+    if (UserService.current == null) {
+      final cached = await UserService.getCachedIsTeacher();
+      if (mounted && cached != null) setState(() => _isTeacher = cached);
+    }
     _loadProfile();
     _loadPlusStatus();
   }
@@ -220,7 +224,8 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                     // Gray section: rest of content
                     const SizedBox(height: 16),
                     if (!_isTeacher) ...[
-                      if (!_isExemptFromPlus) ...[
+                      if (!_isExemptFromPlus &&
+                          AppFeatureService.isEnabled('plus')) ...[
                         if (_plusStatus?.isActive == true)
                           PlusMemberCard(
                             plan: _plusPlanLabel(_plusStatus),
@@ -319,7 +324,10 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                         _MenuRow(
                           icon: 'assets/images/buttons/public-offer.svg',
                           label: 'Public offer',
-                          onTap: () {},
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => const PublicOfferScreen()),
+                          ),
                         ),
                       ],
                     ),

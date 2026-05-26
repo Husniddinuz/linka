@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:video_player/video_player.dart';
 import '../services/api_service.dart';
+import '../services/app_feature_service.dart';
+import '../widgets/app_notify.dart';
 import '../widgets/cached_avatar.dart';
 import 'availability_screen.dart';
 
@@ -84,6 +86,14 @@ if (!mounted) return;
   void _openAvailability() {
     final t = _tutor;
     if (t == null) return;
+    if (!AppFeatureService.isEnabled('bookings')) {
+      AppNotify.show(
+        context,
+        message: 'Booking is temporarily unavailable. Please try again later.',
+        type: NotifyType.info,
+      );
+      return;
+    }
     final rawExp = t['experience'];
     final expStr = rawExp is int
         ? '+$rawExp yrs'

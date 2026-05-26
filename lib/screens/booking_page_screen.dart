@@ -29,15 +29,15 @@ class BookingPageScreen extends StatefulWidget {
 
 class _BookingPageScreenState extends State<BookingPageScreen> {
   final _goalController = TextEditingController();
-  final Set<String> _selectedTopics = {};
+  String? _selectedTopic;
 
-  static const _topics = [
-    'Speaking practice',
-    'Speaking mock',
-    'Grammar',
-    'Vocabulary',
-    'IELTS Writing',
-    'IELTS Reading',
+  static const List<({String value, String label})> _topics = [
+    (value: 'speaking_practice', label: 'Speaking practice'),
+    (value: 'speaking_mock', label: 'Speaking mock'),
+    (value: 'grammar', label: 'Grammar'),
+    (value: 'vocabulary', label: 'Vocabulary'),
+    (value: 'ielts_writing', label: 'IELTS Writing'),
+    (value: 'ielts_reading', label: 'IELTS Reading'),
   ];
 
   static const _monthNames = [
@@ -51,17 +51,10 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
     super.dispose();
   }
 
-  String _buildStudentNote() {
-    final parts = <String>[];
-    if (_selectedTopics.isNotEmpty) {
-      parts.add('Topics: ${_selectedTopics.join(', ')}');
-    }
-    final goal = _goalController.text.trim();
-    if (goal.isNotEmpty) parts.add(goal);
-    return parts.join('\n\n');
-  }
+  String _buildStudentNote() => _goalController.text.trim();
 
   void _onRequestLesson() {
+    if (_selectedTopic == null) return;
     final d = widget.startAt;
     final endMin = d.hour * 60 + d.minute + widget.durationMinutes;
     final endH = (endMin ~/ 60) % 24;
@@ -77,6 +70,7 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
           tutorId: widget.tutorId,
           startAt: widget.startAt,
           durationMinutes: widget.durationMinutes,
+          lessonTopic: _selectedTopic!,
           tutorName: widget.tutorName,
           tutorImage: widget.tutorImage,
           experience: widget.experience,
@@ -149,20 +143,14 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Topic chips
+                    // Topic chips (single-select)
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       children: _topics.map((topic) {
-                        final selected = _selectedTopics.contains(topic);
+                        final selected = _selectedTopic == topic.value;
                         return GestureDetector(
-                          onTap: () => setState(() {
-                            if (selected) {
-                              _selectedTopics.remove(topic);
-                            } else {
-                              _selectedTopics.add(topic);
-                            }
-                          }),
+                          onTap: () => setState(() => _selectedTopic = topic.value),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                             decoration: BoxDecoration(
@@ -174,7 +162,7 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
                               ),
                             ),
                             child: Text(
-                              topic,
+                              topic.label,
                               style: TextStyle(
                                 fontFamily: 'SF Pro',
                                 fontSize: 14,

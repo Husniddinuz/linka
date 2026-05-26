@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
+import '../services/app_feature_service.dart';
 import '../services/plus_service.dart';
 import '../services/wallet_service.dart';
 import '../widgets/app_notify.dart';
@@ -152,7 +153,9 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
         !_balanceLoading && (_balance ?? 0) >= _price;
     final isAlreadyActive = _status?.isActive == true &&
         _status?.planCode == _selectedCode;
-    final canConnect = !_submitting && !_balanceLoading && !isAlreadyActive;
+    final plusEnabled = AppFeatureService.isEnabled('plus');
+    final canConnect =
+        plusEnabled && !_submitting && !_balanceLoading && !isAlreadyActive;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -503,7 +506,11 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                             ),
                           )
                         : Text(
-                            isAlreadyActive ? 'Already active' : 'Connect',
+                            !plusEnabled
+                                ? 'Temporarily unavailable'
+                                : isAlreadyActive
+                                    ? 'Already active'
+                                    : 'Connect',
                             style: const TextStyle(
                                 fontSize: 16, fontWeight: FontWeight.w600),
                           ),

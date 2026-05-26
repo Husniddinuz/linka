@@ -168,11 +168,13 @@ class DailyDebate {
   final String topic;
   final String? description;
   final String? date;
+  final bool hasSession;
 
   const DailyDebate({
     required this.topic,
     this.description,
     this.date,
+    this.hasSession = false,
   });
 
   factory DailyDebate.fromJson(Map<String, dynamic> j) {
@@ -186,10 +188,12 @@ class DailyDebate {
 
     final desc = pick(['description', 'details', 'context']);
     final dt = pick(['date', 'day']);
+    final hs = j['has_session'];
     return DailyDebate(
       topic: pick(['topic', 'title', 'motion', 'question']),
       description: desc.isEmpty ? null : desc,
       date: dt.isEmpty ? null : dt,
+      hasSession: hs is bool ? hs : (hs?.toString().toLowerCase() == 'true'),
     );
   }
 }

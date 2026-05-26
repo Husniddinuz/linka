@@ -1,3 +1,5 @@
+import 'dart:developer' as dev;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../widgets/cached_avatar.dart';
@@ -5,6 +7,7 @@ import '../widgets/lesson_card.dart';
 import '../widgets/mini_player_bar.dart';
 import '../widgets/skeleton.dart';
 import '../services/api_service.dart';
+import '../services/app_feature_service.dart';
 import '../services/notification_service.dart';
 import '../services/prefs_service.dart';
 import '../services/update_service.dart';
@@ -443,31 +446,58 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadTodaysLessons() async {
+    final sw = Stopwatch()..start();
+    dev.log('LESSONS → fetching GET /bookings/my/', name: 'lessons');
     try {
       final list = await ApiService.getList('/bookings/my/');
       if (!mounted) return;
       final now = DateTime.now();
       final lessons = <Lesson>[];
+      final skipped = <String>[];
       for (final item in list) {
         final booking = item as Map<String, dynamic>;
+        final id = booking['id'];
+        final status = (booking['status'] as String? ?? '').toString();
         final startAt = DateTime.tryParse(
           booking['start_at'] as String? ?? booking['start_time'] as String? ?? '',
         );
-        if (startAt == null) continue;
+        if (startAt == null) {
+          skipped.add('#$id status=$status reason=no-start');
+          continue;
+        }
         final local = startAt.toLocal();
         final isToday = local.year == now.year &&
             local.month == now.month &&
             local.day == now.day;
-        if (!isToday) continue;
-        if ((booking['status'] as String? ?? '') == 'cancelled') continue;
+        if (!isToday) {
+          skipped.add('#$id status=$status reason=not-today (start=$local)');
+          continue;
+        }
+        if (status == 'cancelled' || status == 'pending') {
+          skipped.add('#$id status=$status');
+          continue;
+        }
         lessons.add(Lesson.fromBooking(booking));
       }
       lessons.sort((a, b) => a.timeRange.compareTo(b.timeRange));
+      dev.log(
+        'LESSONS → /bookings/my/ returned ${list.length} bookings in '
+        '${sw.elapsedMilliseconds}ms, kept ${lessons.length} for today: '
+        '${lessons.map((l) => '#${l.id} ${l.timeRange} status=${l.status} '
+            'start=${l.startAt} end=${l.endAt}').join(' | ')}'
+        '${skipped.isEmpty ? '' : ' — skipped: ${skipped.join(' | ')}'}',
+        name: 'lessons',
+      );
       setState(() {
         _todaysLessons = lessons;
         _loadingLessons = false;
       });
     } catch (e) {
+      dev.log(
+        'LESSONS → /bookings/my/ failed after ${sw.elapsedMilliseconds}ms: $e',
+        name: 'lessons',
+        error: e,
+      );
       if (!mounted) return;
       setState(() => _loadingLessons = false);
     }
@@ -530,31 +560,34 @@ class _HomeScreenState extends State<HomeScreen> {
                               const _DebateBlock(),
                               const SizedBox(height: 16),
 
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 21),
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _selectedTab = 2),
-                                  child: LayoutBuilder(
-                                    builder: (context, constraints) => SvgPicture.asset(
-                                      'assets/images/buttons/speaking-practice.svg',
-                                      width: constraints.maxWidth,
+                              if (AppFeatureService.isEnabled('tutors'))
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 21),
+                                  child: GestureDetector(
+                                    onTap: () => setState(() => _selectedTab = 2),
+                                    child: LayoutBuilder(
+                                      builder: (context, constraints) => SvgPicture.asset(
+                                        'assets/images/buttons/speaking-practice.svg',
+                                        width: constraints.maxWidth,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
 
                               const SizedBox(height: 32),
 
-                              _LessonsSection(
-                                lessons: _todaysLessons,
-                                loading: _loadingLessons,
-                                onSeeAll: () => setState(() => _selectedTab = 1),
-                                onStartLesson: _joinLesson,
-                                onCancelLesson: _cancelLesson,
-                                onRatedLesson: _loadTodaysLessons,
-                              ),
+                              if (AppFeatureService.isEnabled('bookings'))
+                                _LessonsSection(
+                                  lessons: _todaysLessons,
+                                  loading: _loadingLessons,
+                                  onSeeAll: () => setState(() => _selectedTab = 1),
+                                  onStartLesson: _joinLesson,
+                                  onCancelLesson: _cancelLesson,
+                                  onRatedLesson: _loadTodaysLessons,
+                                ),
 
-                              if (!UserService.isExemptFromPlus) ...[
+                              if (!UserService.isExemptFromPlus &&
+                                  AppFeatureService.isEnabled('speaking')) ...[
                                 const SizedBox(height: 28),
                                 Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 21),
@@ -620,8 +653,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: AppFeatureService.notifier,
+      builder: (context, _, _) => _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width >= 600;
     final navItems = _isTeacher ? _tutorNavItems : _studentNavItems;
+    final bookingsEnabled = AppFeatureService.isEnabled('bookings');
+    final tutorsEnabled = AppFeatureService.isEnabled('tutors');
     final children = _isTeacher
         ? <Widget>[
             TutorHomeBody(
@@ -643,8 +685,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ]
         : <Widget>[
             _buildStudentHomeBody(),
-            LessonsScreen(onFindTutor: () => setState(() => _selectedTab = 2)),
-            const TutorsScreen(),
+            bookingsEnabled
+                ? LessonsScreen(onFindTutor: () => setState(() => _selectedTab = 2))
+                : const _SectionClosed(title: 'My lessons'),
+            tutorsEnabled
+                ? const TutorsScreen()
+                : const _SectionClosed(title: 'Tutors'),
             MyProfileScreen(
               onNavigateToLessons: () => setState(() => _selectedTab = 1),
             ),
@@ -1520,7 +1566,11 @@ class _WebinarBlockState extends State<_WebinarBlock> {
   @override
   void initState() {
     super.initState();
-    _fetchToday();
+    if (AppFeatureService.isEnabled('webinars')) {
+      _fetchToday();
+    } else {
+      _loading = false;
+    }
   }
 
   Future<void> _fetchToday() async {
@@ -1539,6 +1589,9 @@ class _WebinarBlockState extends State<_WebinarBlock> {
 
   @override
   Widget build(BuildContext context) {
+    if (!AppFeatureService.isEnabled('webinars')) {
+      return const SizedBox.shrink();
+    }
     if (_loading) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1728,6 +1781,7 @@ class _DebateBlockState extends State<_DebateBlock>
     with SingleTickerProviderStateMixin {
   DebateState? _state;
   String? _topic;
+  bool _hasSession = false;
   bool _loading = true;
   bool _failed = false;
   late final AnimationController _pulse;
@@ -1739,7 +1793,11 @@ class _DebateBlockState extends State<_DebateBlock>
       vsync: this,
       duration: const Duration(milliseconds: 1100),
     )..repeat(reverse: true);
-    _fetchState();
+    if (AppFeatureService.isEnabled('debates')) {
+      _fetchState();
+    } else {
+      _loading = false;
+    }
   }
 
   @override
@@ -1749,23 +1807,42 @@ class _DebateBlockState extends State<_DebateBlock>
   }
 
   Future<void> _fetchState() async {
+    final sw = Stopwatch()..start();
+    dev.log(
+      'DEBATE → home block fetching: GET /live/debate/state/ + GET /live/debate/today/',
+      name: 'debate',
+    );
     try {
       final results = await Future.wait([
         DebateService.getState(),
         DebateService.today().catchError((e) {
-          debugPrint('DEBATE → home today failed: $e');
+          dev.log('DEBATE → home today failed: $e',
+              name: 'debate', error: e);
           return const DailyDebate(topic: '');
         }),
       ]);
       final state = results[0] as DebateState;
       final daily = results[1] as DailyDebate;
+      dev.log(
+        'DEBATE → home block loaded in ${sw.elapsedMilliseconds}ms '
+        '(room=${state.room}, members=${state.members.length}, '
+        'A=${state.countA}, B=${state.countB}, '
+        'hasSession=${daily.hasSession}, topic="${daily.topic}")',
+        name: 'debate',
+      );
       if (!mounted) return;
       setState(() {
         _state = state;
+        _hasSession = daily.hasSession;
         if (daily.topic.isNotEmpty) _topic = daily.topic;
         _loading = false;
       });
-    } on ApiException {
+    } on ApiException catch (e) {
+      dev.log(
+        'DEBATE → home block failed after ${sw.elapsedMilliseconds}ms: $e',
+        name: 'debate',
+        error: e,
+      );
       if (mounted) {
         setState(() {
           _failed = true;
@@ -1777,6 +1854,9 @@ class _DebateBlockState extends State<_DebateBlock>
 
   @override
   Widget build(BuildContext context) {
+    if (!AppFeatureService.isEnabled('debates')) {
+      return const SizedBox.shrink();
+    }
     if (_loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(horizontal: 20),
@@ -1785,7 +1865,9 @@ class _DebateBlockState extends State<_DebateBlock>
     }
 
     final state = _state;
-    if (_failed || state == null) return const SizedBox.shrink();
+    if (_failed || state == null || !_hasSession) {
+      return const SizedBox.shrink();
+    }
 
     // The "main" room is always available in the new flow.
     final String topic = _topic ?? 'Daily Debate';
@@ -2606,7 +2688,8 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
   List<Lesson> get _upcomingLessons {
     final now = DateTime.now();
     final list = _bookings.where((b) {
-      if ((b['status'] ?? '') == 'cancelled') return false;
+      final status = (b['status'] ?? '').toString();
+      if (status == 'cancelled' || status == 'pending') return false;
       final startD = DateTime.tryParse(
           (b['start_at'] ?? b['start_time'] ?? '').toString());
       if (startD == null) return false;
@@ -3421,6 +3504,66 @@ class _SpeakingTermsSheet extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Closed section placeholder ───────────────────────────────────────────────
+
+/// Shown in place of a tab body whose feature flag is currently disabled.
+class _SectionClosed extends StatelessWidget {
+  final String title;
+  const _SectionClosed({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF2F2F4),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.lock_clock_rounded,
+                    color: Color(0xFF272942),
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF272942),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'This section is temporarily unavailable. Please check back soon.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6C6C6C),
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

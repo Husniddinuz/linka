@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'screens/splash_screen.dart';
 import 'screens/role_selection_screen.dart';
 import 'services/api_service.dart';
+import 'services/app_feature_service.dart';
 import 'services/token_service.dart';
 import 'services/update_service.dart';
 import 'services/user_service.dart';
@@ -56,16 +57,26 @@ class LinkaApp extends StatefulWidget {
   State<LinkaApp> createState() => _LinkaAppState();
 }
 
-class _LinkaAppState extends State<LinkaApp> {
+class _LinkaAppState extends State<LinkaApp> with WidgetsBindingObserver {
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _appLinks = AppLinks();
     _initDeepLinks();
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh remote feature flags when the app returns to the foreground so
+    // toggles flipped server-side land without a restart.
+    if (state == AppLifecycleState.resumed) {
+      AppFeatureService.refresh();
+    }
   }
 
   Future<void> _initDeepLinks() {
@@ -84,6 +95,7 @@ class _LinkaAppState extends State<LinkaApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _linkSubscription?.cancel();
     super.dispose();
   }

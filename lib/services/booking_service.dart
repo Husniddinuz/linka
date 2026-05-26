@@ -7,12 +7,14 @@ class BookingService {
     required int tutorId,
     required DateTime startAt,
     required int durationMinutes,
+    required String lessonTopic,
     String? studentNote,
   }) async {
     final body = <String, dynamic>{
       'tutor_id': tutorId,
       'start_at': _toIso8601WithOffset(startAt),
       'duration_minutes': durationMinutes,
+      'lesson_topic': lessonTopic,
       if (studentNote != null && studentNote.trim().isNotEmpty)
         'student_note': studentNote.trim(),
     };
@@ -28,7 +30,7 @@ class BookingService {
   /// Pays the given booking from the student's wallet balance.
   static Future<void> payFromWallet({required int bookingId}) async {
     final body = {'booking_id': bookingId};
-    final result = await ApiService.post('/payments/bookings/pay/', body);
+    await ApiService.post('/payments/bookings/pay/', body);
   }
 
   /// Formats [dt] as ISO 8601 with timezone offset (e.g. 2026-03-25T14:00:00+05:00).

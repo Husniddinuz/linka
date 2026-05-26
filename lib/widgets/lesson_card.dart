@@ -11,8 +11,10 @@ class Lesson {
   final String? participantImage;
   final String timeRange;
   final String duration;
+  final int durationMinutes;
   final String status;
   final DateTime? startAt;
+  final DateTime? endAt;
   final String dailyRoomUrl;
   final bool rated;
 
@@ -23,8 +25,10 @@ class Lesson {
     this.participantImage,
     required this.timeRange,
     required this.duration,
+    this.durationMinutes = 0,
     required this.status,
     this.startAt,
+    this.endAt,
     this.dailyRoomUrl = '',
     this.rated = false,
   });
@@ -66,6 +70,12 @@ class Lesson {
             ? endAt.difference(startAt).inMinutes
             : 0);
 
+    final localEndAt = (endAt ??
+            (startAt != null && durationMin > 0
+                ? startAt.add(Duration(minutes: durationMin))
+                : null))
+        ?.toLocal();
+
     String timeRange = '';
     if (startAt != null) {
       final localStart = startAt.toLocal();
@@ -93,8 +103,10 @@ class Lesson {
       participantImage: profileImage,
       timeRange: timeRange,
       duration: durationLabel,
+      durationMinutes: durationMin,
       status: booking['status'] as String? ?? '',
       startAt: localStartAt,
+      endAt: localEndAt,
       dailyRoomUrl: booking['daily_room_url']?.toString() ?? '',
       rated: booking['rated'] as bool? ?? false,
     );
@@ -160,9 +172,17 @@ class _LessonCardState extends State<LessonCard> {
     if (mounted) setState(() => _remaining = diff > Duration.zero ? diff : Duration.zero);
   }
 
-  bool get _canStart =>
-      widget.lesson.startAt == null ||
-      _remaining <= const Duration(minutes: _windowMinutes);
+  bool get _hasEnded {
+    final endAt = widget.lesson.endAt;
+    return endAt != null && !DateTime.now().isBefore(endAt);
+  }
+
+  bool get _canStart {
+    final startAt = widget.lesson.startAt;
+    if (startAt == null) return true;
+    if (_hasEnded) return false;
+    return _remaining <= const Duration(minutes: _windowMinutes);
+  }
 
   String get _countdownLabel {
     final total = _remaining.inSeconds;
@@ -242,28 +262,11 @@ class _LessonCardState extends State<LessonCard> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: widget.lesson.participantImage != null &&
-                          widget.lesson.participantImage!.startsWith('http')
-                      ? Image.network(
-                          widget.lesson.participantImage!,
-                          width: 82,
-                          height: 82,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Image.asset(
-                            'assets/images/tutors/tutor.png',
-                            width: 82,
-                            height: 82,
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                      : Image.asset(
-                          'assets/images/tutors/tutor.png',
-                          width: 82,
-                          height: 82,
-                          fit: BoxFit.cover,
-                        ),
+                _LessonAvatar(
+                  imageUrl: widget.lesson.participantImage,
+                  name: widget.lesson.participantName,
+                  size: 82,
+                  radius: 10,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -450,14 +453,16 @@ class _LessonCardState extends State<LessonCard> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
-                        Icons.access_time_rounded,
+                      Icon(
+                        _hasEnded
+                            ? Icons.check_circle_outline_rounded
+                            : Icons.access_time_rounded,
                         size: 16,
-                        color: Color(0xFF6C6C6C),
+                        color: const Color(0xFF6C6C6C),
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'Starts in $_countdownLabel',
+                        _hasEnded ? 'Lesson ended' : 'Starts in $_countdownLabel',
                         style: const TextStyle(
                           fontFamily: 'SF Pro',
                           fontSize: 14,
@@ -807,6 +812,82 @@ class _RateSheetState extends State<_RateSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _LessonAvatar extends StatelessWidget {
+  final String? imageUrl;
+  final String name;
+  final double size;
+  final double radius;
+
+  const _LessonAvatar({
+    required this.imageUrl,
+    required this.name,
+    required this.size,
+    required this.radius,
+  });
+
+  static const _palette = [
+    Color(0xFF4F8EF7),
+    Color(0xFF27AE60),
+    Color(0xFFE67E22),
+    Color(0xFF9B59B6),
+    Color(0xFFE74C3C),
+    Color(0xFF16A085),
+    Color(0xFFF39C12),
+    Color(0xFF34495E),
+  ];
+
+  String get _initials {
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  Color get _bgColor {
+    if (name.isEmpty) return _palette[0];
+    final hash = name.codeUnits.fold<int>(0, (a, b) => a + b);
+    return _palette[hash % _palette.length];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl;
+    final hasUrl = url != null && url.startsWith('http');
+    final fallback = Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      color: _bgColor,
+      child: Text(
+        _initials,
+        style: TextStyle(
+          fontFamily: 'SF Pro',
+          fontSize: size * 0.36,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+          height: 1.0,
+        ),
+      ),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: hasUrl
+          ? Image.network(
+              url,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => fallback,
+            )
+          : fallback,
     );
   }
 }
