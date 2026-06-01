@@ -133,9 +133,43 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     return true;
   }
 
+  // Make the loudspeaker the *default* audio route. setSpeakerphoneOn alone is
+  // a one-shot override that iOS reverts to the receiver (earpiece) whenever the
+  // WebRTC audio unit (re)starts — e.g. when remote audio arrives. Configuring
+  // the session category with defaultToSpeaker (iOS) / the communication profile
+  // (Android) makes the speaker stick across audio-unit restarts. Must be set
+  // before the WebRTC session starts; cannot be changed mid-session on Android.
+  Future<void> _configureAudioRoute() async {
+    try {
+      await Helper.setAppleAudioConfiguration(
+        AppleAudioConfiguration(
+          appleAudioCategory: AppleAudioCategory.playAndRecord,
+          appleAudioCategoryOptions: {
+            AppleAudioCategoryOption.defaultToSpeaker,
+            AppleAudioCategoryOption.allowBluetooth,
+          },
+          appleAudioMode: AppleAudioMode.videoChat,
+        ),
+      );
+      await Helper.setAndroidAudioConfiguration(
+        AndroidAudioConfiguration.communication,
+      );
+    } catch (_) {
+      // Platform without native audio config (e.g. web) — ignore.
+    }
+  }
+
+  // Re-assert the loudspeaker as the active route. Safe to call repeatedly.
+  Future<void> _routeToSpeaker() async {
+    try {
+      await Helper.setSpeakerphoneOn(true);
+    } catch (_) {}
+  }
+
   Future<void> _startLocalMedia() async {
     if (!await _ensurePermissions()) return;
     try {
+      await _configureAudioRoute();
       final stream = await navigator.mediaDevices.getUserMedia({
         'audio': true,
         'video': {
@@ -146,7 +180,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       });
       _localStream = stream;
       _localRenderer.srcObject = stream;
-      await Helper.setSpeakerphoneOn(true);
+      await _routeToSpeaker();
       if (mounted) setState(() {});
     } catch (e) {
       if (mounted) _showError('Camera/microphone unavailable.');
@@ -419,7 +453,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       if (event.streams.isNotEmpty) {
         _remoteRenderer.srcObject = event.streams.first;
         // iOS resets AVAudioSession when remote audio arrives — re-route to speaker.
-        Helper.setSpeakerphoneOn(true);
+        _routeToSpeaker();
         if (mounted) {
           setState(() {
             _isConnected = true;
@@ -430,6 +464,11 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     };
 
     pc.onConnectionState = (state) {
+      if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        // The audio unit fully activates around connection time; re-assert the
+        // loudspeaker so neither peer is left on the earpiece.
+        _routeToSpeaker();
+      }
       if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
           state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected ||
           state == RTCPeerConnectionState.RTCPeerConnectionStateClosed) {

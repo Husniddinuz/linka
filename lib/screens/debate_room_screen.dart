@@ -588,6 +588,13 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
 
   @override
   void dispose() {
+    // If we leave as a speaker, drop our speaker slot server-side so the
+    // assignment doesn't linger in the background (and reappear on rejoin).
+    // Fire-and-forget: ApiService is static so the request outlives this
+    // widget; leave() swallows its own errors.
+    if (_myRole == 'speaker' && _myUserId > 0) {
+      DebateService.leave(_myUserId);
+    }
     // Fire-and-forget but fully guarded: _closeRoom swallows the
     // TimeoutException disconnect() can throw, so no unhandled async error.
     final room = _room;

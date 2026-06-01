@@ -251,4 +251,22 @@ class DebateService {
     final body = {'adminId': adminId, 'targetId': targetId, 'team': team};
     await ApiService.post('/live/debate/team/', body);
   }
+
+  /// Demotes the caller back to `viewer` when they leave the room, freeing
+  /// their speaker slot/team server-side (otherwise the assignment persists
+  /// and they keep occupying a slot in the background until rejoin).
+  ///
+  /// Reuses `POST /live/debate/role/` as a self-demote (adminId == targetId)
+  /// — no dedicated leave endpoint exists. Best-effort: swallows errors
+  /// (incl. a possible 403 if the backend enforces admin-only role changes)
+  /// since it runs on screen teardown.
+  static Future<void> leave(int userId) async {
+    if (userId <= 0) return;
+    try {
+      await setRole(adminId: userId, targetId: userId, role: 'viewer');
+      dev.log('DEBATE → leave: self-demoted user=$userId', name: 'debate');
+    } catch (e) {
+      dev.log('DEBATE → leave self-demote ignored: $e', name: 'debate');
+    }
+  }
 }
