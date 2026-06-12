@@ -1,5 +1,3 @@
-import 'dart:developer' as dev;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../widgets/cached_avatar.dart';
@@ -521,17 +519,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadTodaysLessons() async {
-    final sw = Stopwatch()..start();
-    dev.log('LESSONS → fetching GET /bookings/my/', name: 'lessons');
     try {
       final list = await ApiService.getList('/bookings/my/');
       if (!mounted) return;
       final now = DateTime.now();
       final lessons = <Lesson>[];
-      final skipped = <String>[];
       for (final item in list) {
         final booking = item as Map<String, dynamic>;
-        final id = booking['id'];
         final status = (booking['status'] as String? ?? '').toString();
         final startAt = DateTime.tryParse(
           booking['start_at'] as String? ??
@@ -539,7 +533,6 @@ class _HomeScreenState extends State<HomeScreen> {
               '',
         );
         if (startAt == null) {
-          skipped.add('#$id status=$status reason=no-start');
           continue;
         }
         final local = startAt.toLocal();
@@ -548,34 +541,19 @@ class _HomeScreenState extends State<HomeScreen> {
             local.month == now.month &&
             local.day == now.day;
         if (!isToday) {
-          skipped.add('#$id status=$status reason=not-today (start=$local)');
           continue;
         }
         if (status == 'cancelled' || status == 'pending') {
-          skipped.add('#$id status=$status');
           continue;
         }
         lessons.add(Lesson.fromBooking(booking));
       }
       lessons.sort((a, b) => a.timeRange.compareTo(b.timeRange));
-      dev.log(
-        'LESSONS → /bookings/my/ returned ${list.length} bookings in '
-        '${sw.elapsedMilliseconds}ms, kept ${lessons.length} for today: '
-        '${lessons.map((l) => '#${l.id} ${l.timeRange} status=${l.status} '
-            'start=${l.startAt} end=${l.endAt}').join(' | ')}'
-        '${skipped.isEmpty ? '' : ' — skipped: ${skipped.join(' | ')}'}',
-        name: 'lessons',
-      );
       setState(() {
         _todaysLessons = lessons;
         _loadingLessons = false;
       });
-    } catch (e) {
-      dev.log(
-        'LESSONS → /bookings/my/ failed after ${sw.elapsedMilliseconds}ms: $e',
-        name: 'lessons',
-        error: e,
-      );
+    } catch (_) {
       if (!mounted) return;
       setState(() => _loadingLessons = false);
     }
@@ -1721,7 +1699,6 @@ class _WebinarBlockState extends State<_WebinarBlock> {
     try {
       final data = await ApiService.get('/live/webinar/today/');
       if (!mounted) return;
-      dev.log('WEBINAR → today session data: $data', name: 'webinar');
       final hasSession = data['has_session'] as bool? ?? false;
       setState(() {
         _webinar = hasSession ? WebinarData.fromJson(data) : null;
@@ -1961,28 +1938,15 @@ class _DebateBlockState extends State<_DebateBlock>
   }
 
   Future<void> _fetchState() async {
-    final sw = Stopwatch()..start();
-    dev.log(
-      'DEBATE → home block fetching: GET /live/debate/state/ + GET /live/debate/today/',
-      name: 'debate',
-    );
     try {
       final results = await Future.wait([
         DebateService.getState(),
-        DebateService.today().catchError((e) {
-          dev.log('DEBATE → home today failed: $e', name: 'debate', error: e);
+        DebateService.today().catchError((_) {
           return const DailyDebate(topic: '');
         }),
       ]);
       final state = results[0] as DebateState;
       final daily = results[1] as DailyDebate;
-      dev.log(
-        'DEBATE → home block loaded in ${sw.elapsedMilliseconds}ms '
-        '(room=${state.room}, members=${state.members.length}, '
-        'A=${state.countA}, B=${state.countB}, '
-        'hasSession=${daily.hasSession}, topic="${daily.topic}")',
-        name: 'debate',
-      );
       if (!mounted) return;
       setState(() {
         _state = state;
@@ -1990,12 +1954,7 @@ class _DebateBlockState extends State<_DebateBlock>
         if (daily.topic.isNotEmpty) _topic = daily.topic;
         _loading = false;
       });
-    } on ApiException catch (e) {
-      dev.log(
-        'DEBATE → home block failed after ${sw.elapsedMilliseconds}ms: $e',
-        name: 'debate',
-        error: e,
-      );
+    } on ApiException {
       if (mounted) {
         setState(() {
           _failed = true;

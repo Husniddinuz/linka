@@ -53,8 +53,10 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Center(
         child: Image.asset(
           'assets/images/branding/new-logo.png',
-          width: 180,
-          height: 180,
+          // Matches the native launch screen logo size (LaunchImage@3x is
+          // 384px → 128pt centered) so the native→Flutter handoff is seamless.
+          width: 128,
+          height: 128,
         ),
       ),
     );

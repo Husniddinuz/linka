@@ -29,19 +29,12 @@ class AppFeatureService {
   /// Returns `true` if [key] is unknown — safer than hiding sections on a
   /// schema mismatch or empty cache.
   static bool isEnabled(String key) {
-    final present = _map.containsKey(key);
-    final value = _map[key] ?? true;
-    debugPrint(
-      '[AppFeatureService] isEnabled("$key") -> $value '
-      '(${present ? "from server" : "default — key missing"})',
-    );
-    return value;
+    return _map[key] ?? true;
   }
 
   /// Loads cached flags from disk, then kicks off a network refresh in the
   /// background. Call from the splash screen before navigating.
   static Future<void> init() async {
-    debugPrint('[AppFeatureService] init()');
     await _loadCached();
     unawaited(refresh());
   }
@@ -51,7 +44,6 @@ class AppFeatureService {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_cacheKey);
       if (raw == null) {
-        debugPrint('[AppFeatureService] _loadCached: no cached map');
         return;
       }
       final json = jsonDecode(raw) as Map<String, dynamic>;
@@ -59,30 +51,21 @@ class AppFeatureService {
         for (final entry in json.entries)
           if (entry.value is bool) entry.key: entry.value as bool,
       };
-      debugPrint('[AppFeatureService] _loadCached: loaded $_map');
       notifier.value++;
-    } catch (e) {
-      debugPrint('[AppFeatureService] _loadCached: error $e');
-    }
+    } catch (_) {}
   }
 
   /// Pulls the latest flags from the server. Silent on failure — callers
   /// fall back to the last cached value (or `true` defaults).
   static Future<void> refresh() async {
     if (_refreshing) {
-      debugPrint('[AppFeatureService] refresh: already in progress, skipping');
       return;
     }
     _refreshing = true;
     final url = '$apiBaseUrl/app-features/';
-    debugPrint('[AppFeatureService] refresh: GET $url');
     try {
       final response =
           await http.get(Uri.parse(url)).timeout(const Duration(seconds: 6));
-      debugPrint(
-        '[AppFeatureService] refresh: status=${response.statusCode} '
-        'body=${response.body}',
-      );
       if (response.statusCode != 200) return;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final rawMap = data['map'] as Map<String, dynamic>? ?? const {};
@@ -91,22 +74,18 @@ class AppFeatureService {
           if (entry.value is bool) entry.key: entry.value as bool,
       };
       if (mapEquals(_map, next)) {
-        debugPrint('[AppFeatureService] refresh: unchanged ($next)');
         return;
       }
-      debugPrint(
-        '[AppFeatureService] refresh: updated from $_map to $next',
-      );
       _map = next;
       notifier.value++;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_cacheKey, jsonEncode(_map));
     } on TimeoutException {
-      debugPrint('[AppFeatureService] refresh: timeout — keeping cache');
-    } on SocketException catch (e) {
-      debugPrint('[AppFeatureService] refresh: offline ($e) — keeping cache');
-    } catch (e) {
-      debugPrint('[AppFeatureService] refresh: error $e — keeping cache');
+      // Keep cache on timeout.
+    } on SocketException {
+      // Keep cache while offline.
+    } catch (_) {
+      // Keep cache on any other error.
     } finally {
       _refreshing = false;
     }

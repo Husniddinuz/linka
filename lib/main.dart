@@ -19,13 +19,6 @@ void main() async {
   await Firebase.initializeApp();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
-  FlutterError.onError = (FlutterErrorDetails details) {
-    debugPrint('═══════════════════════════════════════');
-    debugPrint('FLUTTER ERROR: ${details.exceptionAsString()}');
-    debugPrint('${details.stack}');
-    debugPrint('═══════════════════════════════════════');
-  };
-
   // Global session-expired handler: any 401 that can't be recovered by
   // refreshing the token clears auth state and bounces the user to login.
   ApiService.onSessionExpired = () async {
@@ -81,13 +74,11 @@ class _LinkaAppState extends State<LinkaApp> with WidgetsBindingObserver {
 
   Future<void> _initDeepLinks() {
     _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
-      debugPrint('Deep link received: $uri');
       _handleDeepLink(uri);
     });
 
     return _appLinks.getInitialLink().then((uri) {
       if (uri != null) {
-        debugPrint('Initial deep link: $uri');
         _handleDeepLink(uri);
       }
     });
@@ -112,13 +103,11 @@ class _LinkaAppState extends State<LinkaApp> with WidgetsBindingObserver {
   void _handleDeepLink(Uri uri) {
     final host = uri.host;
     final segments = uri.pathSegments;
-    debugPrint('Deep link: host=$host, segments=$segments');
 
     switch (host) {
       case 'tutor':
         if (segments.isNotEmpty) {
           final tutorId = segments[0];
-          debugPrint('Open tutor profile: $tutorId');
           _showDeepLinkToast('Opening tutor: $tutorId');
           // TODO: navigatorKey.currentState?.push(
           //   MaterialPageRoute(builder: (_) => TutorProfileScreen(id: tutorId)),
@@ -127,7 +116,6 @@ class _LinkaAppState extends State<LinkaApp> with WidgetsBindingObserver {
         break;
       default:
         _showDeepLinkToast('Deep link: $uri');
-        debugPrint('Unknown deep link host: $host');
     }
   }
 

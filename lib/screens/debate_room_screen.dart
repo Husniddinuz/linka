@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -128,21 +127,14 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
   }
 
   Future<void> _loadTodayTopic() async {
-    dev.log('DEBATE → GET /live/debate/today/', name: 'debate');
     try {
       final daily = await DebateService.today();
-      dev.log(
-        'DEBATE → today OK: topic="${daily.topic}" '
-        'desc=${daily.description} date=${daily.date}',
-        name: 'debate',
-      );
       if (!mounted || daily.topic.isEmpty) return;
       setState(() => _topic = daily.topic);
-    } on ApiException catch (e) {
-      dev.log('DEBATE → today FAILED: ${e.statusCode} ${e.message}',
-          name: 'debate');
-    } catch (e, st) {
-      dev.log('DEBATE → today ERROR: $e', name: 'debate', stackTrace: st);
+    } on ApiException {
+      // Topic is non-essential; leave the default in place on failure.
+    } catch (_) {
+      // Topic is non-essential; leave the default in place on failure.
     }
   }
 
@@ -159,9 +151,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
     if (room == null) return;
     try {
       await room.disconnect();
-    } catch (e) {
-      dev.log('DEBATE → room.disconnect() ignored: $e', name: 'debate');
-    }
+    } catch (_) {}
     try {
       await room.dispose();
     } catch (_) {}
@@ -187,22 +177,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
           ? _myUserId
           : await DebateService.currentUserId();
 
-      dev.log(
-        'DEBATE → POST /live/debate/join/ userId=$userId',
-        name: 'debate',
-      );
       final join = await DebateService.join(userId);
-      dev.log(
-        'DEBATE → join OK: role=${join.role} team=${join.team} '
-        'isAdmin=${join.isAdmin} identity=${join.identity}',
-        name: 'debate',
-      );
-      dev.log('DEBATE → livekit url=${join.url}', name: 'debate');
-      if (join.hasCredentials) {
-        final testUrl =
-            'https://meet.livekit.io/custom?liveKitUrl=${Uri.encodeComponent(join.url)}&token=${join.token}';
-        dev.log('DEBATE → test in browser: $testUrl', name: 'debate');
-      }
       if (!mounted) return;
 
       _myUserId = join.userId;
@@ -223,8 +198,6 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
       }
       _connectLiveKit(join);
     } on ApiException catch (e) {
-      dev.log('DEBATE → join FAILED: ${e.statusCode} ${e.message}',
-          name: 'debate');
       if (!mounted) return;
       setState(() {
         _joining = false;
@@ -253,9 +226,8 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
         }
       });
       _adminSheetRefresh?.call();
-    } on ApiException catch (e) {
-      dev.log('DEBATE → state seed failed: ${e.statusCode} ${e.message}',
-          name: 'debate');
+    } on ApiException {
+      // Roster seed is best-effort; LiveKit events will populate it.
     }
   }
 
@@ -282,11 +254,6 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
       _wireRoomEvents(listener);
 
       await room.connect(join.url, join.token);
-      dev.log(
-        'DEBATE → LiveKit connected: room=${room.name} '
-        'localIdentity=${room.localParticipant?.identity}',
-        name: 'debate',
-      );
 
       if (!mounted) {
         await _closeRoom(room, listener);
@@ -302,8 +269,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
 
       // Mic always starts OFF; speakers opt in via the mic button.
       await room.localParticipant?.setMicrophoneEnabled(false);
-    } catch (e) {
-      dev.log('DEBATE → LiveKit connect FAILED: $e', name: 'debate');
+    } catch (_) {
       if (!mounted) return;
       setState(() => _joinError = 'Could not connect to debate audio.');
     }
@@ -343,11 +309,6 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
       final newRole = meta?.role ?? _myRole;
       final newTeam = meta?.team;
       if (newRole != _myRole || newTeam != _myTeam) {
-        dev.log(
-          'DEBATE → my role/team changed ($_myRole/$_myTeam → '
-          '$newRole/$newTeam)',
-          name: 'debate',
-        );
         _myRole = newRole;
         _myTeam = newTeam;
         if (newRole != 'speaker') _forceMicOff();
@@ -422,11 +383,6 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
       if (id == _myUserId &&
           meta != null &&
           (meta.role != _myRole || meta.team != _myTeam)) {
-        dev.log(
-          'DEBATE → reconcile self from metadata '
-          '($_myRole/$_myTeam → ${meta.role}/${meta.team})',
-          name: 'debate',
-        );
         _myRole = meta.role;
         _myTeam = meta.team;
         if (_myRole != 'speaker') _forceMicOff();
@@ -548,8 +504,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
         _micOn = next;
         _togglingMic = false;
       });
-    } catch (e) {
-      dev.log('DEBATE → setMicrophoneEnabled failed: $e', name: 'debate');
+    } catch (_) {
       _forceMicOff();
       if (mounted) {
         setState(() => _togglingMic = false);
@@ -613,8 +568,8 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
         reliable: true,
         topic: _chatTopic,
       );
-    } catch (e) {
-      dev.log('DEBATE → chat publish failed: $e', name: 'debate');
+    } catch (_) {
+      // Chat publish is best-effort.
     } finally {
       if (mounted) setState(() => _sendingMessage = false);
     }

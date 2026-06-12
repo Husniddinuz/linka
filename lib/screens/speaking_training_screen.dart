@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as dev;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -352,9 +351,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       try {
         final sigRes = await ApiService.post('/video/signaling/', {'room_id': roomId});
         final limit = sigRes['limit'] as int?;
-        dev.log('PLUS → [inline REST] limit=$limit isPlus=$_isPlus');
         if (!_isPlus && limit != null && limit <= 0) {
-          dev.log('PLUS → [inline REST] firing popup (limit exhausted)');
           if (mounted) {
             await showFreeMinutesDialog(context, dismissible: false);
             if (mounted) Navigator.of(context).pop();
@@ -362,9 +359,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
           return;
         }
         if (!_isPlus && limit != null && limit > 0) _startCountdown(limit);
-      } catch (e) {}
-      dev.log('SIGNALING URL → $inlineSignalingUrl');
-      dev.log('SIGNALING TOKEN → $inlineSignalingToken');
+      } catch (_) {}
       await _createPeerConnection();
       await _connectSignalingWs(inlineSignalingUrl, inlineSignalingToken);
     } else {
@@ -383,9 +378,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       }
 
       final limit = res['limit'] as int?;
-      dev.log('PLUS → [_startSignaling REST] limit=$limit isPlus=$_isPlus');
       if (!_isPlus && limit != null && limit <= 0) {
-        dev.log('PLUS → [_startSignaling REST] firing popup (limit exhausted)');
         if (mounted) {
           await showFreeMinutesDialog(context, dismissible: false);
           if (mounted) Navigator.of(context).pop();
@@ -402,16 +395,8 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
             .map((e) => Map<String, dynamic>.from(e))
             .toList();
       }
-      for (var i = 0; i < _iceServers.length; i++) {
-        final srv = _iceServers[i];
-        final urls = srv['urls'] ?? srv['url'];
-        final hasCred = srv['username'] != null || srv['credential'] != null;
-      }
-
       if (!_isPlus && limit != null && limit > 0) _startCountdown(limit);
 
-      dev.log('SIGNALING URL → $signalingUrl');
-      dev.log('SIGNALING TOKEN → $signalingToken');
       await _createPeerConnection();
       await _connectSignalingWs(signalingUrl, signalingToken);
     } catch (e) {
@@ -509,7 +494,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   }
 
   Future<void> _handleSigMessage(dynamic raw) async {
-    dev.log('WS ← SERVER RAW: $raw');
     Map<String, dynamic> msg;
     try {
       msg = jsonDecode(raw as String) as Map<String, dynamic>;
@@ -606,7 +590,6 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
           }
           _localRenderer.srcObject = null;
           if (mounted) {
-            dev.log('PLUS → [limit finished WS] firing popup');
             await showFreeMinutesDialog(context);
             if (mounted) Navigator.of(context).pop();
           }

@@ -469,11 +469,13 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
           const SizedBox(width: 8),
           if (tutorId != null)
             GestureDetector(
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TutorProfileScreen(tutorId: tutorId),
-                ),
-              ),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => TutorProfileScreen(tutorId: tutorId),
+                  ),
+                );
+              },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(

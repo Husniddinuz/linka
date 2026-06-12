@@ -1,5 +1,3 @@
-import 'dart:developer' as dev;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
@@ -33,10 +31,8 @@ class _LessonsScreenState extends State<LessonsScreen> {
   }
 
   Future<void> _fetchCalendar() async {
-    final sw = Stopwatch()..start();
     final url =
         '/bookings/calendar/?year=${_focusedMonth.year}&month=${_focusedMonth.month}';
-    dev.log('LESSONS(cal) → fetching GET $url', name: 'lessons');
     try {
       final data = await ApiService.get(url);
       final days = <int>{};
@@ -61,100 +57,28 @@ class _LessonsScreenState extends State<LessonsScreen> {
           }
         }
       }
-      dev.log(
-        'LESSONS(cal) → $url returned in ${sw.elapsedMilliseconds}ms, '
-        'busy_days=$days (raw=$raw)',
-        name: 'lessons',
-      );
       if (mounted) {
         setState(() => _busyDays = days);
-        _checkCalendarMismatch();
       }
-    } on ApiException catch (e) {
-      dev.log(
-        'LESSONS(cal) → $url failed after ${sw.elapsedMilliseconds}ms: $e',
-        name: 'lessons',
-        error: e,
-      );
+    } on ApiException {
       if (mounted) setState(() => _busyDays = {});
     }
   }
 
   Future<void> _fetchBookings() async {
     setState(() => _loadingBookings = true);
-    final sw = Stopwatch()..start();
-    dev.log('LESSONS(my) → fetching GET /bookings/my/', name: 'lessons');
     try {
       final list = await ApiService.getList('/bookings/my/');
       final bookings = list.cast<Map<String, dynamic>>();
-      dev.log(
-        'LESSONS(my) → /bookings/my/ returned ${bookings.length} bookings in '
-        '${sw.elapsedMilliseconds}ms: '
-        '${bookings.map((b) => '#${b['id']} '
-            'status=${b['status']} '
-            'start=${b['start_at'] ?? b['start_time']} '
-            'end=${b['end_at'] ?? b['end_time']} '
-            'dur=${b['duration_minutes']}').join(' | ')}',
-        name: 'lessons',
-      );
       if (mounted) {
         setState(() {
           _bookings = bookings;
           _loadingBookings = false;
         });
-        _checkCalendarMismatch();
       }
-    } on ApiException catch (e) {
-      dev.log(
-        'LESSONS(my) → /bookings/my/ failed after ${sw.elapsedMilliseconds}ms: $e',
-        name: 'lessons',
-        error: e,
-      );
+    } on ApiException {
       if (mounted) setState(() { _bookings = []; _loadingBookings = false; });
     }
-  }
-
-  /// Diagnostic: warns when `/bookings/calendar/` flags a day as busy that has
-  /// no live (paid/finished) booking in `/bookings/my/` for the same month,
-  /// or vice versa. This is a backend bug — the calendar endpoint should
-  /// exclude `pending` and `cancelled` bookings to stay consistent.
-  void _checkCalendarMismatch() {
-    if (_busyDays.isEmpty && _bookings.isEmpty) return;
-    final liveDays = <int>{};
-    final pendingOrCancelledDays = <int, String>{};
-    for (final b in _bookings) {
-      final parsed = DateTime.tryParse(
-        b['start_at']?.toString() ?? b['start_time']?.toString() ?? '',
-      );
-      if (parsed == null) continue;
-      final local = parsed.toLocal();
-      if (local.year != _focusedMonth.year ||
-          local.month != _focusedMonth.month) {
-        continue;
-      }
-      final status = (b['status'] ?? '').toString();
-      if (status == 'pending' || status == 'cancelled') {
-        pendingOrCancelledDays[local.day] = status;
-      } else {
-        liveDays.add(local.day);
-      }
-    }
-    final extraInCalendar = _busyDays.difference(liveDays);
-    final missingFromCalendar = liveDays.difference(_busyDays);
-    if (extraInCalendar.isEmpty && missingFromCalendar.isEmpty) return;
-    final extraDetail = extraInCalendar
-        .map((d) => '$d(${pendingOrCancelledDays[d] ?? 'unknown'})')
-        .join(', ');
-    dev.log(
-      'LESSONS(cal) ⚠ BACKEND MISMATCH for '
-      '${_focusedMonth.year}-${_focusedMonth.month}: '
-      '/bookings/calendar/ busy_days=$_busyDays vs '
-      '/bookings/my/ live_days=$liveDays. '
-      'extra-in-calendar=[$extraDetail] '
-      '(calendar should exclude these statuses) '
-      'missing-from-calendar=$missingFromCalendar',
-      name: 'lessons',
-    );
   }
 
   List<Map<String, dynamic>> get _selectedDayBookings {

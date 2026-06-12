@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:developer' as dev;
 
 import 'api_service.dart';
 import 'user_service.dart';
@@ -212,8 +211,6 @@ class DebateService {
   /// `GET /live/debate/today/` — the motion/topic for today's debate.
   static Future<DailyDebate> today() async {
     final data = await ApiService.get('/live/debate/today/');
-    dev.log('DEBATE → /today/ raw response: ${json.encode(data)}',
-        name: 'debate');
     return DailyDebate.fromJson(data);
   }
 
@@ -264,9 +261,8 @@ class DebateService {
     if (userId <= 0) return;
     try {
       await setRole(adminId: userId, targetId: userId, role: 'viewer');
-      dev.log('DEBATE → leave: self-demoted user=$userId', name: 'debate');
-    } catch (e) {
-      dev.log('DEBATE → leave self-demote ignored: $e', name: 'debate');
+    } catch (_) {
+      // Best-effort self-demote on teardown; ignore failures.
     }
   }
 }

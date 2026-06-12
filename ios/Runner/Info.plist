@@ -108,9 +108,5 @@
 			<string>UIInterfaceOrientationLandscapeLeft</string>
 			<string>UIInterfaceOrientationLandscapeRight</string>
 		</array>
-		<key>UIStatusBarHidden</key>
-		<false/>
-		<key>UIViewControllerBasedStatusBarAppearance</key>
-		<true/>
 	</dict>
 </plist>
