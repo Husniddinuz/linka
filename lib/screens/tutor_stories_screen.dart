@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:video_player/video_player.dart';
 import '../services/api_service.dart';
+import '../services/user_service.dart';
+import 'home_screen.dart' show StoryData;
 import 'story_upload_screen.dart';
+import 'story_viewer_screen.dart';
 
 /// Tutor's own stories — shown as a 3-column grid with an "Add new story"
 /// button at the top.
@@ -16,6 +19,8 @@ class TutorStoriesScreen extends StatefulWidget {
 class _TutorStoriesScreenState extends State<TutorStoriesScreen> {
   List<_MyStory> _stories = [];
   bool _loading = true;
+  String _tutorName = 'My stories';
+  String? _tutorImage;
 
   @override
   void initState() {
@@ -28,6 +33,16 @@ class _TutorStoriesScreenState extends State<TutorStoriesScreen> {
     try {
       final list = await ApiService.getList('/tutor/stories/my/');
       if (!mounted) return;
+      // The `/my/` serializer ships the tutor's identity on each row — used to
+      // label the story viewer header. Fall back gracefully when absent.
+      if (list.isNotEmpty) {
+        final first = list.first as Map<String, dynamic>;
+        final firstName = first['tutor_first_name'] as String? ?? '';
+        final lastName = first['tutor_last_name'] as String? ?? '';
+        final name = '$firstName\n$lastName'.trim();
+        if (name.isNotEmpty) _tutorName = name;
+        _tutorImage = first['tutor_profile_image'] as String?;
+      }
       setState(() {
         _stories = list
             .map((e) => _MyStory.fromJson(e as Map<String, dynamic>))
@@ -44,10 +59,100 @@ class _TutorStoriesScreenState extends State<TutorStoriesScreen> {
   }
 
   Future<void> _openUpload() async {
-    final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const StoryUploadScreen()),
-    );
+    final result = await Navigator.of(
+      context,
+    ).push<bool>(MaterialPageRoute(builder: (_) => const StoryUploadScreen()));
     if (result == true) _load();
+  }
+
+  void _openViewer(_MyStory story) {
+    // Only stories with playable media can be shown in the viewer.
+    final playable = _stories
+        .where((s) => (s.mediaFile ?? '').startsWith('http'))
+        .toList();
+    final index = playable.indexWhere((s) => s.id == story.id);
+    if (index < 0) return;
+
+    final tutor = StoryTutor(
+      tutorId: UserService.current?.tutorProfileId ?? 0,
+      name: _tutorName,
+      image: _tutorImage,
+      stories: playable.map((s) => s.toStoryData()).toList(),
+      // Own stories — no "Book a class" CTA.
+      isEnrollable: false,
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => StoryViewerScreen(
+          tutors: [tutor],
+          initialTutorIndex: 0,
+          initialStoryIndex: index,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(_MyStory story) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Delete story?',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF272942),
+          ),
+        ),
+        content: const Text(
+          'This story will be permanently removed. This action can\'t be undone.',
+          style: TextStyle(fontSize: 14, color: Color(0xFF6B6B7B)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: Color(0xFF6B6B7B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                color: Color(0xFFE53935),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    // Optimistically remove from the grid.
+    final previous = _stories;
+    setState(() {
+      _stories = _stories.where((s) => s.id != story.id).toList();
+    });
+    try {
+      await ApiService.delete('/tutor/stories/${story.id}/');
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _stories = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to delete story. Please try again.'),
+        ),
+      );
+    }
   }
 
   @override
@@ -80,8 +185,12 @@ class _TutorStoriesScreenState extends State<TutorStoriesScreen> {
                 child: _loading
                     ? const _GridSkeleton()
                     : _stories.isEmpty
-                        ? const _EmptyGrid()
-                        : _StoryGrid(stories: _stories),
+                    ? _EmptyState(onUpload: _openUpload)
+                    : _StoryGrid(
+                        stories: _stories,
+                        onOpen: _openViewer,
+                        onDelete: _confirmDelete,
+                      ),
               ),
             ),
           ],
@@ -117,8 +226,11 @@ class _AddStoryButton extends StatelessWidget {
                 color: Color(0xFFF5C542),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.add_rounded,
-                  color: Color(0xFF272942), size: 22),
+              child: const Icon(
+                Icons.add_rounded,
+                color: Color(0xFF272942),
+                size: 22,
+              ),
             ),
             const SizedBox(width: 12),
             const Text(
@@ -150,7 +262,13 @@ class _AddStoryButton extends StatelessWidget {
 
 class _StoryGrid extends StatelessWidget {
   final List<_MyStory> stories;
-  const _StoryGrid({required this.stories});
+  final ValueChanged<_MyStory> onOpen;
+  final ValueChanged<_MyStory> onDelete;
+  const _StoryGrid({
+    required this.stories,
+    required this.onOpen,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -164,46 +282,80 @@ class _StoryGrid extends StatelessWidget {
         childAspectRatio: 0.7,
       ),
       itemCount: stories.length,
-      itemBuilder: (_, i) => _StoryTile(story: stories[i]),
+      itemBuilder: (_, i) => _StoryTile(
+        story: stories[i],
+        onOpen: () => onOpen(stories[i]),
+        onDelete: () => onDelete(stories[i]),
+      ),
     );
   }
 }
 
 class _StoryTile extends StatelessWidget {
   final _MyStory story;
-  const _StoryTile({required this.story});
+  final VoidCallback onOpen;
+  final VoidCallback onDelete;
+  const _StoryTile({
+    required this.story,
+    required this.onOpen,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
     final hasUrl =
         story.mediaFile != null && story.mediaFile!.startsWith('http');
     final isVideo = story.mediaType == 'video';
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (!hasUrl)
-            const _TilePlaceholder()
-          else if (isVideo)
-            _VideoThumb(url: story.mediaFile!)
-          else
-            Image.network(
-              story.mediaFile!,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => const _TilePlaceholder(),
-            ),
-          if (isVideo)
-            const Positioned(
-              top: 6,
-              right: 6,
-              child: Icon(
-                Icons.play_circle_fill_rounded,
-                color: Colors.white,
-                size: 22,
+    return GestureDetector(
+      onTap: hasUrl ? onOpen : null,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (!hasUrl)
+              const _TilePlaceholder()
+            else if (isVideo)
+              _VideoThumb(url: story.mediaFile!)
+            else
+              Image.network(
+                story.mediaFile!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const _TilePlaceholder(),
+              ),
+            if (isVideo)
+              const Positioned(
+                top: 6,
+                right: 6,
+                child: Icon(
+                  Icons.play_circle_fill_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+            // Delete button
+            Positioned(
+              top: 4,
+              left: 4,
+              child: GestureDetector(
+                onTap: onDelete,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -310,23 +462,95 @@ class _GridSkeleton extends StatelessWidget {
   }
 }
 
-class _EmptyGrid extends StatelessWidget {
-  const _EmptyGrid();
+class _EmptyState extends StatelessWidget {
+  final VoidCallback onUpload;
+  const _EmptyState({required this.onUpload});
 
   @override
   Widget build(BuildContext context) {
-    // 3x3 empty placeholder tiles so layout matches the loaded state.
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-      physics: const AlwaysScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        childAspectRatio: 0.7,
+    // Scrollable so pull-to-refresh still works on an empty list.
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 96,
+                  height: 96,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF3F1FB),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.auto_stories_rounded,
+                    color: Color(0xFF272942),
+                    size: 44,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'No stories yet',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF272942),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Share a photo or video with your students. '
+                  'Stories stay visible for 24 hours.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: Color(0xFF6B6B7B),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                GestureDetector(
+                  onTap: onUpload,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF272942),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.add_rounded,
+                          color: Color(0xFFF5C542),
+                          size: 22,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Upload your first story',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
-      itemCount: 9,
-      itemBuilder: (_, _) => const _TilePlaceholder(),
     );
   }
 }
@@ -354,4 +578,11 @@ class _MyStory {
       description: j['description'] as String?,
     );
   }
+
+  StoryData toStoryData() => StoryData(
+    id: id,
+    mediaFile: mediaFile ?? '',
+    mediaType: mediaType,
+    description: description,
+  );
 }

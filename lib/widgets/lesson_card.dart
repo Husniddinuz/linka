@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
+import '../screens/lesson_detail_screen.dart';
 
 class Lesson {
   final int id;
@@ -17,6 +18,8 @@ class Lesson {
   final DateTime? endAt;
   final String dailyRoomUrl;
   final bool rated;
+  final List<String> lessonGoals;
+  final String? studentNote;
 
   const Lesson({
     required this.id,
@@ -31,6 +34,8 @@ class Lesson {
     this.endAt,
     this.dailyRoomUrl = '',
     this.rated = false,
+    this.lessonGoals = const [],
+    this.studentNote,
   });
 
   bool get isCancelled => status == 'cancelled';
@@ -96,6 +101,24 @@ class Lesson {
     final tutorMap = booking['tutor'] as Map<String, dynamic>?;
     final tutorId = tutorMap?['id'] as int? ?? booking['tutor_id'] as int?;
 
+    // Prefer the server-provided display labels; fall back to prettifying the
+    // raw goal values, then to the legacy single lesson_topic_label/topic.
+    final goalLabels = (booking['lesson_goals_labels'] as List<dynamic>?)
+        ?.map((e) => e.toString())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    final goalRaw = (booking['lesson_goals'] as List<dynamic>?)
+        ?.map((e) => _prettifyGoal(e.toString()))
+        .where((e) => e.isNotEmpty)
+        .toList();
+    final legacyLabel = (booking['lesson_topic_label'] as String?) ??
+        _prettifyGoal(booking['lesson_topic'] as String? ?? '');
+    final lessonGoals = (goalLabels != null && goalLabels.isNotEmpty)
+        ? goalLabels
+        : (goalRaw != null && goalRaw.isNotEmpty)
+            ? goalRaw
+            : (legacyLabel.isNotEmpty ? [legacyLabel] : const <String>[]);
+
     return Lesson(
       id: booking['id'] as int? ?? 0,
       tutorId: viewerIsTutor ? null : tutorId,
@@ -109,7 +132,22 @@ class Lesson {
       endAt: localEndAt,
       dailyRoomUrl: booking['daily_room_url']?.toString() ?? '',
       rated: booking['rated'] as bool? ?? false,
+      lessonGoals: lessonGoals,
+      studentNote: booking['student_note'] as String?,
     );
+  }
+
+  /// Turns a raw goal value like `speaking_practice` into `Speaking practice`.
+  /// Used only as a fallback when the server omits the display labels.
+  static String _prettifyGoal(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return '';
+    final words = trimmed.split('_').where((w) => w.isNotEmpty).toList();
+    if (words.isEmpty) return '';
+    final first = words.first;
+    final capitalized =
+        '${first[0].toUpperCase()}${first.substring(1)}';
+    return [capitalized, ...words.skip(1)].join(' ');
   }
 }
 
@@ -117,6 +155,11 @@ class LessonCard extends StatefulWidget {
   final Lesson lesson;
   final bool showStartButton;
   final bool showCopyLink;
+
+  /// When true (the default), tapping the card opens [LessonDetailScreen]
+  /// with the full goals/note. Set false when the card is itself rendered
+  /// inside the detail screen, to avoid re-opening it.
+  final bool opensDetail;
   final VoidCallback? onStart;
   final VoidCallback? onCancel;
   final VoidCallback? onRated;
@@ -126,6 +169,7 @@ class LessonCard extends StatefulWidget {
     required this.lesson,
     this.showStartButton = false,
     this.showCopyLink = false,
+    this.opensDetail = true,
     this.onStart,
     this.onCancel,
     this.onRated,
@@ -249,7 +293,7 @@ class _LessonCardState extends State<LessonCard> {
     final isUpcoming = widget.lesson.startAt == null ||
         widget.lesson.startAt!.isAfter(DateTime.now());
 
-    return Opacity(
+    final card = Opacity(
       opacity: isCancelled ? 0.5 : 1.0,
       child: Container(
         padding: const EdgeInsets.all(8),
@@ -561,6 +605,25 @@ class _LessonCardState extends State<LessonCard> {
           ],
         ),
       ),
+    );
+
+    if (!widget.opensDetail) return card;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => LessonDetailScreen(
+            lesson: widget.lesson,
+            showStartButton: widget.showStartButton,
+            showCopyLink: widget.showCopyLink,
+            onStart: widget.onStart,
+            onCancel: widget.onCancel,
+            onRated: widget.onRated,
+          ),
+        ),
+      ),
+      child: card,
     );
   }
 }

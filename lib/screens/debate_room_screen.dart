@@ -409,6 +409,28 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
         role: meta?.role ?? 'viewer',
         team: meta?.team,
       );
+
+      // Keep our own role/team in lockstep with the authoritative LiveKit
+      // metadata. _myRole/_myTeam are seeded from /join/, but a late
+      // leave()/role change can demote us in the room *after* join()
+      // returned (e.g. quitting and immediately re-entering: the in-flight
+      // self-demote lands between join and connect). Then no metadata-update
+      // *event* fires, so _onMetadataUpdated never corrects us, and the mic
+      // UI (driven by _myRole) disagrees with the roster/admin panel (driven
+      // by metadata) — Team B shows empty and "Promote" appears for us, yet
+      // we can still talk. Reconciling here collapses both onto metadata.
+      if (id == _myUserId &&
+          meta != null &&
+          (meta.role != _myRole || meta.team != _myTeam)) {
+        dev.log(
+          'DEBATE → reconcile self from metadata '
+          '($_myRole/$_myTeam → ${meta.role}/${meta.team})',
+          name: 'debate',
+        );
+        _myRole = meta.role;
+        _myTeam = meta.team;
+        if (_myRole != 'speaker') _forceMicOff();
+      }
     }
 
     final lp = room.localParticipant;
@@ -465,6 +487,18 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
 
   bool get _canPublish => _myRole == 'speaker';
   bool get _isAdmin => _join?.isAdmin ?? false;
+
+  /// Speakers currently talking, resolved through the roster (skips viewers
+  /// and unknown ids). Drives the "who is speaking" label.
+  List<_RosterEntry> _activeSpeakingEntries() {
+    final out = <_RosterEntry>[];
+    for (final id in _speakingUserIds) {
+      final e = _roster[id];
+      if (e != null && e.isSpeaker) out.add(e);
+    }
+    out.sort((a, b) => a.name.compareTo(b.name));
+    return out;
+  }
 
   /// Which team is currently speaking, derived from active LiveKit speakers
   /// mapped through the roster: "A", "B", "BOTH", or null when silent.
@@ -953,13 +987,10 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
             : team == 'BOTH'
                 ? _cSpeaking
                 : Colors.white38;
-    final label = team == 'A'
-        ? 'Team A is Speaking'
-        : team == 'B'
-            ? 'Team B is Speaking'
-            : team == 'BOTH'
-                ? 'Both teams speaking'
-                : 'No one speaking';
+    final speaking = _activeSpeakingEntries();
+    final label = speaking.isEmpty
+        ? 'No one speaking'
+        : speaking.map((e) => '${e.name} (${e.team ?? '?'})').join(', ');
 
     final since = _speakingSince;
     final secs =

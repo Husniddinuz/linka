@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
+import '../widgets/new_badge.dart';
 import 'podcast_player_screen.dart';
 
 class PodcastsListScreen extends StatefulWidget {
@@ -74,6 +75,7 @@ class _PodcastsListScreenState extends State<PodcastsListScreen> {
                     final id = podcast['id'] as int;
                     final audioUrl = podcast['audio_url'] as String?;
                     final durationSec = podcast['duration'] as int?;
+                    final isNew = podcast['is_new'] as bool? ?? false;
 
                     String durationText = '';
                     if (durationSec != null && durationSec > 0) {
@@ -105,13 +107,23 @@ class _PodcastsListScreenState extends State<PodcastsListScreen> {
                           ),
                         ),
                       ),
-                      title: Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF272942),
-                        ),
+                      title: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF272942),
+                              ),
+                            ),
+                          ),
+                          if (isNew) ...[
+                            const SizedBox(width: 8),
+                            const NewBadge(),
+                          ],
+                        ],
                       ),
                       subtitle: durationText.isNotEmpty
                           ? Padding(

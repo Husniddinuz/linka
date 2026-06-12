@@ -8,23 +8,35 @@ class StoryTutor {
   final String name;
   final String? image;
   final List<StoryData> stories;
+
+  /// Whether the student can book a class with this tutor. Backend sends this
+  /// via `is_enrollable`; defaults to true until the field is present.
+  final bool isEnrollable;
+
+  /// Platform-wide "Linka" story (backend sends `tutor_id: null`). These have
+  /// no tutor profile image, so the avatar falls back to the Linka app logo.
+  final bool isLinka;
   const StoryTutor({
     required this.tutorId,
     required this.name,
     this.image,
     required this.stories,
+    this.isEnrollable = true,
+    this.isLinka = false,
   });
 }
 
 class StoryViewerScreen extends StatefulWidget {
   final List<StoryTutor> tutors;
   final int initialTutorIndex;
+  final int initialStoryIndex;
   final void Function(int tutorId)? onTutorViewed;
 
   const StoryViewerScreen({
     super.key,
     required this.tutors,
     this.initialTutorIndex = 0,
+    this.initialStoryIndex = 0,
     this.onTutorViewed,
   });
 
@@ -51,6 +63,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   void initState() {
     super.initState();
     _tutorIndex = widget.initialTutorIndex;
+    _storyIndex = widget.initialStoryIndex;
     _progress = AnimationController(vsync: this, duration: _imageDuration);
     _notifyTutorViewed();
     _initMedia();
@@ -79,7 +92,9 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     for (final story in nextStories) {
       if (story.mediaType == 'video') {
         if (!_preloadedVideos.containsKey(story.mediaFile)) {
-          final ctrl = VideoPlayerController.networkUrl(Uri.parse(story.mediaFile));
+          final ctrl = VideoPlayerController.networkUrl(
+            Uri.parse(story.mediaFile),
+          );
           _preloadedVideos[story.mediaFile] = ctrl;
           ctrl.initialize();
         }
@@ -143,7 +158,8 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     if (controller == null || !controller.value.isInitialized) return;
     final duration = controller.value.duration;
     if (duration <= Duration.zero) return;
-    final ratio = controller.value.position.inMilliseconds / duration.inMilliseconds;
+    final ratio =
+        controller.value.position.inMilliseconds / duration.inMilliseconds;
     _progress.value = ratio.clamp(0.0, 1.0);
     if (controller.value.position >= duration) {
       controller.removeListener(_onVideoTick);
@@ -187,12 +203,44 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   void _onBookClass() {
     final id = _tutor.tutorId;
     Navigator.of(context).pop();
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => TutorProfileScreen(tutorId: id),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => TutorProfileScreen(tutorId: id)));
   }
+
+  /// Header avatar: Linka logo for platform stories, the tutor's profile photo
+  /// otherwise, falling back to a person icon.
+  Widget _buildAvatar() {
+    if (_tutor.isLinka) {
+      return Container(
+        width: 40,
+        height: 40,
+        color: Colors.white,
+        padding: const EdgeInsets.all(6),
+        child: Image.asset(
+          'assets/images/branding/new-logo.png',
+          fit: BoxFit.contain,
+        ),
+      );
+    }
+    final hasImage = _tutor.image != null && _tutor.image!.startsWith('http');
+    if (hasImage) {
+      return Image.network(
+        _tutor.image!,
+        fit: BoxFit.cover,
+        width: 40,
+        height: 40,
+        alignment: Alignment.topCenter,
+        errorBuilder: (_, _, _) => _avatarFallback(),
+      );
+    }
+    return _avatarFallback();
+  }
+
+  Widget _avatarFallback() => Container(
+    color: const Color(0xFF444444),
+    child: const Icon(Icons.person, color: Colors.white54, size: 20),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -233,7 +281,11 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                   _current.mediaFile,
                   fit: BoxFit.contain,
                   errorBuilder: (_, _, _) => const Center(
-                    child: Icon(Icons.broken_image, color: Colors.white54, size: 64),
+                    child: Icon(
+                      Icons.broken_image,
+                      color: Colors.white54,
+                      size: 64,
+                    ),
                   ),
                 ),
               ),
@@ -329,24 +381,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 1.5),
                     ),
-                    child: ClipOval(
-                      child: _tutor.image != null && _tutor.image!.startsWith('http')
-                          ? Image.network(
-                              _tutor.image!,
-                              fit: BoxFit.cover,
-                              width: 40,
-                              height: 40,
-                              alignment: Alignment.topCenter,
-                              errorBuilder: (_, _, _) => Container(
-                                color: const Color(0xFF444444),
-                                child: const Icon(Icons.person, color: Colors.white54, size: 20),
-                              ),
-                            )
-                          : Container(
-                              color: const Color(0xFF444444),
-                              child: const Icon(Icons.person, color: Colors.white54, size: 20),
-                            ),
-                    ),
+                    child: ClipOval(child: _buildAvatar()),
                   ),
                   const SizedBox(width: 10),
                   // Name
@@ -371,7 +406,11 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                         color: Colors.white.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close, color: Colors.white, size: 22),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 22,
+                      ),
                     ),
                   ),
                 ],
@@ -387,7 +426,8 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Description
-                  if (_current.description != null && _current.description!.isNotEmpty)
+                  if (_current.description != null &&
+                      _current.description!.isNotEmpty)
                     Container(
                       width: double.infinity,
                       margin: const EdgeInsets.only(bottom: 16),
@@ -407,31 +447,32 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                       ),
                     ),
 
-                  // Book a class button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _onBookClass,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: const Color(0xFF272942),
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                  // Book a class button — only when the tutor is enrollable
+                  if (_tutor.isEnrollable)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _onBookClass,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF272942),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
-                      ),
-                      child: const Text(
-                        'Book a class',
-                        style: TextStyle(
-                          fontFamily: 'SF Pro',
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF272942),
+                        child: const Text(
+                          'Book a class',
+                          style: TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF272942),
+                          ),
                         ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),

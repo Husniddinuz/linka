@@ -29,7 +29,9 @@ class BookingPageScreen extends StatefulWidget {
 
 class _BookingPageScreenState extends State<BookingPageScreen> {
   final _goalController = TextEditingController();
-  String? _selectedTopic;
+  // Multiple goals can be selected; insertion order is preserved so the first
+  // selected goal becomes the booking's primary lesson_topic on the server.
+  final Set<String> _selectedGoals = {};
 
   static const List<({String value, String label})> _topics = [
     (value: 'speaking_practice', label: 'Speaking practice'),
@@ -54,7 +56,7 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
   String _buildStudentNote() => _goalController.text.trim();
 
   void _onRequestLesson() {
-    if (_selectedTopic == null) return;
+    if (_selectedGoals.isEmpty) return;
     final d = widget.startAt;
     final endMin = d.hour * 60 + d.minute + widget.durationMinutes;
     final endH = (endMin ~/ 60) % 24;
@@ -70,7 +72,7 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
           tutorId: widget.tutorId,
           startAt: widget.startAt,
           durationMinutes: widget.durationMinutes,
-          lessonTopic: _selectedTopic!,
+          lessonGoals: _selectedGoals.toList(),
           tutorName: widget.tutorName,
           tutorImage: widget.tutorImage,
           experience: widget.experience,
@@ -133,7 +135,7 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
 
                     // Question
                     const Text(
-                      'What specific skills or topics would you like to improve?',
+                      'What specific skills or topics would you like to improve? (select all that apply)',
                       style: TextStyle(
                         fontFamily: 'SF Pro',
                         fontSize: 16,
@@ -143,14 +145,20 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Topic chips (single-select)
+                    // Goal chips (multi-select)
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       children: _topics.map((topic) {
-                        final selected = _selectedTopic == topic.value;
+                        final selected = _selectedGoals.contains(topic.value);
                         return GestureDetector(
-                          onTap: () => setState(() => _selectedTopic = topic.value),
+                          onTap: () => setState(() {
+                            if (selected) {
+                              _selectedGoals.remove(topic.value);
+                            } else {
+                              _selectedGoals.add(topic.value);
+                            }
+                          }),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                             decoration: BoxDecoration(

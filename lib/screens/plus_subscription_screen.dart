@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../services/app_feature_service.dart';
 import '../services/plus_service.dart';
 import '../services/wallet_service.dart';
+import 'payment_topup_screen.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/skeleton.dart';
 
@@ -90,6 +91,16 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
       if (!mounted) return;
       setState(() => _balanceLoading = false);
     }
+  }
+
+  Future<void> _onTopUp() async {
+    await Navigator.of(context).push<int>(
+      MaterialPageRoute(builder: (_) => const PaymentTopUpScreen()),
+    );
+    if (!mounted) return;
+    // Re-fetch wallet balance from server after returning from top-up
+    setState(() => _balanceLoading = true);
+    await _loadBalance();
   }
 
   Future<void> _loadPlans() async {
@@ -419,10 +430,14 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                                 ),
                               ),
                             const SizedBox(width: 8),
-                            SvgPicture.asset(
-                              'assets/images/buttons/top-up.svg',
-                              width: 28,
-                              height: 28,
+                            GestureDetector(
+                              onTap: _onTopUp,
+                              behavior: HitTestBehavior.opaque,
+                              child: SvgPicture.asset(
+                                'assets/images/buttons/top-up.svg',
+                                width: 28,
+                                height: 28,
+                              ),
                             ),
                           ],
                         ),

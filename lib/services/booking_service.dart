@@ -7,14 +7,17 @@ class BookingService {
     required int tutorId,
     required DateTime startAt,
     required int durationMinutes,
-    required String lessonTopic,
+    required List<String> lessonGoals,
     String? studentNote,
   }) async {
+    if (lessonGoals.isEmpty) {
+      throw const ApiException('Select at least one lesson goal');
+    }
     final body = <String, dynamic>{
       'tutor_id': tutorId,
       'start_at': _toIso8601WithOffset(startAt),
       'duration_minutes': durationMinutes,
-      'lesson_topic': lessonTopic,
+      'lesson_goals': lessonGoals,
       if (studentNote != null && studentNote.trim().isNotEmpty)
         'student_note': studentNote.trim(),
     };

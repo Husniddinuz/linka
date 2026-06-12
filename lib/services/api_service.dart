@@ -354,14 +354,36 @@ class ApiService {
     Map<String, File> files = const {},
     Map<String, String> fields = const {},
     UploadProgressCallback? onProgress,
+  }) =>
+      _sendMultipart('POST', path,
+          files: files, fields: fields, onProgress: onProgress);
+
+  /// Makes an authenticated multipart PUT request for file uploads. Streams
+  /// each file from disk, so large files (e.g. tutor intro videos) are never
+  /// loaded fully into memory. Pass [onProgress] for byte-level progress.
+  static Future<Map<String, dynamic>> putMultipart(
+    String path, {
+    Map<String, File> files = const {},
+    Map<String, String> fields = const {},
+    UploadProgressCallback? onProgress,
+  }) =>
+      _sendMultipart('PUT', path,
+          files: files, fields: fields, onProgress: onProgress);
+
+  static Future<Map<String, dynamic>> _sendMultipart(
+    String method,
+    String path, {
+    Map<String, File> files = const {},
+    Map<String, String> fields = const {},
+    UploadProgressCallback? onProgress,
   }) async {
     var token = await TokenService.getAccessToken();
 
     Future<http.StreamedResponse> send(String? t) async {
       final request = onProgress != null
           ? _ProgressMultipartRequest(
-              'POST', Uri.parse('$_baseUrl$path'), onProgress)
-          : http.MultipartRequest('POST', Uri.parse('$_baseUrl$path'));
+              method, Uri.parse('$_baseUrl$path'), onProgress)
+          : http.MultipartRequest(method, Uri.parse('$_baseUrl$path'));
       if (t != null) request.headers['Authorization'] = 'Bearer $t';
       request.fields.addAll(fields);
       for (final entry in files.entries) {

@@ -1,10 +1,10 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import '../services/api_service.dart';
 import '../widgets/app_notify.dart';
+import '../utils/format.dart';
 
 class StoryUploadScreen extends StatefulWidget {
   const StoryUploadScreen({super.key});
@@ -16,6 +16,7 @@ class StoryUploadScreen extends StatefulWidget {
 class _StoryUploadScreenState extends State<StoryUploadScreen> {
   File? _media;
   bool _isVideo = false;
+  int? _mediaSize;
   VideoPlayerController? _videoController;
   final _descController = TextEditingController();
   bool _uploading = false;
@@ -40,10 +41,11 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
 
     if (file == null || !mounted) return;
 
+    final mediaFile = File(file.path);
+    final mediaSize = await mediaFile.length();
+
     _videoController?.dispose();
     _videoController = null;
-
-    final mediaFile = File(file.path);
 
     if (video) {
       final controller = VideoPlayerController.file(mediaFile);
@@ -56,12 +58,14 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
       controller.play();
       setState(() {
         _media = mediaFile;
+        _mediaSize = mediaSize;
         _isVideo = true;
         _videoController = controller;
       });
     } else {
       setState(() {
         _media = mediaFile;
+        _mediaSize = mediaSize;
         _isVideo = false;
       });
     }
@@ -135,21 +139,12 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
     });
 
     try {
-      final bytes = await _media!.readAsBytes();
-      final ext = _media!.path.split('.').last.toLowerCase();
-      final mime = _isVideo
-          ? (ext == 'mov'
-              ? 'video/quicktime'
-              : ext == 'webm'
-                  ? 'video/webm'
-                  : 'video/mp4')
-          : (ext == 'png' ? 'image/png' : 'image/jpeg');
-      final dataUri = 'data:$mime;base64,${base64Encode(bytes)}';
-
-      await ApiService.post(
+      // Stream the media straight from disk so large videos are never loaded
+      // into memory whole (unlike the old base64-in-JSON approach).
+      await ApiService.postMultipart(
         '/tutor/stories/',
-        {
-          'media_file': dataUri,
+        files: {'media_file': _media!},
+        fields: {
           if (_descController.text.trim().isNotEmpty)
             'description': _descController.text.trim(),
         },
@@ -186,9 +181,25 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
     });
   }
 
+  void _handleBack() {
+    if (_uploading) {
+      AppNotify.show(context,
+          message: 'Upload in progress — please keep the app open');
+      return;
+    }
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return PopScope(
+      canPop: !_uploading,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || !_uploading) return;
+        AppNotify.show(context,
+            message: 'Upload in progress — please keep the app open');
+      },
+      child: GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         backgroundColor: Colors.black,
@@ -202,7 +213,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
               color: Colors.white,
               size: 20,
             ),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: _handleBack,
           ),
           title: const Text(
             'New Story',
@@ -217,6 +228,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
         body: SafeArea(
           child: _media == null ? _buildPicker() : _buildPreview(),
         ),
+      ),
       ),
     );
   }
@@ -335,35 +347,71 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
           Container(
             color: const Color(0xFF1A1A1A),
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: LinearProgressIndicator(
-                      value: (_progress == 0 || _progress >= 1.0)
-                          ? null
-                          : _progress,
-                      minHeight: 4,
-                      backgroundColor: const Color(0xFF2A2A2A),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        Color(0xFFF5C542),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: (_progress == 0 || _progress >= 1.0)
+                              ? null
+                              : _progress,
+                          minHeight: 4,
+                          backgroundColor: const Color(0xFF2A2A2A),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFFF5C542),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Text(
+                      _progress == 0
+                          ? 'Preparing…'
+                          : _progress >= 1.0
+                              ? 'Processing…'
+                              : '${(_progress * 100).round()}%',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  _progress == 0
-                      ? 'Preparing…'
-                      : _progress >= 1.0
-                          ? 'Processing…'
-                          : '${(_progress * 100).round()}%',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                if (_mediaSize != null && _mediaSize! > 0) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _progress <= 0
+                        ? formatBytes(_mediaSize!)
+                        : '${formatBytes((_progress.clamp(0.0, 1.0) * _mediaSize!).round())} of ${formatBytes(_mediaSize!)}',
+                    style: const TextStyle(
+                      color: Color(0xFF8A8A99),
+                      fontSize: 11,
+                    ),
                   ),
+                ],
+                const SizedBox(height: 10),
+                const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.warning_amber_rounded,
+                        color: Color(0xFFF5C542), size: 16),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Keep the app open — leaving now will cancel the upload.',
+                        style: TextStyle(
+                          color: Color(0xFFB0B0B0),
+                          fontSize: 11,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

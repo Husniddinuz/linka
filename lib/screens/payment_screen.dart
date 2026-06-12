@@ -11,7 +11,7 @@ class PaymentScreen extends StatefulWidget {
   final int? tutorId;
   final DateTime? startAt;
   final int? durationMinutes;
-  final String? lessonTopic;
+  final List<String>? lessonGoals;
   final String tutorName;
   final String tutorImage;
   final String experience;
@@ -27,7 +27,7 @@ class PaymentScreen extends StatefulWidget {
     this.tutorId,
     this.startAt,
     this.durationMinutes,
-    this.lessonTopic,
+    this.lessonGoals,
     this.tutorName = 'Azizbek Karimov',
     this.tutorImage = 'assets/images/tutors/azizbek.png',
     this.experience = '+13 yrs',
@@ -54,7 +54,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
       widget.tutorId != null &&
       widget.startAt != null &&
       widget.durationMinutes != null &&
-      widget.lessonTopic != null;
+      widget.lessonGoals != null &&
+      widget.lessonGoals!.isNotEmpty;
 
   @override
   void initState() {
@@ -104,7 +105,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         tutorId: widget.tutorId!,
         startAt: widget.startAt!,
         durationMinutes: widget.durationMinutes!,
-        lessonTopic: widget.lessonTopic!,
+        lessonGoals: widget.lessonGoals!,
         studentNote: widget.goal,
       );
       await BookingService.payFromWallet(bookingId: bookingId);

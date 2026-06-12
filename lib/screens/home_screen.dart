@@ -24,6 +24,7 @@ import 'podcast_player_screen.dart';
 import 'podcasts_list_screen.dart';
 import 'articles_list_screen.dart';
 import 'article_detail_screen.dart';
+import '../widgets/new_badge.dart';
 import 'story_viewer_screen.dart';
 import 'tutor_earnings_screen.dart';
 import 'tutor_stories_screen.dart';
@@ -39,11 +40,13 @@ class StoryData {
   final String mediaFile;
   final String mediaType; // "photo" or "video"
   final String? description;
+  final bool isPin;
   const StoryData({
     required this.id,
     required this.mediaFile,
     required this.mediaType,
     this.description,
+    this.isPin = false,
   });
 }
 
@@ -61,26 +64,62 @@ List<StoryTutor> _groupStories(List<dynamic> raw) {
         tutorId: (j['tutor_id'] ?? j['tutor'] ?? 0) as int,
         name: '$firstName\n$lastName'.trim(),
         image: j['tutor_profile_image'] as String?,
+        // Backend ships `is_enrollable` soon; default true until then.
+        isEnrollable: j['is_enrollable'] as bool? ?? true,
+        // `tutor_id: null` marks a platform-wide Linka story.
+        isLinka: j['tutor_id'] == null,
       ),
     );
-    map[key]!.stories.add(StoryData(
-      id: j['id'] as int? ?? 0,
-      mediaFile: j['media_file'] as String? ?? '',
-      mediaType: j['media_type'] as String? ?? 'photo',
-      description: j['description'] as String?,
-    ));
+    map[key]!.stories.add(
+      StoryData(
+        id: j['id'] as int? ?? 0,
+        mediaFile: j['media_file'] as String? ?? '',
+        mediaType: j['media_type'] as String? ?? 'photo',
+        description: j['description'] as String?,
+        isPin: j['is_pin'] as bool? ?? false,
+      ),
+    );
   }
-  return map.values.map((b) => b.build()).toList();
+  // Pinned stories come first — within each tutor, and tutors that have any
+  // pinned story are surfaced ahead of the rest in the stories row.
+  for (final b in map.values) {
+    b.stories.sort((a, c) {
+      if (a.isPin == c.isPin) return 0;
+      return a.isPin ? -1 : 1;
+    });
+  }
+  final tutors = map.values.map((b) => b.build()).toList();
+  tutors.sort((a, c) {
+    final aPinned = a.stories.any((s) => s.isPin);
+    final cPinned = c.stories.any((s) => s.isPin);
+    if (aPinned == cPinned) return 0;
+    return aPinned ? -1 : 1;
+  });
+  return tutors;
 }
 
 class _StoryTutorBuilder {
   final int tutorId;
   final String name;
   final String? image;
+  final bool isEnrollable;
+  final bool isLinka;
   final List<StoryData> stories = [];
-  _StoryTutorBuilder({required this.tutorId, required this.name, this.image});
-  StoryTutor build() =>
-      StoryTutor(tutorId: tutorId, name: name, image: image, stories: stories);
+  _StoryTutorBuilder({
+    required this.tutorId,
+    required this.name,
+    this.image,
+    this.isEnrollable = true,
+    this.isLinka = false,
+  });
+  StoryTutor build() => StoryTutor(
+    tutorId: tutorId,
+    name: name,
+    image: image,
+    stories: stories,
+    isEnrollable: isEnrollable,
+    isLinka: isLinka,
+  );
 }
 
 class _Podcast {
@@ -88,12 +127,14 @@ class _Podcast {
   final String title;
   final String? audioUrl;
   final int? durationSeconds;
+  final bool isNew;
 
   const _Podcast({
     required this.id,
     required this.title,
     this.audioUrl,
     this.durationSeconds,
+    this.isNew = false,
   });
 
   factory _Podcast.fromJson(Map<String, dynamic> json) {
@@ -102,6 +143,7 @@ class _Podcast {
       title: json['title'] as String? ?? '',
       audioUrl: json['audio_url'] as String?,
       durationSeconds: json['duration'] as int?,
+      isNew: json['is_new'] as bool? ?? false,
     );
   }
 
@@ -119,18 +161,24 @@ class _Article {
   final int id;
   final String title;
   final String? category;
+  final bool isNew;
 
-  const _Article({required this.id, required this.title, this.category});
+  const _Article({
+    required this.id,
+    required this.title,
+    this.category,
+    this.isNew = false,
+  });
 
   factory _Article.fromJson(Map<String, dynamic> json) {
     return _Article(
       id: json['id'] as int,
       title: json['title'] as String? ?? '',
       category: json['category'] as String?,
+      isNew: json['is_new'] as bool? ?? false,
     );
   }
 }
-
 
 // ─── Screen ────────────────────────────────────────────────────────────────────
 
@@ -156,7 +204,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loadingArticles = true;
 
   bool get _isInitialLoading =>
-      _loadingStories && _loadingLessons && _loadingPodcasts && _loadingArticles;
+      _loadingStories &&
+      _loadingLessons &&
+      _loadingPodcasts &&
+      _loadingArticles;
 
   @override
   void initState() {
@@ -187,7 +238,8 @@ class _HomeScreenState extends State<HomeScreen> {
         hasUpdate: true,
         isForce: false,
         title: 'New Update Available',
-        message: 'A new version of Linka is available. Update now to get the latest features and improvements.',
+        message:
+            'A new version of Linka is available. Update now to get the latest features and improvements.',
         storeUrl: 'https://apps.apple.com',
       ),
     );
@@ -210,9 +262,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!me.isProfileComplete) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
-            builder: (_) => ProfileSetupScreen(
-              role: me.isTeacher ? 'tutor' : 'student',
-            ),
+            builder: (_) =>
+                ProfileSetupScreen(role: me.isTeacher ? 'tutor' : 'student'),
           ),
           (route) => false,
         );
@@ -222,6 +273,18 @@ class _HomeScreenState extends State<HomeScreen> {
       // Fall back to cached value on failure.
     }
     _loadProfile();
+  }
+
+  /// Re-fetches the authenticated user and updates the tutor activation
+  /// status so the pending banner reflects an admin approval on refresh.
+  Future<void> _refreshTutorStatus() async {
+    try {
+      final me = await UserService.fetchMe();
+      if (!mounted) return;
+      setState(() => _tutorAccountStatus = me.tutorAccountStatus);
+    } catch (_) {
+      // Best-effort: keep the last known status on failure.
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -319,8 +382,7 @@ class _HomeScreenState extends State<HomeScreen> {
             .map((e) => (e as Map<String, dynamic>)['id'] as int? ?? 0)
             .toSet();
       });
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   Future<void> _toggleArticleBookmark(int articleId) async {
@@ -336,7 +398,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (wasSaved) {
         await ApiService.delete('/student/saved-articles/$articleId/');
       } else {
-        await ApiService.post('/student/saved-articles/', {'article_id': articleId});
+        await ApiService.post('/student/saved-articles/', {
+          'article_id': articleId,
+        });
       }
     } catch (e) {
       if (!mounted) return;
@@ -365,13 +429,16 @@ class _HomeScreenState extends State<HomeScreen> {
       await PrefsService.setSpeakingTermsAgreed();
     }
     if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SpeakingTrainingScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const SpeakingTrainingScreen()));
   }
 
   Future<void> _refreshStudentHome() async {
     await Future.wait([
+      // Re-pull feature flags so newly enabled sections (e.g. a freshly
+      // added webinar) appear on refresh without waiting for an app resume.
+      AppFeatureService.refresh(),
       _loadStoryTutors(),
       _loadTodaysLessons(),
       _loadPodcasts(),
@@ -391,11 +458,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (reason == null) return;
     try {
-      await ApiService.patch('/bookings/${lesson.id}/cancel/', {'reason': reason});
+      await ApiService.patch('/bookings/${lesson.id}/cancel/', {
+        'reason': reason,
+      });
       _loadTodaysLessons();
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     }
   }
@@ -407,19 +478,21 @@ class _HomeScreenState extends State<HomeScreen> {
       final payload = (data['data'] is Map<String, dynamic>)
           ? data['data'] as Map<String, dynamic>
           : data;
-      final roomUrl = (payload['joinUrl'] ??
-              payload['join_url'] ??
-              payload['room_url'] ??
-              payload['daily_room_url'] ??
-              payload['roomUrl'] ??
-              lesson.dailyRoomUrl)
-          .toString();
-      final token = (payload['token'] ??
-              payload['daily_token'] ??
-              payload['meeting_token'] ??
-              payload['daily_meeting_token'] ??
-              '')
-          .toString();
+      final roomUrl =
+          (payload['joinUrl'] ??
+                  payload['join_url'] ??
+                  payload['room_url'] ??
+                  payload['daily_room_url'] ??
+                  payload['roomUrl'] ??
+                  lesson.dailyRoomUrl)
+              .toString();
+      final token =
+          (payload['token'] ??
+                  payload['daily_token'] ??
+                  payload['meeting_token'] ??
+                  payload['daily_meeting_token'] ??
+                  '')
+              .toString();
       if (roomUrl.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -440,7 +513,9 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     }
   }
@@ -459,14 +534,17 @@ class _HomeScreenState extends State<HomeScreen> {
         final id = booking['id'];
         final status = (booking['status'] as String? ?? '').toString();
         final startAt = DateTime.tryParse(
-          booking['start_at'] as String? ?? booking['start_time'] as String? ?? '',
+          booking['start_at'] as String? ??
+              booking['start_time'] as String? ??
+              '',
         );
         if (startAt == null) {
           skipped.add('#$id status=$status reason=no-start');
           continue;
         }
         final local = startAt.toLocal();
-        final isToday = local.year == now.year &&
+        final isToday =
+            local.year == now.year &&
             local.month == now.month &&
             local.day == now.day;
         if (!isToday) {
@@ -550,26 +628,29 @@ class _HomeScreenState extends State<HomeScreen> {
                                   viewedStories: _viewedStories,
                                   onStoryViewed: _onStoryViewed,
                                 ),
-                                const SizedBox(height: 28),
+                                const SizedBox(height: 16),
                               ] else
                                 const SizedBox(height: 20),
 
+                              // Webinar/Debate blocks carry their own bottom
+                              // spacing, so they collapse fully when absent.
                               const _WebinarBlock(),
-                              const SizedBox(height: 16),
-
                               const _DebateBlock(),
-                              const SizedBox(height: 16),
 
                               if (AppFeatureService.isEnabled('tutors'))
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 21),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 21,
+                                  ),
                                   child: GestureDetector(
-                                    onTap: () => setState(() => _selectedTab = 2),
+                                    onTap: () =>
+                                        setState(() => _selectedTab = 2),
                                     child: LayoutBuilder(
-                                      builder: (context, constraints) => SvgPicture.asset(
-                                        'assets/images/buttons/speaking-practice.svg',
-                                        width: constraints.maxWidth,
-                                      ),
+                                      builder: (context, constraints) =>
+                                          SvgPicture.asset(
+                                            'assets/images/buttons/speaking-practice.svg',
+                                            width: constraints.maxWidth,
+                                          ),
                                     ),
                                   ),
                                 ),
@@ -580,7 +661,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 _LessonsSection(
                                   lessons: _todaysLessons,
                                   loading: _loadingLessons,
-                                  onSeeAll: () => setState(() => _selectedTab = 1),
+                                  onSeeAll: () =>
+                                      setState(() => _selectedTab = 1),
                                   onStartLesson: _joinLesson,
                                   onCancelLesson: _cancelLesson,
                                   onRatedLesson: _loadTodaysLessons,
@@ -590,14 +672,17 @@ class _HomeScreenState extends State<HomeScreen> {
                                   AppFeatureService.isEnabled('speaking')) ...[
                                 const SizedBox(height: 28),
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 21),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 21,
+                                  ),
                                   child: GestureDetector(
                                     onTap: _openSpeakingTraining,
                                     child: LayoutBuilder(
-                                      builder: (context, constraints) => SvgPicture.asset(
-                                        'assets/images/buttons/video-chat.svg',
-                                        width: constraints.maxWidth,
-                                      ),
+                                      builder: (context, constraints) =>
+                                          SvgPicture.asset(
+                                            'assets/images/buttons/video-chat.svg',
+                                            width: constraints.maxWidth,
+                                          ),
                                     ),
                                   ),
                                 ),
@@ -615,11 +700,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                 title: 'PODCASTS',
                                 onSeeAll: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const PodcastsListScreen()),
+                                  MaterialPageRoute(
+                                    builder: (_) => const PodcastsListScreen(),
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              _PodcastsSection(podcasts: _podcasts, loading: _loadingPodcasts),
+                              _PodcastsSection(
+                                podcasts: _podcasts,
+                                loading: _loadingPodcasts,
+                              ),
 
                               const SizedBox(height: 28),
 
@@ -627,7 +717,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 title: 'ARTICLES',
                                 onSeeAll: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const ArticlesListScreen()),
+                                  MaterialPageRoute(
+                                    builder: (_) => const ArticlesListScreen(),
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -673,6 +765,7 @@ class _HomeScreenState extends State<HomeScreen> {
               loadingStories: _loadingStories,
               onStoryViewed: _onStoryViewed,
               tutorAccountStatus: _tutorAccountStatus,
+              onRefreshStatus: _refreshTutorStatus,
               onAvatarTap: () => setState(() => _selectedTab = 3),
             ),
             const TutorStoriesScreen(),
@@ -686,7 +779,9 @@ class _HomeScreenState extends State<HomeScreen> {
         : <Widget>[
             _buildStudentHomeBody(),
             bookingsEnabled
-                ? LessonsScreen(onFindTutor: () => setState(() => _selectedTab = 2))
+                ? LessonsScreen(
+                    onFindTutor: () => setState(() => _selectedTab = 2),
+                  )
                 : const _SectionClosed(title: 'My lessons'),
             tutorsEnabled
                 ? const TutorsScreen()
@@ -698,9 +793,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     void handleNavTap(int i) {
       if (_isTeacher && i == 2) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const TutorEarningsScreen()),
-        );
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const TutorEarningsScreen()));
         return;
       }
       setState(() => _selectedTab = i);
@@ -720,7 +815,10 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 children: [
                   Expanded(
-                    child: IndexedStack(index: _selectedTab, children: children),
+                    child: IndexedStack(
+                      index: _selectedTab,
+                      children: children,
+                    ),
                   ),
                   const MiniPlayerBar(),
                 ],
@@ -815,7 +913,12 @@ class _Header extends StatefulWidget {
   final bool isTutor;
   final VoidCallback? onLogoLongPress;
   final VoidCallback? onAvatarTap;
-  const _Header({this.profileImage, this.isTutor = false, this.onLogoLongPress, this.onAvatarTap});
+  const _Header({
+    this.profileImage,
+    this.isTutor = false,
+    this.onLogoLongPress,
+    this.onAvatarTap,
+  });
 
   @override
   State<_Header> createState() => _HeaderState();
@@ -837,9 +940,9 @@ class _HeaderState extends State<_Header> {
   }
 
   Future<void> _openInbox() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const NotificationsInboxScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const NotificationsInboxScreen()));
     // Inbox interactions (tap, mark-all) may have changed unread state.
     if (mounted) _refreshHasNew();
   }
@@ -1188,7 +1291,20 @@ class _TutorItem extends StatelessWidget {
               ),
               child: Padding(
                 padding: const EdgeInsets.all(3),
-                child: CachedAvatar(imageUrl: tutor.image, size: 80),
+                child: tutor.isLinka
+                    ? ClipOval(
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          color: Colors.white,
+                          padding: const EdgeInsets.all(12),
+                          child: Image.asset(
+                            'assets/images/branding/new-logo.png',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      )
+                    : CachedAvatar(imageUrl: tutor.image, size: 80),
               ),
             ),
             const SizedBox(height: 6),
@@ -1217,7 +1333,14 @@ class _LessonsSection extends StatelessWidget {
   final ValueChanged<Lesson>? onStartLesson;
   final ValueChanged<Lesson>? onCancelLesson;
   final VoidCallback? onRatedLesson;
-  const _LessonsSection({required this.lessons, this.loading = false, this.onSeeAll, this.onStartLesson, this.onCancelLesson, this.onRatedLesson});
+  const _LessonsSection({
+    required this.lessons,
+    this.loading = false,
+    this.onSeeAll,
+    this.onStartLesson,
+    this.onCancelLesson,
+    this.onRatedLesson,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1258,63 +1381,69 @@ class _LessonsSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        LayoutBuilder(builder: (context, constraints) {
-          final cardWidth = constraints.maxWidth - 52;
-          if (loading) {
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final cardWidth = constraints.maxWidth - 52;
+            if (loading) {
+              return SizedBox(
+                height: 114,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: 2,
+                  itemBuilder: (_, _) => Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: SizedBox(
+                      width: cardWidth,
+                      child: const Skeleton(height: 98, borderRadius: 16),
+                    ),
+                  ),
+                ),
+              );
+            }
+            if (lessons.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  'No lessons scheduled for today',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 13,
+                    color: Color(0xFFAAAAAA),
+                  ),
+                ),
+              );
+            }
             return SizedBox(
-              height: 114,
+              height: 162,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: 2,
-                itemBuilder: (_, _) => Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: SizedBox(
-                    width: cardWidth,
-                    child: const Skeleton(height: 98, borderRadius: 16),
-                  ),
-                ),
-              ),
-            );
-          }
-          if (lessons.isEmpty) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                'No lessons scheduled for today',
-                style: TextStyle(
-                  fontFamily: 'SF Pro',
-                  fontSize: 13,
-                  color: Color(0xFFAAAAAA),
-                ),
-              ),
-            );
-          }
-          return SizedBox(
-            height: 162,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: lessons.length,
-              itemBuilder: (_, i) {
-                final l = lessons[i];
-                return Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: SizedBox(
-                    width: cardWidth,
-                    child: LessonCard(
-                      lesson: l,
-                      showStartButton: l.dailyRoomUrl.isNotEmpty,
-                      onStart: onStartLesson != null ? () => onStartLesson!(l) : null,
-                      onCancel: onCancelLesson != null ? () => onCancelLesson!(l) : null,
-                      onRated: onRatedLesson,
+                itemCount: lessons.length,
+                itemBuilder: (_, i) {
+                  final l = lessons[i];
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: SizedBox(
+                      width: cardWidth,
+                      child: LessonCard(
+                        lesson: l,
+                        showStartButton: l.dailyRoomUrl.isNotEmpty,
+                        onStart: onStartLesson != null
+                            ? () => onStartLesson!(l)
+                            : null,
+                        onCancel: onCancelLesson != null
+                            ? () => onCancelLesson!(l)
+                            : null,
+                        onRated: onRatedLesson,
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
-          );
-        }),
+                  );
+                },
+              ),
+            );
+          },
+        ),
       ],
     );
   }
@@ -1387,7 +1516,11 @@ class _ComingSoonBanner extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFF1E2040), Color(0xFF272942), Color(0xFF323566)],
+                    colors: [
+                      Color(0xFF1E2040),
+                      Color(0xFF272942),
+                      Color(0xFF323566),
+                    ],
                   ),
                 ),
               ),
@@ -1440,12 +1573,19 @@ class _ComingSoonBanner extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF5C542).withValues(alpha: 0.15),
+                              color: const Color(
+                                0xFFF5C542,
+                              ).withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: const Color(0xFFF5C542).withValues(alpha: 0.4),
+                                color: const Color(
+                                  0xFFF5C542,
+                                ).withValues(alpha: 0.4),
                                 width: 1,
                               ),
                             ),
@@ -1499,10 +1639,14 @@ class _ComingSoonBanner extends StatelessWidget {
                                 width: 62,
                                 height: 88,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF5C542).withValues(alpha: 0.12),
+                                  color: const Color(
+                                    0xFFF5C542,
+                                  ).withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: const Color(0xFFF5C542).withValues(alpha: 0.2),
+                                    color: const Color(
+                                      0xFFF5C542,
+                                    ).withValues(alpha: 0.2),
                                     width: 1,
                                   ),
                                 ),
@@ -1577,6 +1721,7 @@ class _WebinarBlockState extends State<_WebinarBlock> {
     try {
       final data = await ApiService.get('/live/webinar/today/');
       if (!mounted) return;
+      dev.log('WEBINAR → today session data: $data', name: 'webinar');
       final hasSession = data['has_session'] as bool? ?? false;
       setState(() {
         _webinar = hasSession ? WebinarData.fromJson(data) : null;
@@ -1594,7 +1739,7 @@ class _WebinarBlockState extends State<_WebinarBlock> {
     }
     if (_loading) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
         child: Container(
           height: 96,
           decoration: BoxDecoration(
@@ -1636,10 +1781,12 @@ class _WebinarBlockState extends State<_WebinarBlock> {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => WebinarViewerScreen(webinar: webinar)),
+        MaterialPageRoute(
+          builder: (_) => WebinarViewerScreen(webinar: webinar),
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
@@ -1674,7 +1821,9 @@ class _WebinarBlockState extends State<_WebinarBlock> {
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: badgeColor.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
@@ -1722,8 +1871,11 @@ class _WebinarBlockState extends State<_WebinarBlock> {
               Row(
                 children: [
                   if (webinar.tutorName.isNotEmpty) ...[
-                    const Icon(Icons.person_outline_rounded,
-                        size: 14, color: Color(0xFFAAAAAA)),
+                    const Icon(
+                      Icons.person_outline_rounded,
+                      size: 14,
+                      color: Color(0xFFAAAAAA),
+                    ),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
@@ -1743,7 +1895,9 @@ class _WebinarBlockState extends State<_WebinarBlock> {
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 7),
+                        horizontal: 14,
+                        vertical: 7,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF5C542),
                         borderRadius: BorderRadius.circular(20),
@@ -1816,8 +1970,7 @@ class _DebateBlockState extends State<_DebateBlock>
       final results = await Future.wait([
         DebateService.getState(),
         DebateService.today().catchError((e) {
-          dev.log('DEBATE → home today failed: $e',
-              name: 'debate', error: e);
+          dev.log('DEBATE → home today failed: $e', name: 'debate', error: e);
           return const DailyDebate(topic: '');
         }),
       ]);
@@ -1859,7 +2012,7 @@ class _DebateBlockState extends State<_DebateBlock>
     }
     if (_loading) {
       return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20),
+        padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
         child: Skeleton(height: 168, borderRadius: 16),
       );
     }
@@ -1876,12 +2029,10 @@ class _DebateBlockState extends State<_DebateBlock>
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => DebateRoomScreen(title: topic),
-        ),
+        MaterialPageRoute(builder: (_) => DebateRoomScreen(title: topic)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
@@ -1924,7 +2075,10 @@ class _DebateBlockState extends State<_DebateBlock>
                       Row(
                         children: [
                           _buildBadge(
-                              'LIVE NOW', const Color(0xFFFF4D4D), true),
+                            'LIVE NOW',
+                            const Color(0xFFFF4D4D),
+                            true,
+                          ),
                           const SizedBox(width: 8),
                           const Text(
                             'DAILY DEBATE',
@@ -1939,8 +2093,11 @@ class _DebateBlockState extends State<_DebateBlock>
                           if (memberCount > 0)
                             Row(
                               children: [
-                                const Icon(Icons.visibility_rounded,
-                                    size: 13, color: Color(0xFFAEB9D6)),
+                                const Icon(
+                                  Icons.visibility_rounded,
+                                  size: 13,
+                                  color: Color(0xFFAEB9D6),
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   '$memberCount',
@@ -1965,10 +2122,7 @@ class _DebateBlockState extends State<_DebateBlock>
                               gradient: const LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
-                                colors: [
-                                  Color(0xFFF5C542),
-                                  Color(0xFFE0A92E),
-                                ],
+                                colors: [Color(0xFFF5C542), Color(0xFFE0A92E)],
                               ),
                             ),
                             child: const Center(
@@ -2053,10 +2207,7 @@ class _DebateBlockState extends State<_DebateBlock>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (animate)
-            FadeTransition(opacity: _pulse, child: dot)
-          else
-            dot,
+          if (animate) FadeTransition(opacity: _pulse, child: dot) else dot,
           const SizedBox(width: 5),
           Text(
             label,
@@ -2084,7 +2235,7 @@ class _PodcastsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (loading) {
       return SizedBox(
-        height: 100,
+        height: 120,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -2093,14 +2244,14 @@ class _PodcastsSection extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: 6),
             child: SizedBox(
               width: 240,
-              child: Skeleton(height: 100, borderRadius: 14),
+              child: Skeleton(height: 120, borderRadius: 14),
             ),
           ),
         ),
       );
     }
     return SizedBox(
-      height: 100,
+      height: 120,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -2159,6 +2310,10 @@ class _PodcastCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  if (podcast.isNew) ...[
+                    const NewBadge(),
+                    const SizedBox(height: 6),
+                  ],
                   Text(
                     podcast.title,
                     style: const TextStyle(
@@ -2192,7 +2347,6 @@ class _PodcastCard extends StatelessWidget {
 }
 
 // ─── Articles section ──────────────────────────────────────────────────────────
-
 
 class _ArticlesSection extends StatelessWidget {
   final List<_Article> articles;
@@ -2368,12 +2522,22 @@ class _ArticleCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // "NEW" badge top-left
+                  if (article.isNew)
+                    const Positioned(
+                      top: 10,
+                      left: 10,
+                      child: NewBadge(onColored: true),
+                    ),
                   // Article number badge
                   Positioned(
                     bottom: 10,
                     right: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.20),
                         borderRadius: BorderRadius.circular(20),
@@ -2464,7 +2628,9 @@ class _SideNav extends StatelessWidget {
                         item.label,
                         style: TextStyle(
                           fontSize: 11,
-                          fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
                           color: selected
                               ? const Color(0xFF272942)
                               : const Color(0xFFCCCCCC),
@@ -2554,6 +2720,9 @@ class TutorHomeBody extends StatefulWidget {
   final void Function(String) onStoryViewed;
   final String? tutorAccountStatus;
   final VoidCallback? onAvatarTap;
+  // Re-pulls the tutor's account status (activation) on refresh, so an
+  // admin approval clears the "pending" banner without a full app restart.
+  final Future<void> Function()? onRefreshStatus;
 
   const TutorHomeBody({
     super.key,
@@ -2564,6 +2733,7 @@ class TutorHomeBody extends StatefulWidget {
     required this.onStoryViewed,
     this.tutorAccountStatus,
     this.onAvatarTap,
+    this.onRefreshStatus,
   });
 
   @override
@@ -2575,8 +2745,7 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
   String _listTab = 'upcoming'; // 'upcoming' | 'past'
   List<Map<String, dynamic>> _bookings = [];
   Set<int> _busyDays = {};
-  DateTime _focusedMonth =
-      DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime _focusedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   int _selectedDay = DateTime.now().day;
   bool _loading = true;
 
@@ -2588,10 +2757,16 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
 
   Future<void> _fetch() async {
     setState(() => _loading = true);
+    // Refresh the activation status alongside bookings so a freshly
+    // approved tutor sees the pending banner clear on pull-to-refresh.
+    final statusRefresh = widget.onRefreshStatus?.call() ?? Future.value();
     try {
-      final list = await ApiService.getList('/bookings/my/');
+      final results = await Future.wait([
+        ApiService.getList('/bookings/my/'),
+        statusRefresh,
+      ]);
       if (!mounted) return;
-      final bookings = list.cast<Map<String, dynamic>>();
+      final bookings = (results[0] as List).cast<Map<String, dynamic>>();
       setState(() {
         _bookings = bookings;
         _busyDays = _busyDaysForMonth(bookings, _focusedMonth);
@@ -2607,11 +2782,14 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
   }
 
   Set<int> _busyDaysForMonth(
-      List<Map<String, dynamic>> bookings, DateTime month) {
+    List<Map<String, dynamic>> bookings,
+    DateTime month,
+  ) {
     final busy = <int>{};
     for (final b in bookings) {
-      final d = DateTime.tryParse((b['start_at'] ?? b['start_time'] ?? '')
-          .toString());
+      final d = DateTime.tryParse(
+        (b['start_at'] ?? b['start_time'] ?? '').toString(),
+      );
       if (d == null) continue;
       final local = d.toLocal();
       if (local.year == month.year && local.month == month.month) {
@@ -2636,19 +2814,21 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
       final payload = (data['data'] is Map<String, dynamic>)
           ? data['data'] as Map<String, dynamic>
           : data;
-      final roomUrl = (payload['joinUrl'] ??
-              payload['join_url'] ??
-              payload['room_url'] ??
-              payload['daily_room_url'] ??
-              payload['roomUrl'] ??
-              lesson.dailyRoomUrl)
-          .toString();
-      final token = (payload['token'] ??
-              payload['daily_token'] ??
-              payload['meeting_token'] ??
-              payload['daily_meeting_token'] ??
-              '')
-          .toString();
+      final roomUrl =
+          (payload['joinUrl'] ??
+                  payload['join_url'] ??
+                  payload['room_url'] ??
+                  payload['daily_room_url'] ??
+                  payload['roomUrl'] ??
+                  lesson.dailyRoomUrl)
+              .toString();
+      final token =
+          (payload['token'] ??
+                  payload['daily_token'] ??
+                  payload['meeting_token'] ??
+                  payload['daily_meeting_token'] ??
+                  '')
+              .toString();
       if (roomUrl.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -2669,17 +2849,21 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
       );
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     }
   }
 
   DateTime _effectiveEndAt(Map<String, dynamic> b) {
     final endD = DateTime.tryParse(
-        (b['end_at'] ?? b['end_time'] ?? '').toString());
+      (b['end_at'] ?? b['end_time'] ?? '').toString(),
+    );
     if (endD != null) return endD.toLocal();
     final startD = DateTime.tryParse(
-        (b['start_at'] ?? b['start_time'] ?? '').toString());
+      (b['start_at'] ?? b['start_time'] ?? '').toString(),
+    );
     if (startD == null) return DateTime(0);
     final durationMin = (b['duration_minutes'] as num?)?.toInt() ?? 60;
     return startD.toLocal().add(Duration(minutes: durationMin));
@@ -2687,29 +2871,43 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
 
   List<Lesson> get _upcomingLessons {
     final now = DateTime.now();
-    final list = _bookings.where((b) {
-      final status = (b['status'] ?? '').toString();
-      if (status == 'cancelled' || status == 'pending') return false;
-      final startD = DateTime.tryParse(
-          (b['start_at'] ?? b['start_time'] ?? '').toString());
-      if (startD == null) return false;
-      return _effectiveEndAt(b).isAfter(now);
-    }).map((b) => Lesson.fromBooking(b, viewerIsTutor: true)).toList()
-      ..sort((a, b) => (a.startAt ?? DateTime(0))
-          .compareTo(b.startAt ?? DateTime(0)));
+    final list =
+        _bookings
+            .where((b) {
+              final status = (b['status'] ?? '').toString();
+              if (status == 'cancelled' || status == 'pending') return false;
+              final startD = DateTime.tryParse(
+                (b['start_at'] ?? b['start_time'] ?? '').toString(),
+              );
+              if (startD == null) return false;
+              return _effectiveEndAt(b).isAfter(now);
+            })
+            .map((b) => Lesson.fromBooking(b, viewerIsTutor: true))
+            .toList()
+          ..sort(
+            (a, b) =>
+                (a.startAt ?? DateTime(0)).compareTo(b.startAt ?? DateTime(0)),
+          );
     return list;
   }
 
   List<Lesson> get _pastLessons {
     final now = DateTime.now();
-    final list = _bookings.where((b) {
-      final startD = DateTime.tryParse(
-          (b['start_at'] ?? b['start_time'] ?? '').toString());
-      if (startD == null) return false;
-      return _effectiveEndAt(b).isBefore(now);
-    }).map((b) => Lesson.fromBooking(b, viewerIsTutor: true)).toList()
-      ..sort((a, b) => (b.startAt ?? DateTime(0))
-          .compareTo(a.startAt ?? DateTime(0)));
+    final list =
+        _bookings
+            .where((b) {
+              final startD = DateTime.tryParse(
+                (b['start_at'] ?? b['start_time'] ?? '').toString(),
+              );
+              if (startD == null) return false;
+              return _effectiveEndAt(b).isBefore(now);
+            })
+            .map((b) => Lesson.fromBooking(b, viewerIsTutor: true))
+            .toList()
+          ..sort(
+            (a, b) =>
+                (b.startAt ?? DateTime(0)).compareTo(a.startAt ?? DateTime(0)),
+          );
     return list;
   }
 
@@ -2719,15 +2917,19 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
       _focusedMonth.month,
       _selectedDay,
     );
-    return _bookings.where((b) {
-      final d = DateTime.tryParse((b['start_at'] ?? b['start_time'] ?? '')
-          .toString());
-      if (d == null) return false;
-      final local = d.toLocal();
-      return local.year == selected.year &&
-          local.month == selected.month &&
-          local.day == selected.day;
-    }).map((b) => Lesson.fromBooking(b, viewerIsTutor: true)).toList()
+    return _bookings
+        .where((b) {
+          final d = DateTime.tryParse(
+            (b['start_at'] ?? b['start_time'] ?? '').toString(),
+          );
+          if (d == null) return false;
+          final local = d.toLocal();
+          return local.year == selected.year &&
+              local.month == selected.month &&
+              local.day == selected.day;
+        })
+        .map((b) => Lesson.fromBooking(b, viewerIsTutor: true))
+        .toList()
       ..sort((a, b) => a.timeRange.compareTo(b.timeRange));
   }
 
@@ -2740,7 +2942,10 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Header(profileImage: widget.profileImage, onAvatarTap: widget.onAvatarTap),
+          _Header(
+            profileImage: widget.profileImage,
+            onAvatarTap: widget.onAvatarTap,
+          ),
           if (showPendingBanner) _PendingActivationBanner(status: status),
           Expanded(
             child: RefreshIndicator(
@@ -2784,8 +2989,9 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
                               ),
                               const Spacer(),
                               GestureDetector(
-                                onTap: () =>
-                                    setState(() => _calendarMode = !_calendarMode),
+                                onTap: () => setState(
+                                  () => _calendarMode = !_calendarMode,
+                                ),
                                 child: SvgPicture.asset(
                                   _calendarMode
                                       ? 'assets/images/icons/calendar_off.svg'
@@ -2987,9 +3193,7 @@ class _TutorListMode extends StatelessWidget {
               ),
               child: Center(
                 child: Text(
-                  tab == 'upcoming'
-                      ? 'No upcoming lessons'
-                      : 'No past lessons',
+                  tab == 'upcoming' ? 'No upcoming lessons' : 'No past lessons',
                   style: const TextStyle(
                     fontSize: 14,
                     color: Color(0xFFAAAAAA),
@@ -3000,47 +3204,49 @@ class _TutorListMode extends StatelessWidget {
             ),
           )
         else
-          ..._groupByDay(lessons).entries.expand((g) => [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 6, 20, 8),
-                  child: Row(
-                    children: [
-                      Text(
-                        g.key.label,
-                        style: const TextStyle(
+          ..._groupByDay(lessons).entries.expand(
+            (g) => [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 6, 20, 8),
+                child: Row(
+                  children: [
+                    Text(
+                      g.key.label,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF272942),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (g.key.isToday)
+                      const Text(
+                        'Today',
+                        style: TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF272942),
-                          letterSpacing: 0.5,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF2B85DB),
                         ),
                       ),
-                      const Spacer(),
-                      if (g.key.isToday)
-                        const Text(
-                          'Today',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF2B85DB),
-                          ),
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
-                ...g.value.map((lesson) {
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                    child: LessonCard(
-                      lesson: lesson,
-                      showStartButton:
-                          tab == 'upcoming' && lesson.dailyRoomUrl.isNotEmpty,
-                      showCopyLink:
-                          tab == 'upcoming' && lesson.dailyRoomUrl.isNotEmpty,
-                      onStart: () => onStartLesson(lesson),
-                    ),
-                  );
-                }),
-              ]),
+              ),
+              ...g.value.map((lesson) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                  child: LessonCard(
+                    lesson: lesson,
+                    showStartButton:
+                        tab == 'upcoming' && lesson.dailyRoomUrl.isNotEmpty,
+                    showCopyLink:
+                        tab == 'upcoming' && lesson.dailyRoomUrl.isNotEmpty,
+                    onStart: () => onStartLesson(lesson),
+                  ),
+                );
+              }),
+            ],
+          ),
       ],
     );
   }
@@ -3066,11 +3272,28 @@ class _DayKey {
   });
 
   static const _months = [
-    '', 'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
-    'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
+    '',
+    'JANUARY',
+    'FEBRUARY',
+    'MARCH',
+    'APRIL',
+    'MAY',
+    'JUNE',
+    'JULY',
+    'AUGUST',
+    'SEPTEMBER',
+    'OCTOBER',
+    'NOVEMBER',
+    'DECEMBER',
   ];
   static const _weekdays = [
-    'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY',
+    'MONDAY',
+    'TUESDAY',
+    'WEDNESDAY',
+    'THURSDAY',
+    'FRIDAY',
+    'SATURDAY',
+    'SUNDAY',
   ];
 
   factory _DayKey.fromLesson(Lesson l) {
@@ -3226,11 +3449,28 @@ class _TutorCalendarMode extends StatelessWidget {
   }
 
   static const _months = [
-    '', 'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
-    'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
+    '',
+    'JANUARY',
+    'FEBRUARY',
+    'MARCH',
+    'APRIL',
+    'MAY',
+    'JUNE',
+    'JULY',
+    'AUGUST',
+    'SEPTEMBER',
+    'OCTOBER',
+    'NOVEMBER',
+    'DECEMBER',
   ];
   static const _weekdays = [
-    'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY',
+    'MONDAY',
+    'TUESDAY',
+    'WEDNESDAY',
+    'THURSDAY',
+    'FRIDAY',
+    'SATURDAY',
+    'SUNDAY',
   ];
   String _formatDateHeader(DateTime month, int day) {
     final d = DateTime(month.year, month.month, day);
@@ -3257,8 +3497,19 @@ class _TutorCalendarCard extends StatelessWidget {
 
   static const _dayHeaders = ['SAN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
   static const _monthNames = [
-    '', 'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
-    'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
+    '',
+    'JANUARY',
+    'FEBRUARY',
+    'MARCH',
+    'APRIL',
+    'MAY',
+    'JUNE',
+    'JULY',
+    'AUGUST',
+    'SEPTEMBER',
+    'OCTOBER',
+    'NOVEMBER',
+    'DECEMBER',
   ];
 
   @override
@@ -3281,8 +3532,11 @@ class _TutorCalendarCard extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: onPrevMonth,
-                child: const Icon(Icons.chevron_left,
-                    color: Color(0xFF272942), size: 24),
+                child: const Icon(
+                  Icons.chevron_left,
+                  color: Color(0xFF272942),
+                  size: 24,
+                ),
               ),
               Expanded(
                 child: Center(
@@ -3299,27 +3553,32 @@ class _TutorCalendarCard extends StatelessWidget {
               ),
               GestureDetector(
                 onTap: onNextMonth,
-                child: const Icon(Icons.chevron_right,
-                    color: Color(0xFF272942), size: 24),
+                child: const Icon(
+                  Icons.chevron_right,
+                  color: Color(0xFF272942),
+                  size: 24,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 20),
           Row(
             children: _dayHeaders
-                .map((d) => Expanded(
-                      child: Center(
-                        child: Text(
-                          d,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFAAAAAA),
-                            letterSpacing: 0.5,
-                          ),
+                .map(
+                  (d) => Expanded(
+                    child: Center(
+                      child: Text(
+                        d,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFAAAAAA),
+                          letterSpacing: 0.5,
                         ),
                       ),
-                    ))
+                    ),
+                  ),
+                )
                 .toList(),
           ),
           const SizedBox(height: 12),
@@ -3336,7 +3595,9 @@ class _TutorCalendarCard extends StatelessWidget {
                   final hasLesson = busyDays.contains(dayNum);
                   final now = DateTime.now();
                   final isToday =
-                      dayNum == now.day && month == now.month && year == now.year;
+                      dayNum == now.day &&
+                      month == now.month &&
+                      year == now.year;
                   return Expanded(
                     child: GestureDetector(
                       onTap: () => onDayTap(dayNum),
@@ -3410,7 +3671,9 @@ class _SpeakingTermsSheet extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.fromLTRB(
-        24, 12, 24,
+        24,
+        12,
+        24,
         MediaQuery.of(context).padding.bottom + 24,
       ),
       child: Column(
@@ -3442,14 +3705,22 @@ class _SpeakingTermsSheet extends StatelessWidget {
             style: TextStyle(color: Colors.white60, fontSize: 13, height: 1.4),
           ),
           const SizedBox(height: 20),
-          _rule(Icons.person_search_rounded,
-              'You will see your partner\'s name and gender before connecting — you can skip any match.'),
-          _rule(Icons.do_not_disturb_on_outlined,
-              'Zero tolerance for harassment, hate speech, or sexually inappropriate content.'),
-          _rule(Icons.flag_outlined,
-              'Use the Report or Block buttons during a call to flag abusive users instantly.'),
-          _rule(Icons.schedule_rounded,
-              'All reports are reviewed and acted upon within 24 hours; violators are suspended.'),
+          _rule(
+            Icons.person_search_rounded,
+            'You will see your partner\'s name and gender before connecting — you can skip any match.',
+          ),
+          _rule(
+            Icons.do_not_disturb_on_outlined,
+            'Zero tolerance for harassment, hate speech, or sexually inappropriate content.',
+          ),
+          _rule(
+            Icons.flag_outlined,
+            'Use the Report or Block buttons during a call to flag abusive users instantly.',
+          ),
+          _rule(
+            Icons.schedule_rounded,
+            'All reports are reviewed and acted upon within 24 hours; violators are suspended.',
+          ),
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
@@ -3500,7 +3771,11 @@ class _SpeakingTermsSheet extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 13,
+                height: 1.4,
+              ),
             ),
           ),
         ],

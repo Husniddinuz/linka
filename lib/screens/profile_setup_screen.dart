@@ -11,6 +11,7 @@ import '../services/auth_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 import '../widgets/app_notify.dart';
+import '../utils/format.dart';
 import 'home_screen.dart';
 import 'role_selection_screen.dart';
 
@@ -50,6 +51,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   String? _existingCertificateUrl;
   File? _introVideo;
   String? _introVideoName;
+  int? _introVideoSize;
   bool _submitting = false;
   double _progress = 0;
 
@@ -235,13 +237,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     );
     if (picked == null || !mounted) return;
     final fileSize = await File(picked.path).length();
-    if (fileSize > 50 * 1024 * 1024) {
-      if (mounted) AppNotify.show(context, message: 'Intro video must be under 50 MB');
-      return;
-    }
     setState(() {
       _introVideo = File(picked.path);
       _introVideoName = picked.name;
+      _introVideoSize = fileSize;
     });
   }
 
@@ -340,32 +339,38 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         body['certificate_image'] = 'data:$mime;base64,${base64Encode(bytes)}';
       }
 
-      if (_isTutor && _introVideo != null) {
-        final bytes = await _introVideo!.readAsBytes();
-        final ext = _introVideo!.path.split('.').last.toLowerCase();
-        final mime = ext == 'mov'
-            ? 'video/quicktime'
-            : ext == 'webm'
-                ? 'video/webm'
-                : 'video/mp4';
-        body['intro_video'] = 'data:$mime;base64,${base64Encode(bytes)}';
+      final path = _isTutor ? '/tutor/profile/' : '/student/profile/';
+      final hasVideo = _isTutor && _introVideo != null;
+      // Photo/certificate are small; keep them in the JSON body. The intro
+      // video can be 200–300 MB, so it's streamed separately below.
+      final hasInlineMedia =
+          _photo != null || (_isTutor && _certificateFile != null);
+
+      void onProgress(int sent, int total) {
+        if (!mounted || total <= 0) return;
+        final next = sent / total;
+        if ((next - _progress).abs() < 0.01 && next < 1.0) return;
+        setState(() => _progress = next);
       }
 
-      final path = _isTutor ? '/tutor/profile/' : '/student/profile/';
-      final hasMedia = _photo != null ||
-          (_isTutor && (_certificateFile != null || _introVideo != null));
+      // Phase 1 — profile fields (+ small photo/certificate) as JSON.
+      // When a video follows, leave the overlay in its "Preparing…" state
+      // so the progress bar reflects the actual video upload, not this call.
       await ApiService.put(
         path,
         body,
-        onProgress: hasMedia
-            ? (sent, total) {
-                if (!mounted || total <= 0) return;
-                final next = sent / total;
-                if ((next - _progress).abs() < 0.01 && next < 1.0) return;
-                setState(() => _progress = next);
-              }
-            : null,
+        onProgress: (hasInlineMedia && !hasVideo) ? onProgress : null,
       );
+
+      // Phase 2 — stream the intro video to its own endpoint. MultipartFile
+      // reads the file from disk in chunks, so it never sits in memory whole.
+      if (hasVideo) {
+        await ApiService.putMultipart(
+          '/tutor/profile/intro-video/',
+          files: {'intro_video': _introVideo!},
+          onProgress: onProgress,
+        );
+      }
 
       if (!mounted) return;
       AppNotify.show(context,
@@ -397,6 +402,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _handleBack() async {
+    if (_submitting) {
+      AppNotify.show(context,
+          message: 'Upload in progress — please keep the app open');
+      return;
+    }
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
       return;
@@ -454,7 +464,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             ),
           ),
         ),
-        body: SafeArea(
+        body: Stack(
+          children: [
+            SafeArea(
           child: Column(
             children: [
               Expanded(
@@ -674,6 +686,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             onRemove: () => setState(() {
                               _introVideo = null;
                               _introVideoName = null;
+                              _introVideoSize = null;
                             }),
                           )
                         else
@@ -761,6 +774,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ),
             ],
           ),
+        ),
+            if (_submitting && _isTutor && _introVideo != null)
+              _VideoUploadOverlay(
+                fileName: _introVideoName ?? 'intro_video.mp4',
+                fileSize: _introVideoSize,
+                progress: _progress,
+              ),
+          ],
         ),
         ),
       ),
@@ -1271,6 +1292,163 @@ class _PriceRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Video upload overlay ──────────────────────────────────────────────────────
+
+class _VideoUploadOverlay extends StatelessWidget {
+  final String fileName;
+  final int? fileSize;
+  final double progress;
+
+  const _VideoUploadOverlay({
+    required this.fileName,
+    required this.fileSize,
+    required this.progress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = progress.clamp(0.0, 1.0);
+    final preparing = p <= 0;
+    final processing = p >= 1.0;
+    final percent = (p * 100).round();
+
+    String sizeLine;
+    if (fileSize != null && fileSize! > 0) {
+      if (preparing) {
+        sizeLine = formatBytes(fileSize!);
+      } else {
+        final uploaded = (p * fileSize!).round();
+        sizeLine = '${formatBytes(uploaded)} of ${formatBytes(fileSize!)}';
+      }
+    } else {
+      sizeLine = 'Uploading…';
+    }
+
+    return Positioned.fill(
+      child: AbsorbPointer(
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.6),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E2035),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.videocam_rounded,
+                          color: Colors.white, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            fileName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF272942),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            sizeLine,
+                            style: const TextStyle(
+                              color: Color(0xFF8A8A99),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (!processing)
+                      Text(
+                        '$percent%',
+                        style: const TextStyle(
+                          color: Color(0xFF272942),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    minHeight: 6,
+                    value: (preparing || processing) ? null : p,
+                    backgroundColor: const Color(0xFFE8E8EF),
+                    valueColor:
+                        const AlwaysStoppedAnimation(Color(0xFF272942)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  preparing
+                      ? 'Preparing your video…'
+                      : processing
+                          ? 'Processing on our servers…'
+                          : 'Uploading your intro video',
+                  style: const TextStyle(
+                    color: Color(0xFF272942),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF4E5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          color: Color(0xFFE69A19), size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Please keep the app open. Leaving or closing the app will cancel the upload.',
+                          style: TextStyle(
+                            color: Color(0xFF9A6A12),
+                            fontSize: 12,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

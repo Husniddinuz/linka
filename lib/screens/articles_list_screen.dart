@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
+import '../widgets/new_badge.dart';
 import 'article_detail_screen.dart';
 import 'saved_articles_screen.dart';
 
@@ -185,6 +186,7 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
                                 final article = _filtered[i];
                                 final title = article['title'] as String? ?? '';
                                 final id = article['id'] as int;
+                                final isNew = article['is_new'] as bool? ?? false;
                                 final isSaved = _savedArticleIds.contains(id);
                                 final accent = _accents[i % _accents.length];
 
@@ -253,6 +255,12 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
                                                   ),
                                                 ),
                                               ),
+                                              if (isNew)
+                                                const Positioned(
+                                                  top: 10,
+                                                  left: 10,
+                                                  child: NewBadge(onColored: true),
+                                                ),
                                               Positioned(
                                                 top: 10,
                                                 right: 10,
