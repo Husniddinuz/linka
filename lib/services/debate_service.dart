@@ -169,11 +169,17 @@ class DailyDebate {
   final String? date;
   final bool hasSession;
 
+  /// Live-session id (the `id` in `/live/debate/today/`). This is the key the
+  /// chat WebSocket is mounted under (`/ws/live/session/{sessionId}/`) — the
+  /// LiveKit room name ("main") is NOT a valid WS key.
+  final int? sessionId;
+
   const DailyDebate({
     required this.topic,
     this.description,
     this.date,
     this.hasSession = false,
+    this.sessionId,
   });
 
   factory DailyDebate.fromJson(Map<String, dynamic> j) {
@@ -188,17 +194,20 @@ class DailyDebate {
     final desc = pick(['description', 'details', 'context']);
     final dt = pick(['date', 'day']);
     final hs = j['has_session'];
+    final rawId = j['id'] ?? j['session_id'] ?? j['session'];
     return DailyDebate(
       topic: pick(['topic', 'title', 'motion', 'question']),
       description: desc.isEmpty ? null : desc,
       date: dt.isEmpty ? null : dt,
       hasSession: hs is bool ? hs : (hs?.toString().toLowerCase() == 'true'),
+      sessionId: rawId == null ? null : int.tryParse('$rawId'),
     );
   }
 }
 
-/// Thin wrapper over the new debate REST control-plane. RTC transport and
-/// chat both run over the LiveKit connection in the debate room screen.
+/// Thin wrapper over the new debate REST control-plane. RTC audio runs over
+/// the LiveKit connection; chat runs over the backend room WebSocket
+/// (`/ws/live/session/{room}/`) in the debate room screen.
 class DebateService {
   /// The authenticated user's id, needed for `/join/` and admin calls.
   static Future<int> currentUserId() async {

@@ -1,6 +1,8 @@
 PODS:
   - app_links (7.0.0):
     - Flutter
+  - app_tracking_transparency (0.0.1):
+    - Flutter
   - audio_session (0.0.1):
     - Flutter
   - connectivity_plus (0.0.1):
@@ -43,6 +45,15 @@ PODS:
   - DKPhotoGallery/Resource (0.0.19):
     - SDWebImage
     - SwiftyGif
+  - facebook_app_events (0.30.1):
+    - FBSDKCoreKit (~> 18.0)
+    - Flutter
+  - FBAEMKit (18.0.3):
+    - FBSDKCoreKit_Basics (= 18.0.3)
+  - FBSDKCoreKit (18.0.3):
+    - FBAEMKit (= 18.0.3)
+    - FBSDKCoreKit_Basics (= 18.0.3)
+  - FBSDKCoreKit_Basics (18.0.3)
   - file_picker (0.0.1):
     - DKImagePickerController/PhotoGallery
     - Flutter
@@ -151,10 +162,12 @@ PODS:
 
 DEPENDENCIES:
   - app_links (from `.symlinks/plugins/app_links/ios`)
+  - app_tracking_transparency (from `.symlinks/plugins/app_tracking_transparency/ios`)
   - audio_session (from `.symlinks/plugins/audio_session/ios`)
   - connectivity_plus (from `.symlinks/plugins/connectivity_plus/ios`)
   - daily_flutter (from `.symlinks/plugins/daily_flutter/ios`)
   - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
+  - facebook_app_events (from `.symlinks/plugins/facebook_app_events/ios`)
   - file_picker (from `.symlinks/plugins/file_picker/ios`)
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
@@ -177,6 +190,9 @@ SPEC REPOS:
     - DailyFlutter-iOS
     - DKImagePickerController
     - DKPhotoGallery
+    - FBAEMKit
+    - FBSDKCoreKit
+    - FBSDKCoreKit_Basics
     - Firebase
     - FirebaseCore
     - FirebaseCoreInternal
@@ -193,6 +209,8 @@ SPEC REPOS:
 EXTERNAL SOURCES:
   app_links:
     :path: ".symlinks/plugins/app_links/ios"
+  app_tracking_transparency:
+    :path: ".symlinks/plugins/app_tracking_transparency/ios"
   audio_session:
     :path: ".symlinks/plugins/audio_session/ios"
   connectivity_plus:
@@ -201,6 +219,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/daily_flutter/ios"
   device_info_plus:
     :path: ".symlinks/plugins/device_info_plus/ios"
+  facebook_app_events:
+    :path: ".symlinks/plugins/facebook_app_events/ios"
   file_picker:
     :path: ".symlinks/plugins/file_picker/ios"
   firebase_core:
@@ -236,6 +256,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   app_links: a754cbec3c255bd4bbb4d236ecc06f28cd9a7ce8
+  app_tracking_transparency: 3d84f147f67ca82d3c15355c36b1fa6b66ca7c92
   audio_session: 9bb7f6c970f21241b19f5a3658097ae459681ba0
   connectivity_plus: cb623214f4e1f6ef8fe7403d580fdad517d2f7dd
   daily_flutter: a93622180b40299a56c9ee7ececc26954ba72d5e
@@ -243,6 +264,10 @@ SPEC CHECKSUMS:
   device_info_plus: 21fcca2080fbcd348be798aa36c3e5ed849eefbe
   DKImagePickerController: 946cec48c7873164274ecc4624d19e3da4c1ef3c
   DKPhotoGallery: b3834fecb755ee09a593d7c9e389d8b5d6deed60
+  facebook_app_events: eda98dffee80c98536e102a3e23fe8a17f433ba7
+  FBAEMKit: 2a6b529993713c185b02bc36f8c91129bf78dfb0
+  FBSDKCoreKit: 65d7f7a7d6fcc3aa6eb6e093ec737a4184fc6049
+  FBSDKCoreKit_Basics: 7bc9d8fde8f70985fba2ed7c1d07e319f969a991
   file_picker: a0560bc09d61de87f12d246fc47d2119e6ef37be
   Firebase: 7d62445aeabdaea36f7d372f33052fed9a72514f
   firebase_core: 0013f886fbd0b4950865551eaab47784424bfdb5

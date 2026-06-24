@@ -219,8 +219,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       final path = picked.path;
       if (path == null) return;
       final fileSize = await File(path).length();
-      if (fileSize > 5 * 1024 * 1024) {
-        if (mounted) AppNotify.show(context, message: 'IELTS certificate must be under 5 MB');
+      if (fileSize > 15 * 1024 * 1024) {
+        if (mounted) AppNotify.show(context, message: 'IELTS certificate must be under 15 MB');
         return;
       }
       setState(() {
@@ -241,6 +241,26 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       _introVideo = File(picked.path);
       _introVideoName = picked.name;
       _introVideoSize = fileSize;
+    });
+  }
+
+  Future<void> _removeIntroVideo() async {
+    // A freshly picked (not-yet-uploaded) video only lives locally, so just
+    // clear it. An existing server-side video must be deleted via the API.
+    if (_introVideo == null && _introVideoName != null) {
+      try {
+        await ApiService.delete('/tutor/profile/intro-video/');
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        AppNotify.show(context, message: e.message);
+        return;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _introVideo = null;
+      _introVideoName = null;
+      _introVideoSize = null;
     });
   }
 
@@ -683,11 +703,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         if (_introVideoName != null)
                           _UploadedFileCard(
                             name: _introVideoName!,
-                            onRemove: () => setState(() {
-                              _introVideo = null;
-                              _introVideoName = null;
-                              _introVideoSize = null;
-                            }),
+                            onRemove: _removeIntroVideo,
                           )
                         else
                           _UploadButton(

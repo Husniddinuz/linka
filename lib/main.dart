@@ -7,6 +7,7 @@ import 'screens/splash_screen.dart';
 import 'screens/role_selection_screen.dart';
 import 'services/api_service.dart';
 import 'services/app_feature_service.dart';
+import 'services/facebook_events_service.dart';
 import 'services/token_service.dart';
 import 'services/update_service.dart';
 import 'services/user_service.dart';
@@ -17,6 +18,7 @@ import 'widgets/update_dialog.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await FacebookEventsService.init();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   // Global session-expired handler: any 401 that can't be recovered by
@@ -60,7 +62,10 @@ class _LinkaAppState extends State<LinkaApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _appLinks = AppLinks();
     _initDeepLinks();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FacebookEventsService.requestTracking();
+      _checkForUpdate();
+    });
   }
 
   @override

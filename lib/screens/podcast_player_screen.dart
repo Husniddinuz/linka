@@ -5,16 +5,19 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:just_audio/just_audio.dart';
 import '../services/api_service.dart';
 import '../services/podcast_playback_service.dart';
+import '../services/subtitle_service.dart';
 
 class PodcastPlayerScreen extends StatefulWidget {
   final int podcastId;
   final String? initialTitle;
   final String? initialAudioUrl;
+  final String? initialSubtitleUrl;
   const PodcastPlayerScreen({
     super.key,
     required this.podcastId,
     this.initialTitle,
     this.initialAudioUrl,
+    this.initialSubtitleUrl,
   });
 
   @override
@@ -39,6 +42,14 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
   Timer? _sleepTimer;
   String _sleepLabel = 'Off';
 
+  // Subtitles / transcript
+  int? _subtitleLoadedFor;
+  List<SubtitleCue> _cues = [];
+  int _activeCue = -1;
+  bool _showTranscript = false;
+  final ScrollController _transcriptScroll = ScrollController();
+  List<GlobalKey> _cueKeys = [];
+
   @override
   void initState() {
     super.initState();
@@ -47,9 +58,11 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
   }
 
   void _bindStreams() {
+    _service.currentTrack.addListener(_onTrackChanged);
     _positionSub = _service.positionStream.listen((pos) {
       if (!mounted) return;
       setState(() => _position = pos);
+      _updateActiveCue(pos);
     });
     _durationSub = _service.durationStream.listen((d) {
       if (!mounted || d == null) return;
@@ -59,6 +72,13 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
       if (!mounted) return;
       setState(() => _playing = state.playing);
     });
+  }
+
+  void _onTrackChanged() {
+    final track = _service.currentTrack.value;
+    if (!mounted || track == null) return;
+    setState(() => _title = track.title);
+    _loadSubtitles(track.id, track.subtitleUrl);
   }
 
   Future<void> _loadPodcast() async {
@@ -72,23 +92,45 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
         _speed = _service.player.speed;
         _muted = _service.player.volume == 0.0;
         setState(() => _loading = false);
+        String? subtitleUrl =
+            existing.subtitleUrl ?? widget.initialSubtitleUrl;
+        if ((subtitleUrl == null || subtitleUrl.isEmpty) &&
+            existing.audioUrl.isNotEmpty) {
+          subtitleUrl = await _resolveSubtitleUrl(existing.audioUrl);
+        }
+        _loadSubtitles(existing.id, subtitleUrl);
         return;
       }
 
       String? audioUrl = widget.initialAudioUrl;
       String? imageUrl;
+      String? subtitleUrl = widget.initialSubtitleUrl;
       _title = widget.initialTitle ?? '';
 
       if (audioUrl == null || audioUrl.isEmpty) {
-        final data =
-            await ApiService.get('/content/podcasts/${widget.podcastId}/');
-        if (!mounted) return;
-        final podcast = data['data'] as Map<String, dynamic>? ?? data;
-        _title = podcast['title'] as String? ?? '';
-        audioUrl = podcast['audio_url'] as String?;
-        imageUrl = podcast['image_url'] as String? ??
-            podcast['cover_url'] as String?;
+        try {
+          final data =
+              await ApiService.get('/content/podcasts/${widget.podcastId}/');
+          if (!mounted) return;
+          final podcast = data['data'] as Map<String, dynamic>? ?? data;
+          _title = podcast['title'] as String? ?? _title;
+          audioUrl = podcast['audio_url'] as String?;
+          imageUrl = podcast['image_url'] as String? ??
+              podcast['cover_url'] as String?;
+          subtitleUrl ??= podcast['subtitle_url'] as String?;
+        } catch (_) {
+          // API unavailable — use whatever initial data we have
+        }
       }
+
+      // Auto-derive subtitle URL from the audio filename when not provided
+      if ((subtitleUrl == null || subtitleUrl.isEmpty) &&
+          audioUrl != null && audioUrl.isNotEmpty) {
+        subtitleUrl = await _resolveSubtitleUrl(audioUrl);
+      }
+
+      debugPrint('[Podcast] audioUrl: $audioUrl');
+      debugPrint('[Podcast] subtitleUrl: $subtitleUrl');
 
       if (audioUrl != null && audioUrl.isNotEmpty) {
         await _service.load(PodcastTrack(
@@ -96,20 +138,118 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
           title: _title,
           audioUrl: audioUrl,
           imageUrl: imageUrl,
+          subtitleUrl: subtitleUrl,
         ));
         _service.play();
       }
 
       if (!mounted) return;
       setState(() => _loading = false);
+      _loadSubtitles(widget.podcastId, subtitleUrl);
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
+      _loadSubtitles(widget.podcastId, widget.initialSubtitleUrl);
+    }
+  }
+
+  /// Derives a subtitle URL from [audioUrl] by replacing the audio extension
+  /// with `.srt`. Checks the local asset bundle first (for test files), then
+  /// falls back to the same HTTP URL with `.srt` extension (for when the backend
+  /// serves the SRT alongside the MP3).
+  Future<String?> _resolveSubtitleUrl(String audioUrl) async {
+    final uri = Uri.tryParse(audioUrl);
+    final filename = uri?.pathSegments.lastOrNull ?? '';
+    debugPrint('[Subtitle] audio filename: "$filename"');
+    if (filename.isEmpty) return null;
+
+    final srtName = filename.replaceFirst(
+        RegExp(r'\.(mp3|m4a|wav|aac|ogg)$', caseSensitive: false), '.srt');
+    if (srtName == filename) {
+      debugPrint('[Subtitle] no audio extension found, skipping');
+      return null;
+    }
+
+    debugPrint('[Subtitle] trying asset: assets/subtitles/$srtName');
+    final assetKey = 'assets/subtitles/$srtName';
+    try {
+      await rootBundle.loadString(assetKey);
+      debugPrint('[Subtitle] asset found → $assetKey');
+      return 'asset://$assetKey';
+    } catch (_) {
+      debugPrint('[Subtitle] asset not found, using HTTP URL');
+      return audioUrl.replaceFirst(
+          RegExp(r'\.(mp3|m4a|wav|aac|ogg)$', caseSensitive: false), '.srt');
+    }
+  }
+
+  /// Resolves [subtitleUrl] (fetching the podcast detail if it's unknown) and
+  /// loads the WebVTT cues for the podcast with [id]. No-op if already loaded
+  /// for this podcast. Silently leaves the transcript empty on any failure.
+  Future<void> _loadSubtitles(int id, String? subtitleUrl) async {
+    if (_subtitleLoadedFor == id) return;
+    _subtitleLoadedFor = id;
+
+    var url = subtitleUrl;
+    if (url == null || url.isEmpty) {
+      try {
+        final data = await ApiService.get('/content/podcasts/$id/');
+        final podcast = data['data'] as Map<String, dynamic>? ?? data;
+        url = podcast['subtitle_url'] as String?;
+      } catch (_) {
+        url = null;
+      }
+    }
+
+    final cues = await SubtitleService.fetchCues(url);
+    if (!mounted || _subtitleLoadedFor != id) return;
+    setState(() {
+      _cues = cues;
+      _cueKeys = List.generate(cues.length, (_) => GlobalKey());
+      _activeCue = -1;
+      if (cues.isEmpty) {
+        _showTranscript = false;
+      } else {
+        _showTranscript = true;
+      }
+    });
+    _updateActiveCue(_position);
+  }
+
+  /// Recomputes which cue is active at [pos] and, when the transcript panel is
+  /// open, scrolls it into view.
+  void _updateActiveCue(Duration pos) {
+    if (_cues.isEmpty) return;
+    final index = SubtitleService.activeCueIndex(_cues, pos);
+    if (index == _activeCue) return;
+    setState(() => _activeCue = index);
+    if (_showTranscript) _scrollToActiveCue();
+  }
+
+  void _scrollToActiveCue() {
+    if (_activeCue < 0 || _activeCue >= _cueKeys.length) return;
+    final ctx = _cueKeys[_activeCue].currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      alignment: 0.4,
+    );
+  }
+
+  void _toggleTranscript() {
+    setState(() => _showTranscript = !_showTranscript);
+    if (_showTranscript) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _scrollToActiveCue());
     }
   }
 
   @override
   void dispose() {
+    _transcriptScroll.dispose();
+    _service.currentTrack.removeListener(_onTrackChanged);
     _sleepTimer?.cancel();
     _sleepSub?.cancel();
     _positionSub?.cancel();
@@ -199,6 +339,42 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
     return '-${_formatDuration(remaining)}';
   }
 
+  Widget _buildTranscriptPanel() {
+    return Expanded(
+      child: ListView.builder(
+        controller: _transcriptScroll,
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        itemCount: _cues.length,
+        itemBuilder: (context, i) {
+          final cue = _cues[i];
+          final isActive = i == _activeCue;
+          return Padding(
+            key: _cueKeys[i],
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                _service.seek(cue.start);
+                if (!_service.isPlaying) _service.play();
+              },
+              child: Text(
+                cue.text,
+                style: TextStyle(
+                  color: isActive
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.4),
+                  fontSize: isActive ? 19 : 17,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -228,6 +404,20 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                             ),
                           ),
                         ),
+                        if (_cues.isNotEmpty)
+                          IconButton(
+                            onPressed: _toggleTranscript,
+                            tooltip: 'Transcript',
+                            icon: Icon(
+                              _showTranscript
+                                  ? Icons.closed_caption
+                                  : Icons.closed_caption_off_outlined,
+                              color: _showTranscript
+                                  ? const Color(0xFFF5C542)
+                                  : Colors.white,
+                              size: 26,
+                            ),
+                          ),
                         IconButton(
                           onPressed: _loading ? null : _toggleMute,
                           icon: SvgPicture.asset(
@@ -258,8 +448,11 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                     )
                   else ...[
 
-                  // Podcast image + title
-                  Expanded(
+                  // Podcast image + title — or transcript when toggled on
+                  if (_showTranscript)
+                    _buildTranscriptPanel()
+                  else
+                    Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -315,6 +508,29 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                             ),
                           ),
                         ),
+                        if (_activeCue >= 0 && _activeCue < _cues.length) ...[
+                          const SizedBox(height: 20),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                _cues[_activeCue].text,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

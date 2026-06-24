@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../screens/plus_subscription_screen.dart';
-
-Future<void> showFreeMinutesDialog(BuildContext context, {bool dismissible = true}) {
-  return showDialog(
+/// Shows the "free minutes are over" dialog.
+///
+/// Returns `true` if the user chose to join PLUS, otherwise `false`. The caller
+/// is responsible for navigating to the subscription screen so it can control
+/// the order of pops/pushes on the navigator.
+Future<bool> showFreeMinutesDialog(BuildContext context, {bool dismissible = true}) async {
+  final result = await showDialog<bool>(
     context: context,
     barrierDismissible: dismissible,
     barrierColor: Colors.black.withValues(alpha: 0.6),
     builder: (_) => _FreeMinutesDialog(dismissible: dismissible),
   );
+  return result ?? false;
 }
 
 class _FreeMinutesDialog extends StatelessWidget {
@@ -96,14 +100,7 @@ class _FreeMinutesDialog extends StatelessWidget {
                       width: double.infinity,
                       height: 46,
                       child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const PlusSubscriptionScreen(),
-                            ),
-                          );
-                        },
+                        onPressed: () => Navigator.of(context).pop(true),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFF5C542),
                           foregroundColor: const Color(0xFF272942),
@@ -128,7 +125,7 @@ class _FreeMinutesDialog extends StatelessWidget {
                         width: double.infinity,
                         height: 46,
                         child: TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
+                          onPressed: () => Navigator.of(context).pop(false),
                           style: TextButton.styleFrom(
                             foregroundColor: const Color(0xFFAAAAAA),
                             shape: RoundedRectangleBorder(

@@ -39,7 +39,8 @@ class NotificationService {
         'platform': platform,
       });
 
-    } catch (e) {
+    } catch (_) {
+      // Registration is best-effort; ignore failures.
     }
   }
 

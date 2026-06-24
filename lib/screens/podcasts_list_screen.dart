@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
+import '../services/podcast_playback_service.dart';
 import '../widgets/new_badge.dart';
 import 'podcast_player_screen.dart';
 
@@ -25,14 +27,54 @@ class _PodcastsListScreenState extends State<PodcastsListScreen> {
     try {
       final list = await ApiService.getList('/content/podcasts/');
       if (!mounted) return;
+      for (final p in list) {
+        final m = p as Map<String, dynamic>;
+        debugPrint('[Podcasts] id=${m['id']} audio_url=${m['audio_url']} subtitle_url=${m['subtitle_url']}');
+      }
       setState(() {
         _podcasts = list.cast<Map<String, dynamic>>();
         _loading = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[Podcasts] load error: $e');
       if (!mounted) return;
       setState(() => _loading = false);
     }
+    if (!mounted) return;
+    if (_podcasts.isEmpty && kDebugMode) {
+      setState(() {
+        _podcasts = [
+          {
+            'id': -1,
+            'title': 'Deep Dive: Health & Fitness',
+            'audio_url': '',
+            'subtitle_url': 'asset://assets/subtitles/audio_729f7f7467.srt',
+            'duration': null,
+            'is_new': true,
+          },
+        ];
+      });
+    }
+  }
+
+  void _playFrom(int tappedIndex) {
+    final tracks = <PodcastTrack>[];
+    int startIndex = 0;
+    for (var i = 0; i < _podcasts.length; i++) {
+      final p = _podcasts[i];
+      final url = p['audio_url'] as String?;
+      if (url == null || url.isEmpty) continue;
+      if (i == tappedIndex) startIndex = tracks.length;
+      tracks.add(PodcastTrack(
+        id: p['id'] as int,
+        title: p['title'] as String? ?? '',
+        audioUrl: url,
+        imageUrl: p['image_url'] as String? ?? p['cover_url'] as String?,
+        subtitleUrl: p['subtitle_url'] as String?,
+      ));
+    }
+    if (tracks.isEmpty) return;
+    PodcastPlaybackService.instance.setQueue(tracks, startIndex);
   }
 
   @override
@@ -68,12 +110,13 @@ class _PodcastsListScreenState extends State<PodcastsListScreen> {
               : ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   itemCount: _podcasts.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                  separatorBuilder: (_, _) => const Divider(height: 1, color: Color(0xFFEEEEEE)),
                   itemBuilder: (context, i) {
                     final podcast = _podcasts[i];
                     final title = podcast['title'] as String? ?? '';
                     final id = podcast['id'] as int;
                     final audioUrl = podcast['audio_url'] as String?;
+                    final subtitleUrl = podcast['subtitle_url'] as String?;
                     final durationSec = podcast['duration'] as int?;
                     final isNew = podcast['is_new'] as bool? ?? false;
 
@@ -143,16 +186,20 @@ class _PodcastsListScreenState extends State<PodcastsListScreen> {
                         color: Color(0xFF272942),
                         size: 32,
                       ),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PodcastPlayerScreen(
-                            podcastId: id,
-                            initialTitle: title,
-                            initialAudioUrl: audioUrl,
+                      onTap: () {
+                        _playFrom(i);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PodcastPlayerScreen(
+                              podcastId: id,
+                              initialTitle: title,
+                              initialAudioUrl: audioUrl,
+                              initialSubtitleUrl: subtitleUrl,
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     );
                   },
                 ),

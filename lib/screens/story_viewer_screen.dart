@@ -53,6 +53,9 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   VideoPlayerController? _videoController;
   late final AnimationController _progress;
 
+  /// Vertical offset while the user is swiping down to dismiss.
+  double _dragOffset = 0;
+
   // Preloaded controllers keyed by media URL.
   final Map<String, VideoPlayerController> _preloadedVideos = {};
 
@@ -200,6 +203,39 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   void _onTapLeft() => _goBack();
   void _onTapRight() => _advance();
 
+  void _pause() {
+    _progress.stop();
+    _videoController?.pause();
+  }
+
+  void _resume() {
+    if (_videoController != null) {
+      _videoController!.play();
+    } else if (_progress.status != AnimationStatus.completed) {
+      _progress.forward().whenCompleteOrCancel(() {
+        if (!mounted) return;
+        if (_progress.status == AnimationStatus.completed) _advance();
+      });
+    }
+  }
+
+  void _onVerticalDragStart(DragStartDetails details) => _pause();
+
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    final next = _dragOffset + details.delta.dy;
+    setState(() => _dragOffset = next < 0 ? 0 : next);
+  }
+
+  void _onVerticalDragEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (_dragOffset > 120 || velocity > 700) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() => _dragOffset = 0);
+    _resume();
+  }
+
   void _onBookClass() {
     final id = _tutor.tutorId;
     Navigator.of(context).pop();
@@ -248,8 +284,11 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     final stories = _tutor.stories;
 
+    final screenHeight = MediaQuery.of(context).size.height;
+    final dragProgress = (_dragOffset / screenHeight).clamp(0.0, 1.0);
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.black.withValues(alpha: 1 - dragProgress * 0.6),
       body: GestureDetector(
         onTapUp: (details) {
           final dx = details.globalPosition.dx;
@@ -260,9 +299,16 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
             _onTapRight();
           }
         },
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
+        onVerticalDragStart: _onVerticalDragStart,
+        onVerticalDragUpdate: _onVerticalDragUpdate,
+        onVerticalDragEnd: _onVerticalDragEnd,
+        child: Transform.translate(
+          offset: Offset(0, _dragOffset),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(_dragOffset > 0 ? 16 : 0),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
             // Story content
             if (_current.mediaType == 'video' && _videoController != null)
               _videoController!.value.isInitialized
@@ -476,7 +522,9 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                 ],
               ),
             ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );

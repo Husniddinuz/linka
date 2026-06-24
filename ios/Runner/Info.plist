@@ -66,6 +66,14 @@
 				</array>
 			</dict>
 		</dict>
+		<key>NSUserTrackingUsageDescription</key>
+		<string>This identifier will be used to deliver personalized ads and measure the effectiveness of our advertising.</string>
+		<key>FacebookAppID</key>
+		<string>853246200766742</string>
+		<key>FacebookClientToken</key>
+		<string>53b9a7ff7a10d35b0983408562df8ebb</string>
+		<key>FacebookDisplayName</key>
+		<string>Linka</string>
 		<key>CFBundleURLTypes</key>
 		<array>
 			<dict>
@@ -78,6 +86,16 @@
 					<string>linka</string>
 				</array>
 			</dict>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLName</key>
+				<string>facebook</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>fb853246200766742</string>
+				</array>
+			</dict>
 		</array>
 		<key>LSApplicationQueriesSchemes</key>
 		<array>
@@ -88,6 +106,10 @@
 			<string>payme</string>
 			<string>uzumbank</string>
 			<string>uzum</string>
+			<string>fbapi</string>
+			<string>fb-messenger-share-api</string>
+			<string>fbauth2</string>
+			<string>fbshareextension</string>
 		</array>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>

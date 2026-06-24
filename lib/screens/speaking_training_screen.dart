@@ -14,6 +14,7 @@ import '../services/plus_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 import '../widgets/free_minutes_dialog.dart';
+import 'plus_subscription_screen.dart';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,10 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   RTCPeerConnection? _pc;
   bool _offerInFlight = false;
   bool _awaitingUserDecision = false;
+  // True after we accept a partner and are waiting for them to accept/join the
+  // room. Drives the waiting overlay to show "Waiting for partner to accept…"
+  // instead of the generic "Finding a partner…" search state.
+  bool _waitingForPartnerAccept = false;
   // Reentrancy guard: _connectWaitingRoom is triggered from multiple paths
   // (Next button, peer-left, pc state change). Without this, concurrent calls
   // race on _matchWs and throw "Stream has already been listened to".
@@ -199,6 +204,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
       if (!mounted) return;
       setState(() {
         _isConnected = false;
+        _waitingForPartnerAccept = false;
         _remoteName = null;
         _remoteGender = null;
         _remoteProfileImage = null;
@@ -325,7 +331,12 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         profileImage: _remoteProfileImage,
       ),
     );
-    if (mounted) setState(() => _awaitingUserDecision = false);
+    if (mounted) {
+      setState(() {
+        _awaitingUserDecision = false;
+        _waitingForPartnerAccept = accepted == true;
+      });
+    }
     if (!mounted) return;
     if (accepted == true) {
       await _startMatchedCall(data);
@@ -352,10 +363,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         final sigRes = await ApiService.post('/video/signaling/', {'room_id': roomId});
         final limit = sigRes['limit'] as int?;
         if (!_isPlus && limit != null && limit <= 0) {
-          if (mounted) {
-            await showFreeMinutesDialog(context, dismissible: false);
-            if (mounted) Navigator.of(context).pop();
-          }
+          await _showFreeMinutesOver(dismissible: false);
           return;
         }
         if (!_isPlus && limit != null && limit > 0) _startCountdown(limit);
@@ -402,6 +410,23 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     } catch (e) {
       if (mounted) _showError('Failed to start call. Retrying...');
       _connectWaitingRoom();
+    }
+  }
+
+  /// Shows the "free minutes are over" dialog, closes the speaking screen, and
+  /// (if the user chose to) opens the PLUS subscription screen. The navigator is
+  /// captured before awaiting so we pop the speaking screen and push the
+  /// subscription screen in the right order.
+  Future<void> _showFreeMinutesOver({bool dismissible = true}) async {
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    final joinPlus = await showFreeMinutesDialog(context, dismissible: dismissible);
+    if (!mounted) return;
+    navigator.pop();
+    if (joinPlus) {
+      navigator.push(
+        MaterialPageRoute(builder: (_) => const PlusSubscriptionScreen()),
+      );
     }
   }
 
@@ -453,6 +478,8 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
         // The audio unit fully activates around connection time; re-assert the
         // loudspeaker so neither peer is left on the earpiece.
         _routeToSpeaker();
+        // Sync our current camera state in case it was already off before match.
+        _broadcastCameraState();
       }
       if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
           state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected ||
@@ -589,10 +616,16 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
             try { await stream.dispose(); } catch (_) {}
           }
           _localRenderer.srcObject = null;
-          if (mounted) {
-            await showFreeMinutesDialog(context);
-            if (mounted) Navigator.of(context).pop();
-          }
+          await _showFreeMinutesOver();
+        }
+        break;
+
+      case 'camera':
+        // Peer toggled their camera — reflect it so we show the camera-off
+        // avatar instead of a frozen black frame.
+        final enabled = msg['enabled'] as bool? ?? true;
+        if (mounted && _remoteCameraOn != enabled) {
+          setState(() => _remoteCameraOn = enabled);
         }
         break;
 
@@ -722,6 +755,14 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
     for (final track in stream.getVideoTracks()) {
       track.enabled = newState;
     }
+    // Disabling a track keeps it flowing as black frames, so the peer can't tell
+    // the camera is off from the media alone — tell them over the signaling WS so
+    // they can show the camera-off avatar instead of a black screen.
+    _broadcastCameraState();
+  }
+
+  void _broadcastCameraState() {
+    _sendSig({'type': 'camera', 'enabled': _isCameraOn});
   }
 
   Future<void> _onStop() async {
@@ -1041,7 +1082,10 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
                               )
                       else ...[
                         Container(color: const Color(0xFF0D0F1F)),
-                        const _WaitingRoomOverlay(),
+                        _WaitingRoomOverlay(
+                          waitingForAccept: _waitingForPartnerAccept,
+                          partnerName: _remoteName,
+                        ),
                       ],
                       // Partner info — bottom of remote half
                       if (_isConnected)
@@ -1169,7 +1213,15 @@ class _TopBar extends StatelessWidget {
 // ─── Waiting room overlay (sits on top of local camera preview) ───────────────
 
 class _WaitingRoomOverlay extends StatefulWidget {
-  const _WaitingRoomOverlay();
+  /// When true, the user has accepted and is waiting for the partner's decision,
+  /// so the overlay shows "Waiting for partner to accept…" instead of searching.
+  final bool waitingForAccept;
+  final String? partnerName;
+
+  const _WaitingRoomOverlay({
+    this.waitingForAccept = false,
+    this.partnerName,
+  });
 
   @override
   State<_WaitingRoomOverlay> createState() => _WaitingRoomOverlayState();
@@ -1267,9 +1319,12 @@ class _WaitingRoomOverlayState extends State<_WaitingRoomOverlay>
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                'Finding a partner...',
-                style: TextStyle(
+              Text(
+                widget.waitingForAccept
+                    ? 'Waiting for partner to accept...'
+                    : 'Finding a partner...',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -1277,9 +1332,12 @@ class _WaitingRoomOverlayState extends State<_WaitingRoomOverlay>
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Get ready to speak English!',
-                style: TextStyle(color: Colors.white60, fontSize: 13),
+              Text(
+                widget.waitingForAccept
+                    ? '${widget.partnerName ?? 'Your partner'} needs to accept too'
+                    : 'Get ready to speak English!',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white60, fontSize: 13),
               ),
             ],
           ),

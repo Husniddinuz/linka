@@ -20,6 +20,7 @@ import 'my_profile_screen.dart';
 import 'story_upload_screen.dart';
 import 'podcast_player_screen.dart';
 import 'podcasts_list_screen.dart';
+import '../services/podcast_playback_service.dart';
 import 'articles_list_screen.dart';
 import 'article_detail_screen.dart';
 import '../widgets/new_badge.dart';
@@ -200,6 +201,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loadingLessons = true;
   bool _loadingPodcasts = true;
   bool _loadingArticles = true;
+
+  // Keys to drive the self-contained webinar/debate blocks on pull-to-refresh.
+  final GlobalKey<_WebinarBlockState> _webinarKey = GlobalKey();
+  final GlobalKey<_DebateBlockState> _debateKey = GlobalKey();
 
   bool get _isInitialLoading =>
       _loadingStories &&
@@ -443,6 +448,10 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadArticles(),
       _loadSavedArticles(),
       _loadProfile(),
+      // The webinar/debate blocks manage their own state, so explicitly ask
+      // them to re-fetch — otherwise a freshly created session won't appear.
+      _webinarKey.currentState?.refresh() ?? Future.value(),
+      _debateKey.currentState?.refresh() ?? Future.value(),
     ]);
   }
 
@@ -612,8 +621,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
                               // Webinar/Debate blocks carry their own bottom
                               // spacing, so they collapse fully when absent.
-                              const _WebinarBlock(),
-                              const _DebateBlock(),
+                              _WebinarBlock(key: _webinarKey),
+                              _DebateBlock(key: _debateKey),
 
                               if (AppFeatureService.isEnabled('tutors'))
                                 Padding(
@@ -668,12 +677,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
                               const SizedBox(height: 32),
 
-                              const _SectionHeader(title: 'WATCH A MOVIE'),
-                              const SizedBox(height: 12),
-                              const _ComingSoonBanner(),
-
-                              const SizedBox(height: 28),
-
                               _SectionHeader(
                                 title: 'PODCASTS',
                                 onSeeAll: () => Navigator.push(
@@ -707,6 +710,17 @@ class _HomeScreenState extends State<HomeScreen> {
                                 savedArticleIds: _savedArticleIds,
                                 onToggleBookmark: _toggleArticleBookmark,
                               ),
+
+                              if (AppFeatureService.isEnabled('ielts')) ...[
+                                const SizedBox(height: 28),
+                                const _IeltsRegisterBanner(),
+                              ],
+
+                              const SizedBox(height: 28),
+
+                              const _SectionHeader(title: 'WATCH A MOVIE'),
+                              const SizedBox(height: 12),
+                              const _ComingSoonBanner(),
 
                               const SizedBox(height: 32),
                             ],
@@ -1452,20 +1466,21 @@ class _SectionHeader extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          GestureDetector(
-            onTap: onSeeAll,
-            child: const Text(
-              'See all',
-              style: TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFFB9BCBE),
-                height: 1.0,
-                letterSpacing: 0,
+          if (onSeeAll != null)
+            GestureDetector(
+              onTap: onSeeAll,
+              child: const Text(
+                'See all',
+                style: TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFFB9BCBE),
+                  height: 1.0,
+                  letterSpacing: 0,
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -1672,10 +1687,198 @@ class _ComingSoonBanner extends StatelessWidget {
   }
 }
 
+// ─── IELTS registration banner ──────────────────────────────────────────────────
+
+class _IeltsRegisterBanner extends StatelessWidget {
+  const _IeltsRegisterBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GestureDetector(
+        onTap: () {
+          // TODO: open the in-app IELTS registration screen (submits to the
+          // backend endpoint — wire up once the screen/endpoint are ready).
+        },
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            children: [
+              // Official IDP IELTS red (Pantone 186 C) gradient.
+              Positioned.fill(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFFE4002B),
+                        Color(0xFFC8102E),
+                        Color(0xFFA30021),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Decorative circles
+              Positioned(
+                right: -30,
+                top: -30,
+                child: Container(
+                  width: 130,
+                  height: 130,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.12),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 40,
+                bottom: -40,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+              ),
+              // Content
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 22,
+                ),
+                child: Row(
+                  children: [
+                    // Left: text
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.22),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'SPECIAL OFFER',
+                              style: TextStyle(
+                                fontFamily: 'SF Pro',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 1.6,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Register for IELTS',
+                            style: TextStyle(
+                              fontFamily: 'SF Pro',
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Get 1 month of Linka Plus, free',
+                            style: TextStyle(
+                              fontFamily: 'SF Pro',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withValues(alpha: 0.85),
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF8A001C,
+                                  ).withValues(alpha: 0.25),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Register now',
+                                  style: TextStyle(
+                                    fontFamily: 'SF Pro',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFFC8102E),
+                                  ),
+                                ),
+                                SizedBox(width: 6),
+                                Icon(
+                                  Icons.arrow_forward_rounded,
+                                  color: Color(0xFFC8102E),
+                                  size: 16,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Right: icon
+                    SizedBox(
+                      width: 80,
+                      child: Center(
+                        child: Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.school_rounded,
+                            color: Colors.white,
+                            size: 34,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Webinar block (today's session) ───────────────────────────────────────────
 
 class _WebinarBlock extends StatefulWidget {
-  const _WebinarBlock();
+  const _WebinarBlock({super.key});
 
   @override
   State<_WebinarBlock> createState() => _WebinarBlockState();
@@ -1693,6 +1896,12 @@ class _WebinarBlockState extends State<_WebinarBlock> {
     } else {
       _loading = false;
     }
+  }
+
+  /// Re-pull the latest session, e.g. on pull-to-refresh from the parent.
+  Future<void> refresh() async {
+    if (!AppFeatureService.isEnabled('webinars')) return;
+    await _fetchToday();
   }
 
   Future<void> _fetchToday() async {
@@ -1902,7 +2111,7 @@ class _WebinarBlockState extends State<_WebinarBlock> {
 // ─── Debate block ──────────────────────────────────────────────────────────────
 
 class _DebateBlock extends StatefulWidget {
-  const _DebateBlock();
+  const _DebateBlock({super.key});
 
   @override
   State<_DebateBlock> createState() => _DebateBlockState();
@@ -1937,6 +2146,12 @@ class _DebateBlockState extends State<_DebateBlock>
     super.dispose();
   }
 
+  /// Re-pull the latest debate state, e.g. on pull-to-refresh from the parent.
+  Future<void> refresh() async {
+    if (!AppFeatureService.isEnabled('debates')) return;
+    await _fetchState();
+  }
+
   Future<void> _fetchState() async {
     try {
       final results = await Future.wait([
@@ -1952,6 +2167,7 @@ class _DebateBlockState extends State<_DebateBlock>
         _state = state;
         _hasSession = daily.hasSession;
         if (daily.topic.isNotEmpty) _topic = daily.topic;
+        _failed = false;
         _loading = false;
       });
     } on ApiException {
@@ -2215,7 +2431,8 @@ class _PodcastsSection extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: podcasts.length,
-        itemBuilder: (_, i) => _PodcastCard(podcast: podcasts[i]),
+        itemBuilder: (_, i) =>
+            _PodcastCard(podcast: podcasts[i], podcasts: podcasts, index: i),
       ),
     );
   }
@@ -2223,21 +2440,44 @@ class _PodcastsSection extends StatelessWidget {
 
 class _PodcastCard extends StatelessWidget {
   final _Podcast podcast;
-  const _PodcastCard({required this.podcast});
+  final List<_Podcast> podcasts;
+  final int index;
+  const _PodcastCard({
+    required this.podcast,
+    required this.podcasts,
+    required this.index,
+  });
+
+  void _playFrom() {
+    final tracks = <PodcastTrack>[];
+    int startIndex = 0;
+    for (var i = 0; i < podcasts.length; i++) {
+      final p = podcasts[i];
+      final url = p.audioUrl;
+      if (url == null || url.isEmpty) continue;
+      if (i == index) startIndex = tracks.length;
+      tracks.add(PodcastTrack(id: p.id, title: p.title, audioUrl: url));
+    }
+    if (tracks.isEmpty) return;
+    PodcastPlaybackService.instance.setQueue(tracks, startIndex);
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PodcastPlayerScreen(
-            podcastId: podcast.id,
-            initialTitle: podcast.title,
-            initialAudioUrl: podcast.audioUrl,
+      onTap: () {
+        _playFrom();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PodcastPlayerScreen(
+              podcastId: podcast.id,
+              initialTitle: podcast.title,
+              initialAudioUrl: podcast.audioUrl,
+            ),
           ),
-        ),
-      ),
+        );
+      },
       child: Container(
         width: 240,
         margin: const EdgeInsets.symmetric(horizontal: 6),

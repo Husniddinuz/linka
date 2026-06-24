@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../widgets/cached_avatar.dart';
 import '../widgets/plus_member_card.dart';
 import '../services/api_service.dart';
@@ -61,6 +62,25 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
       setState(() => _plusStatus = status);
     } catch (_) {
       // Leave _plusStatus null — the card is hidden when we can't confirm.
+    }
+  }
+
+  Future<void> _openSupport() async {
+    const username = 'Linka_Support';
+    final telegramUri = Uri.parse('tg://resolve?domain=$username');
+    final webUri = Uri.parse('https://t.me/$username');
+    try {
+      if (await canLaunchUrl(telegramUri)) {
+        await launchUrl(telegramUri);
+        return;
+      }
+    } catch (_) {
+      // Fall through to the web link if the Telegram app can't be opened.
+    }
+    if (await canLaunchUrl(webUri)) {
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      AppNotify.show(context, message: 'Could not open support chat.');
     }
   }
 
@@ -319,6 +339,12 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(builder: (_) => const FaqScreen()),
                           ),
+                        ),
+                        const _Divider(),
+                        _MenuRow(
+                          icon: 'assets/images/buttons/help_outline_20.svg',
+                          label: 'Support',
+                          onTap: _openSupport,
                         ),
                         const _Divider(),
                         _MenuRow(

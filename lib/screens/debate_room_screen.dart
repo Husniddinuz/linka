@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../services/api_constants.dart';
 import '../services/api_service.dart';
 import '../services/debate_service.dart';
+import '../services/token_service.dart';
 import '../widgets/cached_avatar.dart';
 
 // ─── Chat message model ────────────────────────────────────────────────────────
@@ -104,19 +106,34 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
   // User ids currently speaking (derived from LiveKit active speakers).
   Set<int> _speakingUserIds = {};
 
-  // Chat (LiveKit data channel, topic "chat")
+  // Chat (backend WebSocket — /ws/live/session/{room}/, same channel the
+  // webinar viewer uses). Replaces the old LiveKit data-channel chat so
+  // viewers — who may not share the speakers' data channel — still see and
+  // send messages over a channel the whole room shares.
   final List<_ChatMessage> _messages = [];
   final _chatController = TextEditingController();
   final _scrollController = ScrollController();
   bool _sendingMessage = false;
+  WebSocketChannel? _chatWs;
+  StreamSubscription? _chatSub;
+  bool _wsConnected = false;
+  // Live-session id from /live/debate/today/ — the WS chat channel key
+  // (`/ws/live/session/{id}/`). The LiveKit room name "main" is NOT valid.
+  int? _chatSessionId;
+  // Texts we just sent; drop the server's echo so we don't double-render.
+  final Set<String> _pendingOutbound = {};
+  // The server throttles chat to 1 message / 10s (replying with a
+  // `chat_rate_limited` frame). We mirror that with a client-side cooldown so
+  // rapid taps don't silently bounce instead of sending.
+  static const _chatCooldown = Duration(seconds: 10);
+  DateTime? _sendBlockedUntil;
+  Timer? _cooldownTimer;
 
   // "Which team is speaking" + how long. Recomputed from active speakers /
   // roster; the ticker just repaints the elapsed clock once a second.
   String? _speakingTeamKey; // "A" | "B" | "BOTH" | null
   DateTime? _speakingSince;
   Timer? _speakTicker;
-
-  static const _chatTopic = 'chat';
 
   @override
   void initState() {
@@ -129,8 +146,13 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
   Future<void> _loadTodayTopic() async {
     try {
       final daily = await DebateService.today();
-      if (!mounted || daily.topic.isEmpty) return;
-      setState(() => _topic = daily.topic);
+      if (!mounted) return;
+      if (daily.topic.isNotEmpty) setState(() => _topic = daily.topic);
+      // The session id (not the LiveKit room name) is the chat WS channel key.
+      if (daily.sessionId != null) {
+        _chatSessionId = daily.sessionId;
+        _connectChat();
+      }
     } on ApiException {
       // Topic is non-essential; leave the default in place on failure.
     } catch (_) {
@@ -190,6 +212,9 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
       });
 
       _seedRosterFromState();
+      // Chat runs over the backend WS keyed by the live-session id, connected
+      // from _loadTodayTopic() — independent of LiveKit audio, so viewers can
+      // still talk even when audio credentials are missing.
 
       if (!join.hasCredentials) {
         setState(() =>
@@ -294,8 +319,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
       ..on<ParticipantConnectedEvent>((_) => _scheduleRosterRebuild())
       ..on<ParticipantDisconnectedEvent>((_) => _scheduleRosterRebuild())
       ..on<ParticipantMetadataUpdatedEvent>(_onMetadataUpdated)
-      ..on<ParticipantPermissionsUpdatedEvent>((_) => _scheduleRosterRebuild())
-      ..on<DataReceivedEvent>(_onDataReceived);
+      ..on<ParticipantPermissionsUpdatedEvent>((_) => _scheduleRosterRebuild());
   }
 
   /// LiveKit metadata changed for someone (role/team is encoded there — the
@@ -317,22 +341,115 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
     _scheduleRosterRebuild();
   }
 
-  void _onDataReceived(DataReceivedEvent e) {
-    if (e.topic != _chatTopic) return;
+  // ─── Chat WebSocket ─────────────────────────────────────────────────────────
+
+  /// Opens (or re-opens) the room chat WebSocket. Same endpoint the webinar
+  /// viewer uses, keyed by the live-session id from /live/debate/today/.
+  /// Best-effort: a failure just leaves [_wsConnected] false and surfaces a
+  /// Reconnect link.
+  Future<void> _connectChat() async {
+    final sessionId = _chatSessionId;
+    if (sessionId == null) return;
+    final token = await TokenService.getAccessToken();
+    if (token == null || !mounted) return;
+
+    final apiUri = Uri.parse(apiBaseUrl);
+    final wsScheme = apiUri.scheme == 'https' ? 'wss' : 'ws';
+    final wsUrl =
+        '$wsScheme://${apiUri.host}/ws/live/session/$sessionId/?token=$token';
+
     try {
-      final decoded = json.decode(utf8.decode(e.data));
-      if (decoded is! Map) return;
-      final text = (decoded['text'] ?? '').toString();
+      await _chatSub?.cancel();
+      await _chatWs?.sink.close();
+      _chatWs = WebSocketChannel.connect(Uri.parse(wsUrl));
+      await _chatWs!.ready;
+      if (!mounted) return;
+      setState(() => _wsConnected = true);
+      _chatSub = _chatWs!.stream.listen(
+        _onChatMessage,
+        onError: (_) {
+          if (mounted) setState(() => _wsConnected = false);
+        },
+        onDone: () {
+          if (mounted) {
+            setState(() {
+              _wsConnected = false;
+              _chatWs = null;
+            });
+          }
+        },
+        cancelOnError: false,
+      );
+    } catch (_) {
+      _chatWs = null;
+      if (mounted) setState(() => _wsConnected = false);
+    }
+  }
+
+  void _onChatMessage(dynamic raw) {
+    try {
+      final data = json.decode(raw as String);
+      if (data is! Map<String, dynamic>) return;
+      final type = (data['type'] as String? ?? '').toLowerCase();
+
+      // Server throttled us: {"type":"chat_rate_limited","detail":"...",
+      // "retry_after_seconds":10}. The optimistic bubble for the bounced
+      // message never broadcast, so drop it and start the cooldown.
+      if (type == 'chat_rate_limited') {
+        final retry = (data['retry_after_seconds'] as num?)?.toInt() ?? 10;
+        _startCooldown(Duration(seconds: retry));
+        if (_messages.isNotEmpty && _messages.last.isOwn) {
+          _pendingOutbound.remove(_messages.last.text);
+          setState(() => _messages.removeLast());
+        }
+        final detail = data['detail']?.toString();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text((detail != null && detail.isNotEmpty)
+                ? detail
+                : 'You can send only one message every 10 seconds.'),
+            duration: const Duration(seconds: 2),
+          ));
+        }
+        return;
+      }
+
+      if (type != 'chat_message') return;
+
+      // Backend shape:
+      // {"type":"chat_message","message":{"text":"...","user":{"display_name":"...","image":"...","id":16}}}
+      String text;
+      String sender = 'Guest';
+      String? avatar;
+      int? userId;
+      final msgObj = data['message'];
+      if (msgObj is Map<String, dynamic>) {
+        text = (msgObj['text'] ?? '').toString();
+        final userObj = msgObj['user'];
+        if (userObj is Map<String, dynamic>) {
+          sender = (userObj['display_name'] ??
+                  userObj['full_name'] ??
+                  userObj['username'] ??
+                  'Guest')
+              .toString();
+          avatar = _resolveUrl(
+              (userObj['image'] ?? userObj['avatar'])?.toString());
+          userId = int.tryParse('${userObj['id'] ?? ''}');
+        }
+      } else {
+        // Tolerate a flat {"text":...,"sender_name":...} fallback.
+        text = (data['text'] ?? data['content'] ?? '').toString();
+        sender = (data['sender_name'] ?? data['sender'] ?? 'Guest').toString();
+      }
       if (text.isEmpty) return;
+      if (userId != null && userId == _myUserId) return; // our own echo
+      if (_pendingOutbound.remove(text)) return; // our own echo (no id match)
 
-      final p = e.participant;
-      final senderId = _userIdFromIdentity(p?.identity ?? '');
-      if (senderId != null && senderId == _myUserId) return; // own loopback
-
-      final meta = DebateMeta.tryParse(p?.metadata);
-      final sender = (meta?.fullName?.isNotEmpty ?? false)
-          ? meta!.fullName!
-          : (p != null && p.name.isNotEmpty ? p.name : 'Guest');
+      // Resolve team/avatar through the live roster so a sender's name keeps
+      // its team color even though the chat payload carries no role/team.
+      final entry = userId != null ? _roster[userId] : null;
+      final team = (entry?.isSpeaker ?? false) ? entry?.team : null;
+      avatar ??= entry?.avatarUrl;
 
       if (!mounted) return;
       setState(() {
@@ -340,8 +457,8 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
           sender: sender,
           text: text,
           isOwn: false,
-          avatarUrl: _resolveUrl(meta?.avatar),
-          team: meta?.role == 'speaker' ? meta?.team : null,
+          avatarUrl: avatar,
+          team: team,
         ));
       });
       _scrollToBottom();
@@ -522,7 +639,29 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
     if (mounted) setState(() => _micOn = false);
   }
 
-  // ─── Chat (LiveKit data channel) ──────────────────────────────────────────────
+  // ─── Chat (UI helpers) ────────────────────────────────────────────────────────
+
+  /// Seconds left before another chat message may be sent (0 when free).
+  int get _cooldownRemaining {
+    final until = _sendBlockedUntil;
+    if (until == null) return 0;
+    final ms = until.difference(DateTime.now()).inMilliseconds;
+    return ms <= 0 ? 0 : (ms / 1000).ceil();
+  }
+
+  /// Blocks sending for [d] and ticks a 1s repaint so the button counts down.
+  void _startCooldown(Duration d) {
+    _sendBlockedUntil = DateTime.now().add(d);
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted || _cooldownRemaining <= 0) {
+        t.cancel();
+        _cooldownTimer = null;
+      }
+      if (mounted) setState(() {});
+    });
+    if (mounted) setState(() {});
+  }
 
   void _scrollToBottom() {
     // Two frames: the first lets the new bubble lay out so maxScrollExtent
@@ -546,11 +685,20 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
 
   Future<void> _sendMessage() async {
     final text = _chatController.text.trim();
-    final lp = _room?.localParticipant;
-    if (text.isEmpty || _sendingMessage || lp == null) return;
+    if (text.isEmpty || _sendingMessage || _chatWs == null) return;
+
+    final wait = _cooldownRemaining;
+    if (wait > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Please wait ${wait}s before sending another message.'),
+        duration: const Duration(seconds: 1),
+      ));
+      return;
+    }
 
     _chatController.clear();
     FocusScope.of(context).unfocus();
+    _pendingOutbound.add(text); // track before the server echo arrives
     setState(() {
       _sendingMessage = true;
       _messages.add(_ChatMessage(
@@ -563,13 +711,10 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
     _scrollToBottom();
 
     try {
-      await lp.publishData(
-        utf8.encode(json.encode({'text': text})),
-        reliable: true,
-        topic: _chatTopic,
-      );
+      _chatWs!.sink.add(json.encode({'type': 'chat_message', 'text': text}));
+      _startCooldown(_chatCooldown);
     } catch (_) {
-      // Chat publish is best-effort.
+      _pendingOutbound.remove(text); // send failed, no echo will arrive
     } finally {
       if (mounted) setState(() => _sendingMessage = false);
     }
@@ -592,6 +737,9 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
     _roomListener = null;
     _closeRoom(room, listener);
     _speakTicker?.cancel();
+    _cooldownTimer?.cancel();
+    _chatSub?.cancel();
+    _chatWs?.sink.close();
     _chatController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -1185,13 +1333,27 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
               color: Colors.white,
             ),
           ),
+          if (!_wsConnected) ...[
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: _connectChat,
+              child: const Text(
+                'Reconnect',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: _cTeamA,
+                ),
+              ),
+            ),
+          ],
           const Spacer(),
           Container(
             width: 7,
             height: 7,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: _rtcConnected ? _cOnline : Colors.white24,
+              color: _wsConnected ? _cOnline : Colors.white24,
             ),
           ),
           const SizedBox(width: 6),
@@ -1283,16 +1445,30 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
           ),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: _sendingMessage ? null : _sendMessage,
+            onTap:
+                (_sendingMessage || _cooldownRemaining > 0) ? null : _sendMessage,
             child: Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: _sendingMessage ? Colors.white24 : _cTeamA,
+                color: (_sendingMessage || _cooldownRemaining > 0)
+                    ? Colors.white24
+                    : _cTeamA,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(Icons.arrow_upward_rounded,
-                  color: Colors.white, size: 20),
+              child: _cooldownRemaining > 0
+                  ? Center(
+                      child: Text(
+                        '$_cooldownRemaining',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    )
+                  : const Icon(Icons.arrow_upward_rounded,
+                      color: Colors.white, size: 20),
             ),
           ),
         ],
