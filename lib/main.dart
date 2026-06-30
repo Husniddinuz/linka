@@ -3,6 +3,7 @@ import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'screens/splash_screen.dart';
 import 'screens/role_selection_screen.dart';
 import 'services/api_service.dart';
@@ -16,7 +17,12 @@ import 'widgets/connectivity_wrapper.dart';
 import 'widgets/update_dialog.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  await JustAudioBackground.init(
+    androidNotificationChannelId: 'com.linka.app.channel.audio',
+    androidNotificationChannelName: 'Linka Podcasts',
+    androidNotificationOngoing: true,
+    androidStopForegroundOnPause: true,
+  );
   await Firebase.initializeApp();
   await FacebookEventsService.init();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);

@@ -581,24 +581,28 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
     return Stack(
       children: [
         Positioned.fill(
-          child: _messages.isEmpty
-              ? const Center(
-                  child: Text(
-                    'No messages yet.\nBe the first to say hi!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFFAAAAAA),
-                      height: 1.5,
+          child: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            behavior: HitTestBehavior.translucent,
+            child: _messages.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No messages yet.\nBe the first to say hi!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFFAAAAAA),
+                        height: 1.5,
+                      ),
                     ),
+                  )
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, inputH + keyboardH),
+                    itemCount: _messages.length,
+                    itemBuilder: (_, i) => _ChatBubble(message: _messages[i]),
                   ),
-                )
-              : ListView.builder(
-                  controller: _scrollController,
-                  padding: EdgeInsets.fromLTRB(16, 8, 16, inputH + keyboardH),
-                  itemCount: _messages.length,
-                  itemBuilder: (_, i) => _ChatBubble(message: _messages[i]),
-                ),
+          ),
         ),
         Positioned(
           left: 0,

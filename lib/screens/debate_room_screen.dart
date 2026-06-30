@@ -1376,28 +1376,32 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
       children: [
         _buildChatHeader(),
         Expanded(
-          child: _messages.isEmpty
-              ? const Center(
-                  child: Text(
-                    'No messages yet.\nBe the first to say hi!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.white38,
-                      height: 1.5,
+          child: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            behavior: HitTestBehavior.translucent,
+            child: _messages.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No messages yet.\nBe the first to say hi!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white38,
+                        height: 1.5,
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(12, 2, 12, 6),
+                    itemCount: _messages.length,
+                    itemBuilder: (_, i) => _ChatBubble(
+                      message: _messages[i],
+                      teamAColor: _cTeamA,
+                      teamBColor: _cTeamB,
                     ),
                   ),
-                )
-              : ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(12, 2, 12, 6),
-                  itemCount: _messages.length,
-                  itemBuilder: (_, i) => _ChatBubble(
-                    message: _messages[i],
-                    teamAColor: _cTeamA,
-                    teamBColor: _cTeamB,
-                  ),
-                ),
+          ),
         ),
         Padding(
           padding: EdgeInsets.only(bottom: keyboardH),

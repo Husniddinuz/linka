@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
+import '../services/facebook_events_service.dart';
 import '../services/podcast_playback_service.dart';
 import '../widgets/new_badge.dart';
 import 'podcast_player_screen.dart';
@@ -187,6 +188,11 @@ class _PodcastsListScreenState extends State<PodcastsListScreen> {
                         size: 32,
                       ),
                       onTap: () {
+                        debugPrint('[Podcasts] opened id=$id title="$title"');
+                        FacebookEventsService.logEvent('podcast_opened', parameters: {
+                          'podcast_id': id,
+                          'podcast_title': title,
+                        });
                         _playFrom(i);
                         Navigator.push(
                           context,

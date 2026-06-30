@@ -48,7 +48,6 @@ class _NotificationsInboxScreenState extends State<NotificationsInboxScreen> {
 
   Future<void> _markOne(_InboxItem item) async {
     if (item.isRead) return;
-    // Optimistic update — on failure, the next refresh will restore state.
     setState(() => item.isRead = true);
     try {
       await NotificationService.markRead(item.id);
@@ -56,6 +55,16 @@ class _NotificationsInboxScreenState extends State<NotificationsInboxScreen> {
       if (!mounted) return;
       setState(() => item.isRead = false);
     }
+  }
+
+  void _openDetail(_InboxItem item) {
+    _markOne(item);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _NotificationDetailSheet(item: item),
+    );
   }
 
   Future<void> _markAll() async {
@@ -178,7 +187,7 @@ class _NotificationsInboxScreenState extends State<NotificationsInboxScreen> {
                                 const SizedBox(height: 10),
                             itemBuilder: (_, i) => _InboxCard(
                               item: _items[i],
-                              onTap: () => _markOne(_items[i]),
+                              onTap: () => _openDetail(_items[i]),
                             ),
                           ),
               ),
@@ -372,6 +381,122 @@ class _InboxCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _NotificationDetailSheet extends StatelessWidget {
+  final _InboxItem item;
+
+  const _NotificationDetailSheet({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.all(Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFDDDDDD),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            width: 52,
+            height: 52,
+            decoration: const BoxDecoration(
+              color: Color(0xFF272942),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              _iconForType(item.type),
+              color: const Color(0xFFF5C542),
+              size: 26,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              item.title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF272942),
+                height: 1.3,
+              ),
+            ),
+          ),
+          if (item.body.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                item.body,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: Color(0xFF6C6C6C),
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              _timeAgo(item.createdAt),
+              style: const TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                color: Color(0xFFAAAAAA),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF272942),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Text(
+                  'Close',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
       ),
     );
   }

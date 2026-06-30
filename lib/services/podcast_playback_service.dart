@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
+import 'facebook_events_service.dart';
 
 class PodcastTrack {
   final int id;
@@ -35,8 +37,16 @@ class PodcastPlaybackService {
   int _currentIndex = -1;
 
   bool get hasNext => _currentIndex >= 0 && _currentIndex < _queue.length - 1;
+  bool get hasPrevious => _currentIndex > 0;
 
   Future<void> _onTrackCompleted() async {
+    final finished = currentTrack.value;
+    debugPrint('[Podcast] completed id=${finished?.id} title="${finished?.title}"');
+    FacebookEventsService.logEvent('podcast_completed', parameters: {
+      'podcast_id': finished?.id ?? -1,
+      'podcast_title': finished?.title ?? '',
+      'auto_advance': hasNext,
+    });
     if (hasNext) {
       await _playIndex(_currentIndex + 1);
     } else {
@@ -50,7 +60,14 @@ class PodcastPlaybackService {
     _currentIndex = index;
     final track = _queue[index];
     currentTrack.value = track;
-    await _player.setAudioSource(AudioSource.uri(Uri.parse(track.audioUrl)));
+    await _player.setAudioSource(AudioSource.uri(
+      Uri.parse(track.audioUrl),
+      tag: MediaItem(
+        id: track.audioUrl,
+        title: track.title,
+        artUri: track.imageUrl != null ? Uri.parse(track.imageUrl!) : null,
+      ),
+    ));
     await _player.play();
   }
 
@@ -71,6 +88,10 @@ class PodcastPlaybackService {
     if (hasNext) await _playIndex(_currentIndex + 1);
   }
 
+  Future<void> previous() async {
+    if (hasPrevious) await _playIndex(_currentIndex - 1);
+  }
+
   AudioPlayer get player => _player;
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
@@ -85,7 +106,14 @@ class PodcastPlaybackService {
     _queue = [track];
     _currentIndex = 0;
     currentTrack.value = track;
-    await _player.setAudioSource(AudioSource.uri(Uri.parse(track.audioUrl)));
+    await _player.setAudioSource(AudioSource.uri(
+      Uri.parse(track.audioUrl),
+      tag: MediaItem(
+        id: track.audioUrl,
+        title: track.title,
+        artUri: track.imageUrl != null ? Uri.parse(track.imageUrl!) : null,
+      ),
+    ));
   }
 
   Future<void> play() => _player.play();

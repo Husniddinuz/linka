@@ -103,6 +103,8 @@ class _OtpScreenState extends State<OtpScreen> {
 
       if (!mounted) return;
 
+      FocusScope.of(context).unfocus();
+
       NotificationService.registerDevice();
       NotificationService.listenTokenRefresh();
 

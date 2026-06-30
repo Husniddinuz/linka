@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:just_audio/just_audio.dart';
 import '../services/api_service.dart';
+import '../services/facebook_events_service.dart';
 import '../services/podcast_playback_service.dart';
 import '../services/subtitle_service.dart';
 
@@ -47,6 +48,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
   List<SubtitleCue> _cues = [];
   int _activeCue = -1;
   bool _showTranscript = false;
+  bool _isScrubbing = false;
   final ScrollController _transcriptScroll = ScrollController();
   List<GlobalKey> _cueKeys = [];
 
@@ -60,7 +62,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
   void _bindStreams() {
     _service.currentTrack.addListener(_onTrackChanged);
     _positionSub = _service.positionStream.listen((pos) {
-      if (!mounted) return;
+      if (!mounted || _isScrubbing) return;
       setState(() => _position = pos);
       _updateActiveCue(pos);
     });
@@ -77,8 +79,14 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
   void _onTrackChanged() {
     final track = _service.currentTrack.value;
     if (!mounted || track == null) return;
-    setState(() => _title = track.title);
-    _loadSubtitles(track.id, track.subtitleUrl);
+    setState(() {
+      _title = track.title;
+      _cues = [];
+      _cueKeys = [];
+      _activeCue = -1;
+      _subtitleLoadedFor = null;
+    });
+    _loadSubtitles(track.id, track.subtitleUrl, audioUrl: track.audioUrl);
   }
 
   Future<void> _loadPodcast() async {
@@ -96,7 +104,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
             existing.subtitleUrl ?? widget.initialSubtitleUrl;
         if ((subtitleUrl == null || subtitleUrl.isEmpty) &&
             existing.audioUrl.isNotEmpty) {
-          subtitleUrl = await _resolveSubtitleUrl(existing.audioUrl);
+          subtitleUrl = _resolveSubtitleUrl(existing.audioUrl);
         }
         _loadSubtitles(existing.id, subtitleUrl);
         return;
@@ -126,7 +134,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
       // Auto-derive subtitle URL from the audio filename when not provided
       if ((subtitleUrl == null || subtitleUrl.isEmpty) &&
           audioUrl != null && audioUrl.isNotEmpty) {
-        subtitleUrl = await _resolveSubtitleUrl(audioUrl);
+        subtitleUrl = _resolveSubtitleUrl(audioUrl);
       }
 
       debugPrint('[Podcast] audioUrl: $audioUrl');
@@ -153,40 +161,27 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
     }
   }
 
-  /// Derives a subtitle URL from [audioUrl] by replacing the audio extension
-  /// with `.srt`. Checks the local asset bundle first (for test files), then
-  /// falls back to the same HTTP URL with `.srt` extension (for when the backend
-  /// serves the SRT alongside the MP3).
-  Future<String?> _resolveSubtitleUrl(String audioUrl) async {
-    final uri = Uri.tryParse(audioUrl);
-    final filename = uri?.pathSegments.lastOrNull ?? '';
-    debugPrint('[Subtitle] audio filename: "$filename"');
-    if (filename.isEmpty) return null;
-
-    final srtName = filename.replaceFirst(
-        RegExp(r'\.(mp3|m4a|wav|aac|ogg)$', caseSensitive: false), '.srt');
-    if (srtName == filename) {
-      debugPrint('[Subtitle] no audio extension found, skipping');
+  /// Derives the subtitle URL from [audioUrl] by inserting `srt/` after
+  /// `podcasts/` in the path and replacing the audio extension with `.srt`.
+  /// e.g. `.../podcasts/audio.mp3` → `.../podcasts/srt/audio.srt`
+  String? _resolveSubtitleUrl(String audioUrl) {
+    final withSubdir = audioUrl.replaceFirst('podcasts/', 'podcasts/srt/');
+    final srtUrl = withSubdir.replaceFirst(
+      RegExp(r'\.(mp3|m4a|wav|aac|ogg)$', caseSensitive: false),
+      '.srt',
+    );
+    if (srtUrl == audioUrl) {
+      debugPrint('[Subtitle] URL did not match expected pattern: $audioUrl');
       return null;
     }
-
-    debugPrint('[Subtitle] trying asset: assets/subtitles/$srtName');
-    final assetKey = 'assets/subtitles/$srtName';
-    try {
-      await rootBundle.loadString(assetKey);
-      debugPrint('[Subtitle] asset found → $assetKey');
-      return 'asset://$assetKey';
-    } catch (_) {
-      debugPrint('[Subtitle] asset not found, using HTTP URL');
-      return audioUrl.replaceFirst(
-          RegExp(r'\.(mp3|m4a|wav|aac|ogg)$', caseSensitive: false), '.srt');
-    }
+    debugPrint('[Subtitle] resolved: $srtUrl');
+    return srtUrl;
   }
 
   /// Resolves [subtitleUrl] (fetching the podcast detail if it's unknown) and
   /// loads the WebVTT cues for the podcast with [id]. No-op if already loaded
   /// for this podcast. Silently leaves the transcript empty on any failure.
-  Future<void> _loadSubtitles(int id, String? subtitleUrl) async {
+  Future<void> _loadSubtitles(int id, String? subtitleUrl, {String? audioUrl}) async {
     if (_subtitleLoadedFor == id) return;
     _subtitleLoadedFor = id;
 
@@ -199,6 +194,9 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
       } catch (_) {
         url = null;
       }
+    }
+    if ((url == null || url.isEmpty) && audioUrl != null && audioUrl.isNotEmpty) {
+      url = _resolveSubtitleUrl(audioUrl);
     }
 
     final cues = await SubtitleService.fetchCues(url);
@@ -229,10 +227,26 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
   void _scrollToActiveCue() {
     if (_activeCue < 0 || _activeCue >= _cueKeys.length) return;
     final ctx = _cueKeys[_activeCue].currentContext;
-    if (ctx == null) return;
+    if (ctx == null) {
+      // Item is off-screen; jump to a proportional estimate to bring it into
+      // the viewport, then refine with ensureVisible on the next frame.
+      if (_transcriptScroll.hasClients && _cues.isNotEmpty) {
+        final max = _transcriptScroll.position.maxScrollExtent;
+        _transcriptScroll.jumpTo((_activeCue / _cues.length * max).clamp(0, max));
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final refined = _cueKeys[_activeCue].currentContext;
+          if (refined != null) {
+            Scrollable.ensureVisible(refined,
+                duration: Duration.zero, alignment: 0.4);
+          }
+        });
+      }
+      return;
+    }
     Scrollable.ensureVisible(
       ctx,
-      duration: const Duration(milliseconds: 300),
+      duration: _isScrubbing ? Duration.zero : const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
       alignment: 0.4,
     );
@@ -260,18 +274,38 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
 
   void _togglePlay() {
     if (_playing) {
+      debugPrint('[Podcast] pause id=${widget.podcastId}');
+      FacebookEventsService.logEvent('podcast_pause', parameters: {'podcast_id': widget.podcastId});
       _service.pause();
     } else {
+      debugPrint('[Podcast] play id=${widget.podcastId}');
+      FacebookEventsService.logEvent('podcast_play', parameters: {'podcast_id': widget.podcastId});
       _service.play();
     }
   }
 
+  void _previousTrack() {
+    debugPrint('[Podcast] previous_track id=${widget.podcastId}');
+    FacebookEventsService.logEvent('podcast_previous_track', parameters: {'podcast_id': widget.podcastId});
+    _service.previous();
+  }
+
+  void _nextTrack() {
+    debugPrint('[Podcast] next_track id=${widget.podcastId}');
+    FacebookEventsService.logEvent('podcast_next_track', parameters: {'podcast_id': widget.podcastId});
+    _service.next();
+  }
+
   void _seekForward() {
+    debugPrint('[Podcast] seek_forward id=${widget.podcastId}');
+    FacebookEventsService.logEvent('podcast_seek_forward', parameters: {'podcast_id': widget.podcastId});
     final newPos = _position + const Duration(seconds: 15);
     _service.seek(newPos > _totalDuration ? _totalDuration : newPos);
   }
 
   void _seekBackward() {
+    debugPrint('[Podcast] seek_backward id=${widget.podcastId}');
+    FacebookEventsService.logEvent('podcast_seek_backward', parameters: {'podcast_id': widget.podcastId});
     final newPos = _position - const Duration(seconds: 15);
     _service.seek(newPos < Duration.zero ? Duration.zero : newPos);
   }
@@ -279,6 +313,11 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
   void _toggleMute() {
     setState(() {
       _muted = !_muted;
+      debugPrint('[Podcast] mute=$_muted id=${widget.podcastId}');
+      FacebookEventsService.logEvent('podcast_mute_toggled', parameters: {
+        'podcast_id': widget.podcastId,
+        'muted': _muted,
+      });
       _service.setVolume(_muted ? 0.0 : 1.0);
     });
   }
@@ -286,6 +325,11 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
   void _cycleSpeed() {
     setState(() {
       _speed = _speed == 1.0 ? 1.5 : _speed == 1.5 ? 2.0 : 1.0;
+      debugPrint('[Podcast] speed=$_speed id=${widget.podcastId}');
+      FacebookEventsService.logEvent('podcast_speed_changed', parameters: {
+        'podcast_id': widget.podcastId,
+        'speed': _speed,
+      });
       _service.setSpeed(_speed);
     });
   }
@@ -304,9 +348,19 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
           _sleepTimer?.cancel();
           _sleepSub?.cancel();
           if (duration == null) {
+            debugPrint('[Podcast] sleep_timer=Off id=${widget.podcastId}');
+            FacebookEventsService.logEvent('podcast_sleep_timer_set', parameters: {
+              'podcast_id': widget.podcastId,
+              'timer': 'Off',
+            });
             setState(() => _sleepLabel = 'Off');
             return;
           }
+          debugPrint('[Podcast] sleep_timer="$label" id=${widget.podcastId}');
+          FacebookEventsService.logEvent('podcast_sleep_timer_set', parameters: {
+            'podcast_id': widget.podcastId,
+            'timer': label,
+          });
           setState(() => _sleepLabel = label);
           if (label == 'At the end of the release') {
             _sleepSub = _service.playerStateStream.listen((state) {
@@ -565,6 +619,17 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                           ),
                         ),
                         const Spacer(),
+                        // Previous track
+                        IconButton(
+                          onPressed: _service.hasPrevious ? _previousTrack : null,
+                          icon: Icon(
+                            Icons.skip_previous_rounded,
+                            size: 28,
+                            color: _service.hasPrevious
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.3),
+                          ),
+                        ),
                         // Rewind
                         IconButton(
                           onPressed: _seekBackward,
@@ -574,7 +639,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                             height: 28,
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 4),
                         // Play / Pause
                         GestureDetector(
                           onTap: _togglePlay,
@@ -592,7 +657,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 4),
                         // Forward
                         IconButton(
                           onPressed: _seekForward,
@@ -600,6 +665,17 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                             'assets/images/branding/video-front.svg',
                             width: 28,
                             height: 28,
+                          ),
+                        ),
+                        // Next track
+                        IconButton(
+                          onPressed: _service.hasNext ? _nextTrack : null,
+                          icon: Icon(
+                            Icons.skip_next_rounded,
+                            size: 28,
+                            color: _service.hasNext
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.3),
                           ),
                         ),
                         const Spacer(),
@@ -637,9 +713,11 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                       children: [
                         SliderTheme(
                           data: SliderThemeData(
-                            trackHeight: 3,
-                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 0),
-                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 0),
+                            trackHeight: 4,
+                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
+                            thumbColor: Colors.white,
+                            overlayColor: Colors.white.withValues(alpha: 0.15),
                             activeTrackColor: Colors.white,
                             inactiveTrackColor: Colors.white.withValues(alpha: 0.3),
                           ),
@@ -650,8 +728,15 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen> {
                             max: _totalDuration.inMilliseconds > 0
                                 ? _totalDuration.inMilliseconds.toDouble()
                                 : 1,
-                            onChanged: (v) {
+                            onChangeStart: (_) => setState(() => _isScrubbing = true),
+                            onChangeEnd: (v) {
+                              setState(() => _isScrubbing = false);
                               _service.seek(Duration(milliseconds: v.toInt()));
+                            },
+                            onChanged: (v) {
+                              final pos = Duration(milliseconds: v.toInt());
+                              setState(() => _position = pos);
+                              _updateActiveCue(pos);
                             },
                           ),
                         ),

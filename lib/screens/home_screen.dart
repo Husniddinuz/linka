@@ -14,6 +14,7 @@ import '../widgets/update_dialog.dart';
 import 'speaking_training_screen.dart';
 import 'lesson_meeting_screen.dart';
 import 'notifications_inbox_screen.dart';
+import 'chats_screen.dart';
 import 'lessons_screen.dart';
 import 'tutors_screen.dart';
 import 'my_profile_screen.dart';
@@ -648,8 +649,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                 _LessonsSection(
                                   lessons: _todaysLessons,
                                   loading: _loadingLessons,
-                                  onSeeAll: () =>
-                                      setState(() => _selectedTab = 1),
+                                  onSeeAll: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => LessonsScreen(
+                                        onFindTutor: () => setState(
+                                          () => _selectedTab = 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                   onStartLesson: _joinLesson,
                                   onCancelLesson: _cancelLesson,
                                   onRatedLesson: _loadTodaysLessons,
@@ -713,7 +722,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                               if (AppFeatureService.isEnabled('ielts')) ...[
                                 const SizedBox(height: 28),
-                                const _IeltsRegisterBanner(),
+                                const _IeltsSection(),
                               ],
 
                               const SizedBox(height: 28),
@@ -746,7 +755,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildScaffold(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width >= 600;
     final navItems = _isTeacher ? _tutorNavItems : _studentNavItems;
-    final bookingsEnabled = AppFeatureService.isEnabled('bookings');
     final tutorsEnabled = AppFeatureService.isEnabled('tutors');
     final children = _isTeacher
         ? <Widget>[
@@ -758,8 +766,9 @@ class _HomeScreenState extends State<HomeScreen> {
               onStoryViewed: _onStoryViewed,
               tutorAccountStatus: _tutorAccountStatus,
               onRefreshStatus: _refreshTutorStatus,
-              onAvatarTap: () => setState(() => _selectedTab = 3),
+              onAvatarTap: () => setState(() => _selectedTab = 4),
             ),
+            ChatsScreen(isActive: _selectedTab == 1),
             const TutorStoriesScreen(),
             // Earnings is opened as a full-screen push, not an IndexedStack
             // child. The placeholder keeps indices aligned with the nav.
@@ -770,21 +779,24 @@ class _HomeScreenState extends State<HomeScreen> {
           ]
         : <Widget>[
             _buildStudentHomeBody(),
-            bookingsEnabled
-                ? LessonsScreen(
-                    onFindTutor: () => setState(() => _selectedTab = 2),
-                  )
-                : const _SectionClosed(title: 'My lessons'),
+            ChatsScreen(isActive: _selectedTab == 1),
             tutorsEnabled
                 ? const TutorsScreen()
                 : const _SectionClosed(title: 'Tutors'),
             MyProfileScreen(
-              onNavigateToLessons: () => setState(() => _selectedTab = 1),
+              onNavigateToLessons: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => LessonsScreen(
+                    onFindTutor: () => setState(() => _selectedTab = 2),
+                  ),
+                ),
+              ),
             ),
           ];
 
     void handleNavTap(int i) {
-      if (_isTeacher && i == 2) {
+      if (_isTeacher && i == 3) {
         Navigator.of(
           context,
         ).push(MaterialPageRoute(builder: (_) => const TutorEarningsScreen()));
@@ -848,9 +860,9 @@ const _studentNavItems = <_NavItem>[
     label: 'Home',
   ),
   _NavItem(
-    activeIcon: 'assets/images/icons/lessons_active.svg',
-    inactiveIcon: 'assets/images/icons/lessons_inactive.svg',
-    label: 'Lessons',
+    activeIcon: 'assets/images/icons/chat_active.svg',
+    inactiveIcon: 'assets/images/icons/chat_inactive.svg',
+    label: 'Chats',
   ),
   _NavItem(
     activeIcon: 'assets/images/icons/tutors_active.svg',
@@ -869,6 +881,11 @@ const _tutorNavItems = <_NavItem>[
     activeIcon: 'assets/images/icons/home_active.svg',
     inactiveIcon: 'assets/images/icons/home_inactive.svg',
     label: 'Home',
+  ),
+  _NavItem(
+    activeIcon: 'assets/images/icons/chat_active.svg',
+    inactiveIcon: 'assets/images/icons/chat_inactive.svg',
+    label: 'Chats',
   ),
   _NavItem(
     activeIcon: 'assets/images/icons/story_active.svg',
@@ -1687,188 +1704,326 @@ class _ComingSoonBanner extends StatelessWidget {
   }
 }
 
-// ─── IELTS registration banner ──────────────────────────────────────────────────
+// ─── IELTS section ──────────────────────────────────────────────────────────────
 
-class _IeltsRegisterBanner extends StatelessWidget {
-  const _IeltsRegisterBanner();
+class _IeltsSection extends StatelessWidget {
+  const _IeltsSection();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: GestureDetector(
-        onTap: () {
-          // TODO: open the in-app IELTS registration screen (submits to the
-          // backend endpoint — wire up once the screen/endpoint are ready).
-        },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Stack(
-            children: [
-              // Official IDP IELTS red (Pantone 186 C) gradient.
-              Positioned.fill(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFFE4002B),
-                        Color(0xFFC8102E),
-                        Color(0xFFA30021),
-                      ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Registration banner
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: GestureDetector(
+            onTap: () {},
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFFE4002B),
+                            Color(0xFFC8102E),
+                            Color(0xFFA30021),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              // Decorative circles
-              Positioned(
-                right: -30,
-                top: -30,
-                child: Container(
-                  width: 130,
-                  height: 130,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.12),
+                  Positioned(
+                    right: -30,
+                    top: -30,
+                    child: Container(
+                      width: 130,
+                      height: 130,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.12),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              Positioned(
-                right: 40,
-                bottom: -40,
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.08),
+                  Positioned(
+                    right: 40,
+                    bottom: -40,
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              // Content
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 22,
-                ),
-                child: Row(
-                  children: [
-                    // Left: text
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.22),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              'SPECIAL OFFER',
-                              style: TextStyle(
-                                fontFamily: 'SF Pro',
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 22,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.22),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Text(
+                                  'SPECIAL OFFER',
+                                  style: TextStyle(
+                                    fontFamily: 'SF Pro',
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    letterSpacing: 1.6,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Register for IELTS',
+                                style: TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  height: 1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Get 1 month of Linka Plus, free',
+                                style: TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  height: 1.4,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 18,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF8A001C)
+                                          .withValues(alpha: 0.25),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Register now',
+                                      style: TextStyle(
+                                        fontFamily: 'SF Pro',
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFFC8102E),
+                                      ),
+                                    ),
+                                    SizedBox(width: 6),
+                                    Icon(
+                                      Icons.arrow_forward_rounded,
+                                      color: Color(0xFFC8102E),
+                                      size: 16,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          width: 80,
+                          child: Center(
+                            child: Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.18),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.school_rounded,
                                 color: Colors.white,
-                                letterSpacing: 1.6,
+                                size: 34,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Register for IELTS',
-                            style: TextStyle(
-                              fontFamily: 'SF Pro',
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              height: 1.2,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Get 1 month of Linka Plus, free',
-                            style: TextStyle(
-                              fontFamily: 'SF Pro',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white.withValues(alpha: 0.85),
-                              height: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF8A001C,
-                                  ).withValues(alpha: 0.25),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Register now',
-                                  style: TextStyle(
-                                    fontFamily: 'SF Pro',
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFFC8102E),
-                                  ),
-                                ),
-                                SizedBox(width: 6),
-                                Icon(
-                                  Icons.arrow_forward_rounded,
-                                  color: Color(0xFFC8102E),
-                                  size: 16,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // 3-button grid
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: 96,
+                      child: _IeltsActionButton(
+                        label: 'Speaking\nModal Answers',
+                        icon: Icons.record_voice_over_rounded,
+                        onTap: () {},
                       ),
                     ),
-                    // Right: icon
+                    const SizedBox(height: 10),
                     SizedBox(
-                      width: 80,
-                      child: Center(
-                        child: Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.school_rounded,
-                            color: Colors.white,
-                            size: 34,
-                          ),
-                        ),
+                      height: 96,
+                      child: _IeltsActionButton(
+                        label: 'Writing\nModal Answers',
+                        icon: Icons.edit_rounded,
+                        onTap: () {},
                       ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 202,
+                  child: _IeltsActionButton(
+                    label: 'Mock\nExams',
+                    icon: Icons.assignment_rounded,
+                    onTap: () {},
+                    large: true,
+                  ),
+                ),
+              ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _IeltsActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool large;
+
+  const _IeltsActionButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.large = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFE4002B), Color(0xFFA30021)],
+          ),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned(
+              right: -20,
+              top: -20,
+              child: Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.08),
+                ),
+              ),
+            ),
+            Positioned(
+              left: -16,
+              bottom: -16,
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.06),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: large ? 46 : 36,
+                    height: large ? 46 : 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.20),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      icon,
+                      color: Colors.white,
+                      size: large ? 24 : 18,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: large ? 16 : 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

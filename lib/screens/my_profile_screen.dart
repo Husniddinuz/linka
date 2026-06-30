@@ -340,12 +340,14 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                             MaterialPageRoute(builder: (_) => const FaqScreen()),
                           ),
                         ),
-                        const _Divider(),
-                        _MenuRow(
-                          icon: 'assets/images/buttons/help_outline_20.svg',
-                          label: 'Support',
-                          onTap: _openSupport,
-                        ),
+                        if (AppFeatureService.isEnabled('support')) ...[
+                          const _Divider(),
+                          _MenuRow(
+                            icon: 'assets/images/buttons/help_outline_20.svg',
+                            label: 'Support',
+                            onTap: _openSupport,
+                          ),
+                        ],
                         const _Divider(),
                         _MenuRow(
                           icon: 'assets/images/buttons/public-offer.svg',

@@ -1,0 +1,6 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- back bubble (bottom-right) -->
+  <path d="M10 10H20Q23 10 23 13V18Q23 21 20 21L18 23.5L14 21H10Q7 21 7 18V13Q7 10 10 10Z" fill="#272942"/>
+  <!-- front bubble (top-left) — white stroke creates visible gap from back bubble -->
+  <path d="M4 2H14Q17 2 17 5V10Q17 13 14 13H7L2.5 17V13H4Q1 13 1 10V5Q1 2 4 2Z" fill="#272942" stroke="white" stroke-width="1.8" stroke-linejoin="round"/>
+</svg>

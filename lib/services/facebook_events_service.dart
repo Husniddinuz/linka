@@ -13,8 +13,11 @@ class FacebookEventsService {
 
   static final FacebookAppEvents _events = FacebookAppEvents();
 
-  /// Enable automatic in-app event logging. Call once on app start.
+  /// Enable automatic in-app event logging. On iOS, call only after ATT
+  /// consent is resolved via [requestTracking] to avoid collecting data
+  /// before the user has been prompted.
   static Future<void> init() async {
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) return;
     await _events.setAutoLogAppEventsEnabled(true);
   }
 
@@ -28,20 +31,26 @@ class FacebookEventsService {
   /// Show the iOS App Tracking Transparency prompt (if not yet decided) and
   /// gate advertiser-ID / IDFA collection on the user's choice.
   ///
-  /// No-op on non-iOS platforms. Must be called once the app is in the
-  /// foreground (e.g. from a post-frame callback) — iOS silently ignores the
-  /// request otherwise. The native prompt is only shown the first time; later
-  /// calls just read the stored status.
+  /// No-op on non-iOS platforms. Must be called from a post-frame callback
+  /// after a short delay — iPadOS requires the app window to be fully
+  /// presented before it will display the system prompt.
   static Future<void> requestTracking() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
     try {
+      // Wait for the app window to be fully on-screen. Without this delay
+      // iPadOS silently drops the system ATT dialog on first launch.
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
       final status =
           await AppTrackingTransparency.requestTrackingAuthorization();
-      await _events.setAdvertiserIdCollectionEnabled(
-        status == TrackingStatus.authorized,
-      );
+      final authorized = status == TrackingStatus.authorized;
+      await Future.wait([
+        _events.setAutoLogAppEventsEnabled(authorized),
+        _events.setAdvertiserIdCollectionEnabled(authorized),
+      ]);
     } catch (_) {
       // ATT unavailable (e.g. iOS < 14) — leave default collection behavior.
+      await _events.setAutoLogAppEventsEnabled(true);
     }
   }
 
