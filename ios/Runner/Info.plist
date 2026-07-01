@@ -85,6 +85,10 @@
 		<string>53b9a7ff7a10d35b0983408562df8ebb</string>
 		<key>FacebookDisplayName</key>
 		<string>Linka</string>
+		<key>FacebookAutoLogAppEventsEnabled</key>
+		<false/>
+		<key>FacebookAdvertiserIDCollectionEnabled</key>
+		<false/>
 		<key>CFBundleURLTypes</key>
 		<array>
 			<dict>

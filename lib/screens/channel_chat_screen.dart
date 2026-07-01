@@ -284,7 +284,10 @@ class _Message {
 
 class ChannelChatScreen extends StatefulWidget {
   final ChatChannel channel;
-  const ChannelChatScreen({super.key, required this.channel});
+  // When the screen is opened from a push notification, pass the message_id
+  // to scroll to that message after the initial load.
+  final String? initialScrollToId;
+  const ChannelChatScreen({super.key, required this.channel, this.initialScrollToId});
 
   @override
   State<ChannelChatScreen> createState() => _ChannelChatScreenState();
@@ -328,9 +331,18 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
   // Posting permissions
   bool _currentUserIsTutor = false;
 
+  // Blocked users
+  final Set<int> _blockedUserIds = {};
+
   // Quiz submission state
   final Set<int> _quizSubmitting = {};
   final Map<int, int> _quizPendingOption = {};
+
+  // Reply navigation state
+  String? _highlightedId;
+  final Set<String> _pendingReplyIds = {};
+  bool _showReplyBadge = false;
+  final Map<String, GlobalKey> _messageKeys = {};
 
   // Typing OUT (client → server)
   bool _isTypingOut = false;
@@ -346,6 +358,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
     WidgetsBinding.instance.addObserver(this);
     _loadCurrentUserId().then((_) => _connectWs());
     _loadCurrentUserIsTutor();
+    _loadBlockedUsers();
     _loadMessages();
     _scrollController.addListener(_onScroll);
     _textController.addListener(_onTextChanged);
@@ -415,6 +428,145 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         ?? await UserService.getCachedIsTeacher()
         ?? false;
     if (mounted) setState(() => _currentUserIsTutor = fromCache);
+  }
+
+  Future<void> _loadBlockedUsers() async {
+    try {
+      final raw = await ChatService.fetchBlockedUsers();
+      if (mounted) {
+        setState(() {
+          _blockedUserIds.addAll(
+            raw.map((u) => (u['user_id'] as num).toInt()),
+          );
+        });
+      }
+    } catch (_) {}
+  }
+
+  // ─── Report ────────────────────────────────────────────────────────────────
+
+  void _showReportSheet(_Message msg) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _ReportSheet(
+        onSubmit: (reason, comment) => _submitReport(msg, reason, comment),
+      ),
+    );
+  }
+
+  Future<void> _submitReport(_Message msg, String reason, String comment) async {
+    try {
+      await ChatService.reportMessage(
+        messageId: int.parse(msg.id),
+        reason: reason,
+        comment: comment,
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Message reported. Thank you.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to send report. Please try again.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  // ─── Block ─────────────────────────────────────────────────────────────────
+
+  Future<void> _confirmBlock(_Message msg) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'Block ${msg.senderName}?',
+          style: const TextStyle(
+            fontFamily: 'SF Pro',
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: const Text(
+          "You won't see their messages in any channel. You can unblock them later in Settings → Blocked users.",
+          style: TextStyle(fontFamily: 'SF Pro'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Color(0xFFAAAAAA)),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Block',
+              style: TextStyle(color: Color(0xFFEB3349)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _blockUser(msg);
+  }
+
+  Future<void> _blockUser(_Message msg) async {
+    try {
+      await ChatService.blockUser(userId: msg.senderId);
+      if (!mounted) return;
+      setState(() {
+        _blockedUserIds.add(msg.senderId);
+        _messages.removeWhere((m) => m.senderId == msg.senderId);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${msg.senderName} blocked.'),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () => _unblockUser(msg.senderId),
+          ),
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _unblockUser(int userId) async {
+    try {
+      await ChatService.unblockUser(userId: userId);
+      if (!mounted) return;
+      setState(() => _blockedUserIds.remove(userId));
+    } catch (_) {}
   }
 
   // ─── Quiz ──────────────────────────────────────────────────────────────────
@@ -497,6 +649,84 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
     );
   }
 
+  // ─── Reply navigation ──────────────────────────────────────────────────────
+
+  void _highlight(String messageId) {
+    setState(() => _highlightedId = messageId);
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (mounted) setState(() => _highlightedId = null);
+    });
+  }
+
+  Future<void> _scrollToMessageById(String messageId) async {
+    if (!_scrollController.hasClients) return;
+
+    final key = _messageKeys[messageId];
+    if (key?.currentContext != null) {
+      await Scrollable.ensureVisible(
+        key!.currentContext!,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+        alignment: 0.3,
+      );
+      return;
+    }
+
+    // Item not in viewport — estimate position by list index fraction
+    final idx = _messages.indexWhere((m) => m.id == messageId);
+    if (idx == -1) return;
+    final maxExtent = _scrollController.position.maxScrollExtent;
+    final fraction =
+        _messages.isNotEmpty ? (idx + 1) / (_messages.length + 1) : 0.0;
+    await _scrollController.animateTo(
+      (fraction * maxExtent).clamp(0.0, maxExtent),
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+    await WidgetsBinding.instance.endOfFrame;
+    final retryKey = _messageKeys[messageId];
+    if (retryKey?.currentContext != null) {
+      await Scrollable.ensureVisible(
+        retryKey!.currentContext!,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        alignment: 0.3,
+      );
+    }
+  }
+
+  Future<void> _scrollToOriginal(String replyToId) async {
+    var idx = _messages.indexWhere((m) => m.id == replyToId);
+    while (idx == -1 && _hasMore) {
+      await _loadOlderMessages();
+      await WidgetsBinding.instance.endOfFrame;
+      idx = _messages.indexWhere((m) => m.id == replyToId);
+    }
+
+    if (idx == -1) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Original message not available'),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+      return;
+    }
+
+    await _scrollToMessageById(replyToId);
+    _highlight(replyToId);
+  }
+
+  void _onReplyBadgeTap() {
+    if (_pendingReplyIds.isEmpty) return;
+    final targetId = _pendingReplyIds.last;
+    setState(() {
+      _pendingReplyIds.clear();
+      _showReplyBadge = false;
+    });
+    _scrollToMessageById(targetId).then((_) => _highlight(targetId));
+  }
+
   // ─── Typing OUT ────────────────────────────────────────────────────────────
 
   void _onTextChanged() {
@@ -537,9 +767,15 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
           _hasMore = data['has_more'] as bool? ?? false;
           _loadingInitial = false;
         });
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-        });
+        if (widget.initialScrollToId != null) {
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _scrollToOriginal(widget.initialScrollToId!),
+          );
+        } else {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+          });
+        }
       }
     } catch (_) {
       if (mounted) setState(() => _loadingInitial = false);
@@ -600,10 +836,15 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
                 jsonDecode(data as String) as Map<String, dynamic>;
             if (json['type'] == 'new_message') {
               final msgData = json['message'] as Map<String, dynamic>;
-              final senderId =
-                  (msgData['sender_id'] as num?)?.toInt().toString();
+              final senderIdInt = (msgData['sender_id'] as num?)?.toInt();
+              final senderId = senderIdInt?.toString();
               final isMine = _currentUserId != null &&
                   senderId == _currentUserId;
+              if (!isMine &&
+                  senderIdInt != null &&
+                  _blockedUserIds.contains(senderIdInt)) {
+                return;
+              }
               final msg = _Message.fromJson({
                 ...msgData,
                 'is_mine': isMine,
@@ -621,6 +862,18 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
                     _messages = [..._messages, msg];
                   }
                 });
+                // Show @ badge when someone replies to the current user's message
+                if (!isMine && msg.replyTo != null) {
+                  final replyToId = msg.replyTo!.id;
+                  final isReplyToMine =
+                      _messages.any((m) => m.id == replyToId && m.isMine);
+                  if (isReplyToMine) {
+                    setState(() {
+                      _pendingReplyIds.add(msg.id);
+                      _showReplyBadge = true;
+                    });
+                  }
+                }
                 WidgetsBinding.instance
                     .addPostFrameCallback((_) => _scrollToBottom());
               }
@@ -1119,7 +1372,25 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         behavior: HitTestBehavior.translucent,
         child: Column(
           children: [
-            Expanded(child: _buildMessageList()),
+            Expanded(
+              child: Stack(
+                children: [
+                  _buildMessageList(),
+                  if (_showReplyBadge && _pendingReplyIds.isNotEmpty)
+                    Positioned(
+                      bottom: 8,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: _ReplyBadge(
+                          count: _pendingReplyIds.length,
+                          onTap: _onReplyBadgeTap,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
             if (_typingUsers.isNotEmpty)
               _TypingIndicator(names: _typingUsers.values.toList()),
             if (isAnnouncement)
@@ -1131,6 +1402,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
                 _ReplyBar(
                   message: _replyingTo!,
                   onDismiss: () => setState(() => _replyingTo = null),
+                  onTap: () => _scrollToOriginal(_replyingTo!.id),
                 ),
               isVoiceOnly
                   ? _VoiceInputBar(
@@ -1203,30 +1475,54 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         final showDate =
             msgIdx == 0 || !_sameDay(_messages[msgIdx - 1].sentAt, msg.sentAt);
 
-        return Column(
-          children: [
-            if (showDate) _DateDivider(date: msg.sentAt),
-            _MessageBubble(
-              message: msg,
-              isPlaying: _playingId == msg.id,
-              playerTotalSeconds: _playingId == msg.id ? _playTotalSeconds : null,
-              downloadProgress: _downloading.contains(msg.id) ? -1.0 : null,
-              onPlayToggle: () => _togglePlayVoice(msg),
-              onReply: () => setState(() => _replyingTo = msg),
-              onDelete: msg.isMine && !msg.isDeleted
-                  ? () => _deleteMessage(msg)
-                  : null,
-              quizSubmitting: msg.quiz != null &&
-                  _quizSubmitting.contains(msg.quiz!.id),
-              quizPendingOptionId: msg.quiz != null
-                  ? _quizPendingOption[msg.quiz!.id]
-                  : null,
-              onQuizOptionTap: msg.isQuiz
-                  ? (optionId) =>
-                      _submitQuizAnswer(msg.id, msg.quiz!.id, optionId)
-                  : null,
-            ),
-          ],
+        final itemKey = _messageKeys.putIfAbsent(msg.id, GlobalKey.new);
+
+        return AnimatedContainer(
+          key: ValueKey(msg.id),
+          duration: const Duration(milliseconds: 300),
+          color: _highlightedId == msg.id
+              ? const Color(0xFFFFA500).withValues(alpha: 0.12)
+              : Colors.transparent,
+          child: Column(
+            children: [
+              if (showDate) _DateDivider(date: msg.sentAt),
+              _SwipeToReply(
+                onReply: msg.isDeleted
+                    ? null
+                    : () => setState(() => _replyingTo = msg),
+                child: _MessageBubble(
+                  key: itemKey,
+                  message: msg,
+                  isPlaying: _playingId == msg.id,
+                  playerTotalSeconds:
+                      _playingId == msg.id ? _playTotalSeconds : null,
+                  downloadProgress:
+                      _downloading.contains(msg.id) ? -1.0 : null,
+                  onPlayToggle: () => _togglePlayVoice(msg),
+                  onReply: () => setState(() => _replyingTo = msg),
+                  onDelete: msg.isMine && !msg.isDeleted
+                      ? () => _deleteMessage(msg)
+                      : null,
+                  onReport: !msg.isMine && !msg.isDeleted
+                      ? () => _showReportSheet(msg)
+                      : null,
+                  onBlock: !msg.isMine
+                      ? () => _confirmBlock(msg)
+                      : null,
+                  quizSubmitting: msg.quiz != null &&
+                      _quizSubmitting.contains(msg.quiz!.id),
+                  quizPendingOptionId: msg.quiz != null
+                      ? _quizPendingOption[msg.quiz!.id]
+                      : null,
+                  onQuizOptionTap: msg.isQuiz
+                      ? (optionId) =>
+                          _submitQuizAnswer(msg.id, msg.quiz!.id, optionId)
+                      : null,
+                  onScrollToOriginal: _scrollToOriginal,
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -1333,21 +1629,28 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback onPlayToggle;
   final VoidCallback onReply;
   final VoidCallback? onDelete;
+  final VoidCallback? onReport;
+  final VoidCallback? onBlock;
   final bool quizSubmitting;
   final int? quizPendingOptionId;
   final void Function(int)? onQuizOptionTap;
+  final void Function(String replyToId)? onScrollToOriginal;
 
   const _MessageBubble({
+    super.key,
     required this.message,
     required this.isPlaying,
     required this.onPlayToggle,
     required this.onReply,
     this.onDelete,
+    this.onReport,
+    this.onBlock,
     this.playerTotalSeconds,
     this.downloadProgress,
     this.quizSubmitting = false,
     this.quizPendingOptionId,
     this.onQuizOptionTap,
+    this.onScrollToOriginal,
   });
 
   String _timeLabel(DateTime dt) {
@@ -1359,7 +1662,9 @@ class _MessageBubble extends StatelessWidget {
   void _showActions(BuildContext context) {
     final canReply = !message.isDeleted;
     final canDelete = onDelete != null;
-    if (!canReply && !canDelete) return;
+    final canReport = onReport != null;
+    final canBlock = onBlock != null;
+    if (!canReply && !canDelete && !canReport && !canBlock) return;
 
     showModalBottomSheet<void>(
       context: context,
@@ -1393,6 +1698,30 @@ class _MessageBubble extends StatelessWidget {
                 onTap: () {
                   Navigator.pop(context);
                   onDelete!();
+                },
+              ),
+            if (canReport)
+              ListTile(
+                leading: const Icon(Icons.flag_outlined, color: Color(0xFF272942)),
+                title: const Text(
+                  'Report',
+                  style: TextStyle(fontFamily: 'SF Pro', color: Color(0xFF272942)),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  onReport!();
+                },
+              ),
+            if (canBlock)
+              ListTile(
+                leading: const Icon(Icons.block, color: Color(0xFFEB3349)),
+                title: const Text(
+                  'Block sender',
+                  style: TextStyle(fontFamily: 'SF Pro', color: Color(0xFFEB3349)),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  onBlock!();
                 },
               ),
           ],
@@ -1500,6 +1829,7 @@ class _MessageBubble extends StatelessWidget {
         isMine: isMine,
         radius: radius,
         replyTo: message.replyTo,
+        onScrollToOriginal: onScrollToOriginal,
       );
     } else {
       bubbleContent = Container(
@@ -1511,7 +1841,13 @@ class _MessageBubble extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (message.replyTo != null)
-              _ReplyBlock(replyTo: message.replyTo!, isMine: isMine),
+              _ReplyBlock(
+                replyTo: message.replyTo!,
+                isMine: isMine,
+                onTap: message.replyTo!.isDeleted
+                    ? null
+                    : () => onScrollToOriginal?.call(message.replyTo!.id),
+              ),
             if (message.isVoice)
               _VoiceBubble(
                 duration: message.voiceDuration,
@@ -1615,8 +1951,9 @@ class _MessageBubble extends StatelessWidget {
 class _ReplyBlock extends StatelessWidget {
   final _ReplyTo replyTo;
   final bool isMine;
+  final VoidCallback? onTap;
 
-  const _ReplyBlock({required this.replyTo, required this.isMine});
+  const _ReplyBlock({required this.replyTo, required this.isMine, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1693,17 +2030,20 @@ class _ReplyBlock extends StatelessWidget {
       );
     }
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border(
-          left: BorderSide(color: accentColor, width: 3),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(8),
+          border: Border(
+            left: BorderSide(color: accentColor, width: 3),
+          ),
         ),
+        child: content,
       ),
-      child: content,
     );
   }
 }
@@ -1713,8 +2053,9 @@ class _ReplyBlock extends StatelessWidget {
 class _ReplyBar extends StatelessWidget {
   final _Message message;
   final VoidCallback onDismiss;
+  final VoidCallback? onTap;
 
-  const _ReplyBar({required this.message, required this.onDismiss});
+  const _ReplyBar({required this.message, required this.onDismiss, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1723,13 +2064,18 @@ class _ReplyBar extends StatelessWidget {
       preview = 'Message deleted';
     } else if (message.isQuiz) {
       preview = '📊 Quiz';
+    } else if (message.isImage) {
+      preview = '🖼 Image';
     } else if (message.isVoice) {
-      preview = 'Voice message';
+      preview = '🎵 Voice message';
     } else {
-      preview = message.text ?? '';
+      final t = message.text ?? '';
+      preview = t.length > 60 ? '${t.substring(0, 60)}…' : t;
     }
 
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: const BoxDecoration(
         color: Color(0xFFF8F8FF),
@@ -1784,6 +2130,7 @@ class _ReplyBar extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -1864,12 +2211,14 @@ class _ImageBubble extends StatelessWidget {
   final bool isMine;
   final BorderRadius radius;
   final _ReplyTo? replyTo;
+  final void Function(String replyToId)? onScrollToOriginal;
 
   const _ImageBubble({
     required this.imageUrl,
     required this.isMine,
     required this.radius,
     this.replyTo,
+    this.onScrollToOriginal,
   });
 
   void _openFullScreen(BuildContext context) {
@@ -1901,7 +2250,13 @@ class _ImageBubble extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (replyTo != null)
-              _ReplyBlock(replyTo: replyTo!, isMine: isMine),
+              _ReplyBlock(
+                replyTo: replyTo!,
+                isMine: isMine,
+                onTap: replyTo!.isDeleted
+                    ? null
+                    : () => onScrollToOriginal?.call(replyTo!.id),
+              ),
             ClipRRect(
               borderRadius: replyTo != null
                   ? BorderRadius.only(
@@ -3469,6 +3824,380 @@ class _AudioLibrarySheetState extends State<_AudioLibrarySheet> {
                       ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Swipe-to-reply wrapper ────────────────────────────────────────────────────
+
+class _SwipeToReply extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onReply;
+  const _SwipeToReply({required this.child, this.onReply});
+
+  @override
+  State<_SwipeToReply> createState() => _SwipeToReplyState();
+}
+
+class _SwipeToReplyState extends State<_SwipeToReply>
+    with SingleTickerProviderStateMixin {
+  static const _threshold = 56.0;
+  double _drag = 0;
+  bool _triggered = false;
+  late AnimationController _springController;
+  late Animation<double> _spring;
+
+  @override
+  void initState() {
+    super.initState();
+    _springController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    )..addListener(() => setState(() {}));
+    _spring = const AlwaysStoppedAnimation(0);
+  }
+
+  @override
+  void dispose() {
+    _springController.dispose();
+    super.dispose();
+  }
+
+  double get _offset => _drag > 0 ? _drag : _spring.value;
+
+  void _onDragUpdate(DragUpdateDetails d) {
+    if (widget.onReply == null) return;
+    if (d.delta.dx > 0) {
+      _springController.stop();
+      setState(() {
+        _drag = (_drag + d.delta.dx).clamp(0, _threshold + 20);
+        if (_drag >= _threshold && !_triggered) {
+          _triggered = true;
+          widget.onReply!();
+        }
+      });
+    }
+  }
+
+  void _onDragEnd(DragEndDetails _) {
+    _spring = Tween<double>(begin: _drag, end: 0).animate(
+      CurvedAnimation(parent: _springController, curve: Curves.easeOut),
+    );
+    _drag = 0;
+    _triggered = false;
+    _springController.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dx = _offset;
+    return GestureDetector(
+      onHorizontalDragUpdate: _onDragUpdate,
+      onHorizontalDragEnd: _onDragEnd,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          if (dx > 0)
+            Positioned(
+              left: 16,
+              top: 0,
+              bottom: 0,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Opacity(
+                  opacity: (dx / _threshold).clamp(0, 1),
+                  child: Transform.scale(
+                    scale: 0.6 + 0.4 * (dx / _threshold).clamp(0, 1),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF5B7FD4).withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.reply_rounded,
+                        color: Color(0xFF5B7FD4),
+                        size: 17,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          Transform.translate(
+            offset: Offset(dx, 0),
+            child: widget.child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Report sheet ──────────────────────────────────────────────────────────────
+
+class _ReportSheet extends StatefulWidget {
+  final Future<void> Function(String reason, String comment) onSubmit;
+  const _ReportSheet({required this.onSubmit});
+
+  @override
+  State<_ReportSheet> createState() => _ReportSheetState();
+}
+
+class _ReportSheetState extends State<_ReportSheet> {
+  static const _reasons = [
+    ('spam', 'Spam'),
+    ('inappropriate', 'Inappropriate content'),
+    ('harassment', 'Harassment or bullying'),
+    ('other', 'Other'),
+  ];
+
+  String? _selectedReason;
+  final _commentController = TextEditingController();
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_selectedReason == null || _submitting) return;
+    setState(() => _submitting = true);
+    try {
+      await widget.onSubmit(_selectedReason!, _commentController.text.trim());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
+            child: Row(
+              children: [
+                const Text(
+                  'Report message',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF272942),
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Color(0xFFAAAAAA)),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          ..._reasons.map((r) {
+            final (value, label) = r;
+            final selected = _selectedReason == value;
+            return InkWell(
+              onTap: () => setState(() => _selectedReason = value),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: selected
+                              ? const Color(0xFF5B7FD4)
+                              : const Color(0xFFCCCCCC),
+                          width: 2,
+                        ),
+                      ),
+                      child: selected
+                          ? Center(
+                              child: Container(
+                                width: 10,
+                                height: 10,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFF5B7FD4),
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 14),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontFamily: 'SF Pro',
+                        fontSize: 15,
+                        color: Color(0xFF272942),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Text(
+              'Additional comment (optional)',
+              style: const TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF888888),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: TextField(
+              controller: _commentController,
+              maxLines: 3,
+              minLines: 2,
+              decoration: InputDecoration(
+                hintText: 'Tell us more...',
+                hintStyle: const TextStyle(
+                  fontFamily: 'SF Pro',
+                  color: Color(0xFFBBBBBB),
+                  fontSize: 14,
+                ),
+                filled: true,
+                fillColor: const Color(0xFFF8F8F8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFEEEEEE)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFEEEEEE)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF5B7FD4)),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 10),
+              ),
+              style: const TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 14,
+                color: Color(0xFF272942),
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + safeBottom),
+            child: SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: (_selectedReason != null && !_submitting)
+                    ? _submit
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF272942),
+                  disabledBackgroundColor: const Color(0xFFDDDDDD),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _submitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Send report',
+                        style: TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── @ Reply badge ─────────────────────────────────────────────────────────────
+
+class _ReplyBadge extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
+  const _ReplyBadge({required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF272942),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              '@',
+              style: TextStyle(
+                color: Color(0xFF5B7FD4),
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                fontFamily: 'SF Pro',
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              count == 1 ? '1 new reply' : '$count new replies',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                fontFamily: 'SF Pro',
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.keyboard_arrow_down_rounded,
+                color: Colors.white54, size: 16),
+          ],
+        ),
       ),
     );
   }

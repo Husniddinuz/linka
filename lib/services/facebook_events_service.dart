@@ -37,9 +37,9 @@ class FacebookEventsService {
   static Future<void> requestTracking() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
     try {
-      // Wait for the app window to be fully on-screen. Without this delay
-      // iPadOS silently drops the system ATT dialog on first launch.
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      // iPadOS requires the window to be key+visible before showing the ATT
+      // dialog. 300ms is not enough on iPadOS 26+; 1500ms is safe.
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
 
       final status =
           await AppTrackingTransparency.requestTrackingAuthorization();

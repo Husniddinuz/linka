@@ -282,6 +282,53 @@ class ChatService {
     }
   }
 
+  static Future<void> reportMessage({
+    required int messageId,
+    required String reason,
+    String comment = '',
+  }) async {
+    final token = await TokenService.getAccessToken();
+    final response = await http.post(
+      Uri.parse('$chatApiBaseUrl/chats/messages/$messageId/report/'),
+      headers: _headers(token),
+      body: jsonEncode({'reason': reason, 'comment': comment}),
+    );
+    if (response.statusCode != 201) {
+      String detail;
+      try {
+        final parsed = jsonDecode(response.body) as Map<String, dynamic>;
+        detail = parsed['detail']?.toString() ??
+            'Report failed (${response.statusCode})';
+      } catch (_) {
+        detail = 'Report failed (${response.statusCode})';
+      }
+      throw ApiException(detail, statusCode: response.statusCode);
+    }
+  }
+
+  static Future<void> blockUser({required int userId}) async {
+    final token = await TokenService.getAccessToken();
+    await http.post(
+      Uri.parse('$chatApiBaseUrl/chats/users/$userId/block/'),
+      headers: _headers(token),
+    );
+  }
+
+  static Future<void> unblockUser({required int userId}) async {
+    final token = await TokenService.getAccessToken();
+    await http.delete(
+      Uri.parse('$chatApiBaseUrl/chats/users/$userId/block/'),
+      headers: _headers(token),
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchBlockedUsers() async {
+    final data = await _get('/chats/users/blocked/');
+    final results = data['results'];
+    if (results is! List) return [];
+    return results.cast<Map<String, dynamic>>();
+  }
+
   /// Converts a relative server path (e.g. /media/photo.jpg) to an absolute
   /// URL. Absolute URLs are returned unchanged. Null/empty → null.
   static String? absoluteUrl(String? path) {

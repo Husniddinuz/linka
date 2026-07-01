@@ -22,6 +22,7 @@ import 'my_reviews_screen.dart';
 import 'saved_articles_screen.dart';
 import 'payment_topup_screen.dart';
 import 'public_offer_screen.dart';
+import 'blocked_users_screen.dart';
 import 'tutor_schedule_screen.dart';
 
 class MyProfileScreen extends StatefulWidget {
@@ -324,6 +325,14 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                           label: 'Notifications',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                          ),
+                        ),
+                        const _Divider(),
+                        _MenuRow(
+                          icon: 'assets/images/buttons/faqs.svg',
+                          label: 'Blocked users',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const BlockedUsersScreen()),
                           ),
                         ),
                         const _Divider(),
