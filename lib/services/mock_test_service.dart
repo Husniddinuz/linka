@@ -52,4 +52,16 @@ class MockTestService {
   static Future<Map<String, dynamic>> fetchWritingQuota() {
     return ApiService.get('/writing-attempts/quota/');
   }
+
+  static Future<List<Map<String, dynamic>>> fetchSpeakingSamples({int? part}) async {
+    final qs = part != null ? '?part=$part' : '';
+    final data = await ApiService.getList('/speaking-samples/$qs');
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchWritingSamples({int? taskNumber}) async {
+    final qs = taskNumber != null ? '?task=$taskNumber' : '';
+    final data = await ApiService.getList('/writing-samples/$qs');
+    return data.cast<Map<String, dynamic>>();
+  }
 }

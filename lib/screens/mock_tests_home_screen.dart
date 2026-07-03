@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import '../widgets/mock_test_styles.dart';
 import 'mock_test_history_screen.dart';
 import 'mock_test_list_screen.dart';
+import 'speaking_samples_list_screen.dart';
 import 'tutors_screen.dart';
 import 'writing_prompts_list_screen.dart';
+import 'writing_samples_list_screen.dart';
 
 class MockTestsHomeScreen extends StatelessWidget {
   const MockTestsHomeScreen({super.key});
@@ -70,6 +72,37 @@ class MockTestsHomeScreen extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const TutorsScreen(showBackButton: true)),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'SAMPLES FROM REAL TESTS',
+            style: TextStyle(
+              fontFamily: 'SF Pro',
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: MockTestColors.greyLight,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _SkillButton(
+            icon: Icons.record_voice_over_rounded,
+            title: 'Speaking Samples',
+            subtitle: 'Real test answers with band scores',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SpeakingSamplesListScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _SkillButton(
+            icon: Icons.auto_stories_rounded,
+            title: 'Writing Samples',
+            subtitle: 'Real essays with band scores',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const WritingSamplesListScreen()),
             ),
           ),
         ],
