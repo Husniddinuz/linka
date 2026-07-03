@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:audioplayers/audioplayers.dart' as ap;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -12,6 +15,7 @@ import 'package:image_picker/image_picker.dart';
 import '../services/token_service.dart';
 import '../services/api_service.dart';
 import '../services/chat_service.dart';
+import '../services/podcast_playback_service.dart';
 import '../services/user_service.dart';
 import 'chats_screen.dart';
 import 'tutor_profile_screen.dart';
@@ -115,30 +119,6 @@ class _QuizData {
       );
 
   int get totalVotes => options.fold(0, (s, o) => s + o.answerCount);
-}
-
-// ─── Audio storage item ────────────────────────────────────────────────────────
-
-class _AudioStorageItem {
-  final int id;
-  final String title;
-  final String fileUrl;
-  final int duration;
-
-  const _AudioStorageItem({
-    required this.id,
-    required this.title,
-    required this.fileUrl,
-    required this.duration,
-  });
-
-  factory _AudioStorageItem.fromJson(Map<String, dynamic> json) =>
-      _AudioStorageItem(
-        id: (json['id'] as num).toInt(),
-        title: json['title']?.toString() ?? 'Audio',
-        fileUrl: json['file_url']?.toString() ?? '',
-        duration: (json['duration'] as num?)?.toInt() ?? 0,
-      );
 }
 
 // ─── Message model ─────────────────────────────────────────────────────────────
@@ -314,14 +294,25 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
 
   String? _playingId;
   int? _playTotalSeconds;
-  final Set<String> _downloading = {};
-  AudioPlayer? _audioPlayer;
+  // messageId → fraction downloaded (0.0-1.0), absent once not downloading.
+  final Map<String, double> _downloadProgress = {};
+  // just_audio_background allows only one live AudioPlayer app-wide, so
+  // playback of *received* voice messages shares PodcastPlaybackService's
+  // instance instead of constructing its own (which would throw "single
+  // player instance").
+  AudioPlayer get _player => PodcastPlaybackService.instance.player;
   StreamSubscription? _playerStateSub;
 
+  // Recording preview (before send) uses its own independent audioplayers
+  // instance rather than the just_audio_background-managed shared player
+  // above — it's a short-lived local-only playback with no need for
+  // lock-screen controls, and reusing the shared instance here caused a
+  // string of state-sync races (stale replayed "completed" events, queue
+  // index confusion with podcasts, activation races on rapid re-taps).
   String? _recordedPath;
   int _recordedDuration = 0;
-  AudioPlayer? _previewPlayer;
-  StreamSubscription? _previewPlayerSub;
+  ap.AudioPlayer? _previewPlayer;
+  StreamSubscription<void>? _previewCompleteSub;
   bool _previewPlaying = false;
 
   WebSocketChannel? _wsChannel;
@@ -401,8 +392,12 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
     _wsSub?.cancel();
     _wsChannel?.sink.close();
     _playerStateSub?.cancel();
-    _audioPlayer?.dispose();
-    _previewPlayerSub?.cancel();
+    // Never dispose the shared player — it's PodcastPlaybackService's
+    // app-lifetime instance. Just pause it if this screen was using it.
+    if (_playingId != null) {
+      _player.pause();
+    }
+    _previewCompleteSub?.cancel();
     _previewPlayer?.dispose();
     _recorder.dispose();
     super.dispose();
@@ -637,16 +632,58 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
     );
   }
 
-  void _openAudioLibrarySheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _AudioLibrarySheet(slug: widget.channel.id),
+  Future<void> _pickAndSendAudioFile() async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['mp3'],
     );
+    if (result == null || result.files.isEmpty || result.files.first.path == null) {
+      return;
+    }
+    final path = result.files.first.path!;
+    if (!mounted) return;
+
+    final replyingTo = _replyingTo;
+    setState(() => _replyingTo = null);
+
+    // Probe the file's duration for display purposes, same approach used
+    // for voice-message playback (some codecs report duration async).
+    int duration = 0;
+    final probePlayer = AudioPlayer();
+    try {
+      final dur = await probePlayer.setAudioSource(AudioSource.uri(
+        Uri.file(path),
+        tag: const MediaItem(id: 'audio_probe', title: 'Audio file'),
+      ));
+      duration = (dur ?? probePlayer.duration)?.inSeconds ??
+          await probePlayer.durationStream
+              .firstWhere((d) => d != null)
+              .timeout(const Duration(seconds: 2), onTimeout: () => null)
+              .then((d) => d?.inSeconds ?? 0);
+    } catch (_) {
+    } finally {
+      await probePlayer.dispose();
+    }
+
+    _addLocalMessage(
+      isVoice: true,
+      voiceDuration: duration,
+      replyTo: replyingTo != null
+          ? _ReplyTo(
+              id: replyingTo.id,
+              senderName: replyingTo.senderName,
+              text: replyingTo.text,
+              isVoice: replyingTo.isVoice,
+              isDeleted: replyingTo.isDeleted,
+            )
+          : null,
+    );
+    ChatService.uploadVoiceMessage(
+      widget.channel.id,
+      File(path),
+      duration,
+      replyToId: replyingTo?.id,
+    ).catchError((_) {});
   }
 
   // ─── Reply navigation ──────────────────────────────────────────────────────
@@ -1021,28 +1058,31 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
     setState(() => _replyingTo = null);
 
     final replyToId = replyingTo?.id;
+    final replyToArg = replyingTo != null
+        ? _ReplyTo(
+            id: replyingTo.id,
+            senderName: replyingTo.senderName,
+            text: replyingTo.text,
+            isVoice: replyingTo.isVoice,
+            isDeleted: replyingTo.isDeleted,
+          )
+        : null;
+
+    // Always add an optimistic local bubble immediately — relying solely on
+    // the WS echo left the send looking like a no-op whenever that socket
+    // was dead/reconnecting (it has no onDone/reconnect handling, so
+    // _wsChannel can be non-null but silently unable to deliver).
+    _addLocalMessage(text: text, replyTo: replyToArg);
 
     if (_wsChannel != null) {
-      // WS delivers new_message back to all clients including sender
+      // WS delivers new_message back to all clients including sender, which
+      // reconciles the optimistic bubble above via _pendingLocalId.
       _wsSend({
         'type': 'send_message',
         'text': text,
         if (replyToId != null) 'reply_to_id': int.tryParse(replyToId) ?? replyToId,
       });
     } else {
-      // Optimistic local add — server doesn't push back without WS
-      _addLocalMessage(
-        text: text,
-        replyTo: replyingTo != null
-            ? _ReplyTo(
-                id: replyingTo.id,
-                senderName: replyingTo.senderName,
-                text: replyingTo.text,
-                isVoice: replyingTo.isVoice,
-                isDeleted: replyingTo.isDeleted,
-              )
-            : null,
-      );
       ChatService.sendTextMessageRest(
         widget.channel.id,
         text,
@@ -1193,11 +1233,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
     if (path == null) return;
     _stopTypingOut();
 
-    _previewPlayerSub?.cancel();
-    _previewPlayerSub = null;
-    await _previewPlayer?.stop();
-    await _previewPlayer?.dispose();
-    _previewPlayer = null;
+    await _disposePreviewPlayer();
 
     setState(() {
       _recordedPath = null;
@@ -1229,11 +1265,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
 
   Future<void> _discardRecorded() async {
     final path = _recordedPath;
-    _previewPlayerSub?.cancel();
-    _previewPlayerSub = null;
-    await _previewPlayer?.stop();
-    await _previewPlayer?.dispose();
-    _previewPlayer = null;
+    await _disposePreviewPlayer();
     setState(() {
       _recordedPath = null;
       _recordedDuration = 0;
@@ -1246,26 +1278,42 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
     }
   }
 
+  Future<void> _disposePreviewPlayer() async {
+    await _previewCompleteSub?.cancel();
+    _previewCompleteSub = null;
+    final player = _previewPlayer;
+    _previewPlayer = null;
+    await player?.dispose();
+  }
+
   Future<void> _togglePreviewPlay() async {
-    if (_recordedPath == null) return;
+    final path = _recordedPath;
+    if (path == null) return;
+
     if (_previewPlaying) {
       await _previewPlayer?.pause();
       if (mounted) setState(() => _previewPlaying = false);
       return;
     }
-    _previewPlayerSub?.cancel();
-    _previewPlayerSub = null;
-    await _previewPlayer?.stop();
-    _previewPlayer ??= AudioPlayer();
+
     try {
-      await _previewPlayer!.setFilePath(_recordedPath!);
-      await _previewPlayer!.play();
+      var player = _previewPlayer;
+      if (player == null) {
+        player = ap.AudioPlayer();
+        _previewPlayer = player;
+        _previewCompleteSub = player.onPlayerComplete.listen((_) {
+          if (mounted) setState(() => _previewPlaying = false);
+        });
+      }
+      // Resume keeps the paused position; play() restarts from the top —
+      // only take the restart path the first time or after it ran to
+      // completion.
+      if (player.state == ap.PlayerState.paused) {
+        await player.resume();
+      } else {
+        await player.play(ap.DeviceFileSource(path));
+      }
       if (mounted) setState(() => _previewPlaying = true);
-      _previewPlayerSub = _previewPlayer!.playerStateStream.listen((state) {
-        if (state.processingState == ProcessingState.completed && mounted) {
-          setState(() => _previewPlaying = false);
-        }
-      });
     } catch (_) {
       if (mounted) setState(() => _previewPlaying = false);
     }
@@ -1278,34 +1326,60 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
 
     if (_playingId == msg.id) {
       _playerStateSub?.cancel();
-      await _audioPlayer?.pause();
+      await _player.pause();
       setState(() => _playingId = null);
       return;
     }
 
+    // Don't call _player.stop() here — this player is now the long-lived
+    // shared instance (see _player getter above), and stop() immediately
+    // followed by the setAudioSource() below (once the download finishes)
+    // races just_audio's platform activation and can silently abort the
+    // load on the first tap. loadAdHoc()'s setAudioSource call already
+    // interrupts/replaces whatever was previously loaded.
     _playerStateSub?.cancel();
-    await _audioPlayer?.stop();
     setState(() => _playingId = msg.id);
 
     try {
       debugPrint('[Voice] ▶ tapped id=${msg.id} url=${msg.voiceUrl}');
-      setState(() => _downloading.add(msg.id));
+      setState(() => _downloadProgress[msg.id] = 0.0);
 
-      // http.get follows redirects and decompresses gzip transparently.
-      final response = await http.get(Uri.parse(msg.voiceUrl!));
-      debugPrint('[Voice] HTTP ${response.statusCode} '
-          'content-type=${response.headers['content-type']} '
-          'bytes=${response.bodyBytes.length}');
-      if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}');
+      // Stream the response so we can report real download progress instead
+      // of a plain spinner. http.get buffers the whole body before returning.
+      final client = http.Client();
+      final http.StreamedResponse streamed;
+      try {
+        streamed = await client.send(http.Request('GET', Uri.parse(msg.voiceUrl!)));
+      } catch (e) {
+        client.close();
+        rethrow;
+      }
+      debugPrint('[Voice] HTTP ${streamed.statusCode} '
+          'content-length=${streamed.contentLength}');
+      if (streamed.statusCode != 200) {
+        client.close();
+        throw Exception('HTTP ${streamed.statusCode}');
       }
 
-      if (mounted) setState(() => _downloading.remove(msg.id));
+      final total = streamed.contentLength;
+      final builder = BytesBuilder(copy: false);
+      var received = 0;
+      await for (final chunk in streamed.stream) {
+        builder.add(chunk);
+        received += chunk.length;
+        if (total != null && total > 0 && mounted) {
+          setState(() =>
+              _downloadProgress[msg.id] = (received / total).clamp(0.0, 1.0));
+        }
+      }
+      client.close();
+
+      if (mounted) setState(() => _downloadProgress.remove(msg.id));
 
       final dir = await getTemporaryDirectory();
       final ext = msg.voiceUrl!.split('.').last.split('?').first;
       final file = File('${dir.path}/voice_${msg.id}.$ext');
-      await file.writeAsBytes(response.bodyBytes);
+      await file.writeAsBytes(builder.takeBytes());
       final fileSize = await file.length();
       debugPrint('[Voice] saved → ${file.path} ($fileSize bytes)');
 
@@ -1313,30 +1387,44 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         throw Exception('Audio file too small ($fileSize bytes) — likely empty recording');
       }
 
-      await _audioPlayer?.dispose();
-      _audioPlayer = AudioPlayer();
-      debugPrint('[Voice] setFilePath...');
-      final dur = await _audioPlayer!.setFilePath(file.path);
+      debugPrint('[Voice] setAudioSource...');
+      // just_audio_background is initialized globally in main.dart, which
+      // requires every AudioSource to carry a MediaItem tag or setFilePath
+      // throws an assertion error.
+      final dur = await PodcastPlaybackService.instance.loadAdHoc(
+        'voice_${msg.id}',
+        Uri.file(file.path),
+        title: 'Voice message',
+      );
       // Use the actual file duration; fall back to durationStream for formats
       // that report duration asynchronously (some iOS codecs).
-      final actualSeconds = (dur ?? _audioPlayer!.duration)?.inSeconds;
-      debugPrint('[Voice] duration from setFilePath: ${dur?.inSeconds}s  '
-          'from .duration: ${_audioPlayer!.duration?.inSeconds}s');
+      final actualSeconds = (dur ?? _player.duration)?.inSeconds;
+      debugPrint('[Voice] duration from setAudioSource: ${dur?.inSeconds}s  '
+          'from .duration: ${_player.duration?.inSeconds}s');
       setState(() => _playTotalSeconds = actualSeconds);
 
       if (actualSeconds == null) {
-        _audioPlayer!.durationStream.first.then((d) {
+        _player.durationStream.first.then((d) {
           debugPrint('[Voice] durationStream emitted: ${d?.inSeconds}s');
           if (d != null && mounted) setState(() => _playTotalSeconds = d.inSeconds);
         });
       }
 
       debugPrint('[Voice] play()');
-      await _audioPlayer!.play();
+      await _player.play();
 
-      _playerStateSub = _audioPlayer!.playerStateStream.listen((state) {
-        debugPrint('[Voice] playerState: ${state.processingState}');
-        if (state.processingState == ProcessingState.completed && mounted) {
+      // playerStateStream is a BehaviorSubject: subscribing replays the
+      // player's last known state first, which — if the previous track we
+      // played on this shared player ran to completion — is a stale
+      // "completed" left over from before this load. Skip that replay so
+      // we don't immediately reset _playingId based on someone else's
+      // completion.
+      _playerStateSub = _player.playerStateStream.skip(1).listen((state) {
+        debugPrint('[Voice] playerState: ${state.processingState} '
+            'pos=${_player.position} dur=${_player.duration}');
+        if (state.processingState == ProcessingState.completed &&
+            mounted &&
+            _reallyAtEnd()) {
           setState(() => _playingId = null);
         }
       });
@@ -1345,13 +1433,34 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
       if (mounted) {
         setState(() {
           _playingId = null;
-          _downloading.remove(msg.id);
+          _downloadProgress.remove(msg.id);
         });
       }
     }
   }
 
+  // Reusing one shared AudioPlayer across rapid source swaps sometimes fires
+  // a spurious ProcessingState.completed moments after play() starts (the
+  // native/plugin side briefly reports stale end-of-track bookkeeping from
+  // the previous source before it catches up). A genuine completion always
+  // has position ≈ duration, so use that to tell the two apart instead of
+  // trusting the processingState alone.
+  bool _reallyAtEnd() {
+    final dur = _player.duration;
+    if (dur == null || dur == Duration.zero) return true;
+    return _player.position >= dur - const Duration(milliseconds: 500);
+  }
+
+  Future<void> _seekVoice(Duration position) async {
+    await _player.seek(position);
+  }
+
   // ─── Helpers ───────────────────────────────────────────────────────────────
+
+  // Channels where students can't post are tutor-only channels: every
+  // participant is a tutor, so per-message tutor identity/moderation UI
+  // (name, avatar, IELTS badge, profile tap, report, block) is redundant.
+  bool get _isTutorOnlyChannel => !widget.channel.studentCanPost;
 
   bool _sameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
@@ -1420,7 +1529,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
                       onCreateQuiz:
                           _currentUserIsTutor ? _openCreateQuizSheet : null,
                       onAudioLibrary:
-                          _currentUserIsTutor ? _openAudioLibrarySheet : null,
+                          _currentUserIsTutor ? _pickAndSendAudioFile : null,
                     )
                   : _TextInputBar(
                       controller: _textController,
@@ -1430,7 +1539,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
                       onCreateQuiz:
                           _currentUserIsTutor ? _openCreateQuizSheet : null,
                       onAudioLibrary:
-                          _currentUserIsTutor ? _openAudioLibrarySheet : null,
+                          _currentUserIsTutor ? _pickAndSendAudioFile : null,
                     ),
             ],
           ],
@@ -1496,19 +1605,21 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
                   isPlaying: _playingId == msg.id,
                   playerTotalSeconds:
                       _playingId == msg.id ? _playTotalSeconds : null,
-                  downloadProgress:
-                      _downloading.contains(msg.id) ? -1.0 : null,
+                  downloadProgress: _downloadProgress[msg.id],
+                  voicePlayer: _playingId == msg.id ? _player : null,
+                  onVoiceSeek: _playingId == msg.id ? _seekVoice : null,
                   onPlayToggle: () => _togglePlayVoice(msg),
                   onReply: () => setState(() => _replyingTo = msg),
                   onDelete: msg.isMine && !msg.isDeleted
                       ? () => _deleteMessage(msg)
                       : null,
-                  onReport: !msg.isMine && !msg.isDeleted
+                  onReport: !msg.isMine && !msg.isDeleted && !_isTutorOnlyChannel
                       ? () => _showReportSheet(msg)
                       : null,
-                  onBlock: !msg.isMine
+                  onBlock: !msg.isMine && !_isTutorOnlyChannel
                       ? () => _confirmBlock(msg)
                       : null,
+                  hideTutorIdentity: _isTutorOnlyChannel,
                   quizSubmitting: msg.quiz != null &&
                       _quizSubmitting.contains(msg.quiz!.id),
                   quizPendingOptionId: msg.quiz != null
@@ -1626,6 +1737,8 @@ class _MessageBubble extends StatelessWidget {
   final bool isPlaying;
   final int? playerTotalSeconds;
   final double? downloadProgress;
+  final AudioPlayer? voicePlayer;
+  final void Function(Duration)? onVoiceSeek;
   final VoidCallback onPlayToggle;
   final VoidCallback onReply;
   final VoidCallback? onDelete;
@@ -1635,6 +1748,7 @@ class _MessageBubble extends StatelessWidget {
   final int? quizPendingOptionId;
   final void Function(int)? onQuizOptionTap;
   final void Function(String replyToId)? onScrollToOriginal;
+  final bool hideTutorIdentity;
 
   const _MessageBubble({
     super.key,
@@ -1647,10 +1761,13 @@ class _MessageBubble extends StatelessWidget {
     this.onBlock,
     this.playerTotalSeconds,
     this.downloadProgress,
+    this.voicePlayer,
+    this.onVoiceSeek,
     this.quizSubmitting = false,
     this.quizPendingOptionId,
     this.onQuizOptionTap,
     this.onScrollToOriginal,
+    this.hideTutorIdentity = false,
   });
 
   String _timeLabel(DateTime dt) {
@@ -1738,48 +1855,51 @@ class _MessageBubble extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            _Avatar(
-              initials: message.senderInitials,
-              color: message.senderColor,
-              imageUrl: message.senderAvatar,
-            ),
-            const SizedBox(width: 8),
+            if (!hideTutorIdentity) ...[
+              _Avatar(
+                initials: message.senderInitials,
+                color: message.senderColor,
+                imageUrl: message.senderAvatar,
+              ),
+              const SizedBox(width: 8),
+            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  GestureDetector(
-                    onTap: message.isTutor && message.tutorId != null
-                        ? () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => TutorProfileScreen(
-                                    tutorId: message.tutorId!),
+                  if (!hideTutorIdentity)
+                    GestureDetector(
+                      onTap: message.isTutor && message.tutorId != null
+                          ? () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => TutorProfileScreen(
+                                      tutorId: message.tutorId!),
+                                ),
+                              )
+                          : null,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 4, bottom: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              message.senderName,
+                              style: TextStyle(
+                                fontFamily: 'SF Pro',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: message.senderColor,
                               ),
-                            )
-                        : null,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 4, bottom: 4),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            message.senderName,
-                            style: TextStyle(
-                              fontFamily: 'SF Pro',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: message.senderColor,
                             ),
-                          ),
-                          if (message.isTutor) ...[
-                            const SizedBox(width: 6),
-                            _TutorBadge(ieltsScore: message.tutorIeltsScore),
+                            if (message.isTutor) ...[
+                              const SizedBox(width: 6),
+                              _TutorBadge(ieltsScore: message.tutorIeltsScore),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
-                  ),
                   _QuizBubble(
                     quiz: message.quiz!,
                     submitting: quizSubmitting,
@@ -1856,6 +1976,8 @@ class _MessageBubble extends StatelessWidget {
                 isMine: isMine,
                 isPlaying: isPlaying,
                 onPlayToggle: onPlayToggle,
+                player: voicePlayer,
+                onSeek: onVoiceSeek,
               )
             else
               _TextBubble(
@@ -1877,7 +1999,7 @@ class _MessageBubble extends StatelessWidget {
           mainAxisAlignment:
               isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
           children: [
-            if (!isMine) ...[
+            if (!isMine && !hideTutorIdentity) ...[
               _Avatar(
                 initials: message.senderInitials,
                 color: message.senderColor,
@@ -1890,7 +2012,7 @@ class _MessageBubble extends StatelessWidget {
                 crossAxisAlignment:
                     isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 children: [
-                  if (!isMine)
+                  if (!isMine && !hideTutorIdentity)
                     GestureDetector(
                       onTap: message.isTutor && message.tutorId != null
                           ? () => Navigator.push(
@@ -2330,6 +2452,10 @@ class _VoiceBubble extends StatefulWidget {
   final bool isMine;
   final bool isPlaying;
   final VoidCallback onPlayToggle;
+  // Non-null only while this bubble is the one loaded in the shared player —
+  // lets the waveform track real playback position and support seeking.
+  final AudioPlayer? player;
+  final void Function(Duration)? onSeek;
   const _VoiceBubble({
     required this.duration,
     required this.isMine,
@@ -2337,6 +2463,8 @@ class _VoiceBubble extends StatefulWidget {
     required this.onPlayToggle,
     this.playerTotalSeconds,
     this.downloadProgress,
+    this.player,
+    this.onSeek,
   });
 
   @override
@@ -2344,8 +2472,13 @@ class _VoiceBubble extends StatefulWidget {
 }
 
 class _VoiceBubbleState extends State<_VoiceBubble> {
-  Timer? _timer;
-  int _elapsedMs = 0;
+  static const _waveformWidth = 110.0;
+
+  StreamSubscription<Duration>? _positionSub;
+  Duration _position = Duration.zero;
+  // Fraction (0-1) of the waveform the user is currently dragging/tapping to,
+  // used for immediate visual feedback ahead of the player's seek + stream.
+  double? _dragFraction;
 
   static const _bars = [
     4, 8, 14, 10, 16, 11, 5, 18, 13, 7,
@@ -2354,23 +2487,34 @@ class _VoiceBubbleState extends State<_VoiceBubble> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _subscribeToPlayer();
+  }
+
+  @override
   void didUpdateWidget(_VoiceBubble old) {
     super.didUpdateWidget(old);
-    if (widget.isPlaying && !old.isPlaying) {
-      _elapsedMs = 0;
-      _timer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-        if (!mounted) return;
-        setState(() => _elapsedMs += 100);
-      });
-    } else if (!widget.isPlaying && old.isPlaying) {
-      _timer?.cancel();
-      setState(() => _elapsedMs = 0);
+    if (widget.player != old.player) {
+      _positionSub?.cancel();
+      _positionSub = null;
+      _position = Duration.zero;
+      _subscribeToPlayer();
     }
+  }
+
+  void _subscribeToPlayer() {
+    final player = widget.player;
+    if (player == null) return;
+    _position = player.position;
+    _positionSub = player.positionStream.listen((pos) {
+      if (mounted) setState(() => _position = pos);
+    });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _positionSub?.cancel();
     super.dispose();
   }
 
@@ -2381,6 +2525,21 @@ class _VoiceBubbleState extends State<_VoiceBubble> {
     final m = (seconds ~/ 60).toString().padLeft(2, '0');
     final s = (seconds % 60).toString().padLeft(2, '0');
     return '$m:$s';
+  }
+
+  void _updateDragFraction(double localDx) {
+    if (widget.onSeek == null || _total <= 0) return;
+    setState(() => _dragFraction = (localDx / _waveformWidth).clamp(0.0, 1.0));
+  }
+
+  void _commitSeek() {
+    final fraction = _dragFraction;
+    if (fraction == null) return;
+    setState(() => _dragFraction = null);
+    if (widget.onSeek == null || _total <= 0) return;
+    widget.onSeek!(
+      Duration(milliseconds: (fraction * _total * 1000).round()),
+    );
   }
 
   @override
@@ -2394,13 +2553,20 @@ class _VoiceBubbleState extends State<_VoiceBubble> {
     final waveActive = isMine ? Colors.white : const Color(0xFF272942);
 
     final total = _total;
-    final fraction = isPlaying && total > 0
-        ? (_elapsedMs / (total * 1000)).clamp(0.0, 1.0)
+    final dragFraction = _dragFraction;
+    final elapsedMs = dragFraction != null
+        ? (dragFraction * total * 1000).round()
+        : (isPlaying ? _position.inMilliseconds : 0);
+    final fraction = total > 0
+        ? (elapsedMs / (total * 1000)).clamp(0.0, 1.0)
         : 0.0;
     final activeCount = (fraction * _bars.length).round();
-    final label = isPlaying ? _fmt(_elapsedMs ~/ 1000) : _fmt(total);
+    final label = (isPlaying || dragFraction != null)
+        ? _fmt(elapsedMs ~/ 1000)
+        : _fmt(total);
     final downloading = widget.downloadProgress != null;
     final ringColor = isMine ? Colors.white : const Color(0xFF5B5EA6);
+    final canSeek = widget.onSeek != null && total > 0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -2439,6 +2605,9 @@ class _VoiceBubbleState extends State<_VoiceBubble> {
                       width: 34,
                       height: 34,
                       child: CircularProgressIndicator(
+                        value: widget.downloadProgress! > 0
+                            ? widget.downloadProgress
+                            : null,
                         strokeWidth: 2.5,
                         color: ringColor,
                         backgroundColor: ringColor.withValues(alpha: 0.2),
@@ -2452,23 +2621,37 @@ class _VoiceBubbleState extends State<_VoiceBubble> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                height: 28,
-                width: 110,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: List.generate(_bars.length, (i) {
-                    final barH = _bars[i].toDouble().clamp(3.0, 20.0);
-                    return Container(
-                      width: 2.5,
-                      height: barH,
-                      margin: const EdgeInsets.symmetric(horizontal: 0.5),
-                      decoration: BoxDecoration(
-                        color: i < activeCount ? waveActive : waveBase,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    );
-                  }),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapDown: canSeek
+                    ? (d) => _updateDragFraction(d.localPosition.dx)
+                    : null,
+                onTapUp: canSeek ? (_) => _commitSeek() : null,
+                onHorizontalDragStart: canSeek
+                    ? (d) => _updateDragFraction(d.localPosition.dx)
+                    : null,
+                onHorizontalDragUpdate: canSeek
+                    ? (d) => _updateDragFraction(d.localPosition.dx)
+                    : null,
+                onHorizontalDragEnd: canSeek ? (_) => _commitSeek() : null,
+                child: SizedBox(
+                  height: 28,
+                  width: _waveformWidth,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: List.generate(_bars.length, (i) {
+                      final barH = _bars[i].toDouble().clamp(3.0, 20.0);
+                      return Container(
+                        width: 2.5,
+                        height: barH,
+                        margin: const EdgeInsets.symmetric(horizontal: 0.5),
+                        decoration: BoxDecoration(
+                          color: i < activeCount ? waveActive : waveBase,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      );
+                    }),
+                  ),
                 ),
               ),
               const SizedBox(height: 2),
@@ -2530,7 +2713,7 @@ class _TextInputBar extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.headphones, color: Color(0xFFAAAAAA)),
               onPressed: onAudioLibrary,
-              tooltip: 'Audio Library',
+              tooltip: 'Send MP3 file',
             ),
           IconButton(
             icon: const Icon(Icons.image_outlined, color: Color(0xFFAAAAAA)),
@@ -2670,7 +2853,7 @@ class _VoiceInputBar extends StatelessWidget {
                   TextButton.icon(
                     onPressed: onAudioLibrary,
                     icon: const Icon(Icons.headphones, size: 16),
-                    label: const Text('Audio Library'),
+                    label: const Text('MP3 file'),
                     style: TextButton.styleFrom(
                       foregroundColor: const Color(0xFF888888),
                       textStyle: const TextStyle(
@@ -3578,250 +3761,6 @@ class _CreateQuizSheetState extends State<_CreateQuizSheet> {
                       ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Audio library sheet ───────────────────────────────────────────────────────
-
-class _AudioLibrarySheet extends StatefulWidget {
-  final String slug;
-  const _AudioLibrarySheet({required this.slug});
-
-  @override
-  State<_AudioLibrarySheet> createState() => _AudioLibrarySheetState();
-}
-
-class _AudioLibrarySheetState extends State<_AudioLibrarySheet> {
-  List<_AudioStorageItem> _items = [];
-  bool _loading = true;
-  bool _uploading = false;
-  int? _sendingId;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final raw = await ChatService.fetchAudioStorage();
-      if (mounted) {
-        setState(() {
-          _items = raw.map(_AudioStorageItem.fromJson).toList();
-          _loading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _uploadNew() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['mp3', 'wav', 'aac', 'm4a'],
-    );
-    if (result == null || result.files.isEmpty || result.files.first.path == null) {
-      return;
-    }
-    final file = result.files.first;
-    setState(() => _uploading = true);
-    try {
-      final raw = await ChatService.uploadAudioStorage(
-        File(file.path!),
-        title: file.name.replaceAll(RegExp(r'\.\w+$'), ''),
-      );
-      if (mounted) {
-        setState(() {
-          _uploading = false;
-          _items = [_AudioStorageItem.fromJson(raw), ..._items];
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _uploading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(e is ApiException ? e.message : 'Upload failed'),
-        backgroundColor: const Color(0xFFEB3349),
-        behavior: SnackBarBehavior.floating,
-      ));
-    }
-  }
-
-  Future<void> _send(_AudioStorageItem item) async {
-    if (_sendingId != null) return;
-    setState(() => _sendingId = item.id);
-    try {
-      await ChatService.sendStorageAudio(widget.slug, item.id);
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _sendingId = null);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(e is ApiException ? e.message : 'Failed to send'),
-        backgroundColor: const Color(0xFFEB3349),
-        behavior: SnackBarBehavior.floating,
-      ));
-    }
-  }
-
-  String _fmtDuration(int seconds) {
-    final m = seconds ~/ 60;
-    final s = (seconds % 60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.7,
-      child: Column(
-        children: [
-          Container(
-            margin: const EdgeInsets.only(top: 12),
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: const Color(0xFFDDDDDD),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
-            child: Row(
-              children: [
-                const Text(
-                  'Audio Library',
-                  style: TextStyle(
-                    fontFamily: 'SF Pro',
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF272942),
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded,
-                      color: Color(0xFFAAAAAA)),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _uploading ? null : _uploadNew,
-                icon: _uploading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Color(0xFF5B7FD4),
-                        ),
-                      )
-                    : const Icon(Icons.upload_rounded, size: 18),
-                label: Text(_uploading ? 'Uploading...' : '+ Upload new'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF5B7FD4),
-                  side: const BorderSide(color: Color(0xFF5B7FD4)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  textStyle: const TextStyle(
-                    fontFamily: 'SF Pro',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                        color: Color(0xFF5B7FD4)),
-                  )
-                : _items.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No audio files yet',
-                          style: TextStyle(
-                            fontFamily: 'SF Pro',
-                            fontSize: 14,
-                            color: Color(0xFFAAAAAA),
-                          ),
-                        ),
-                      )
-                    : ListView.separated(
-                        itemCount: _items.length,
-                        separatorBuilder: (context, i) =>
-                            const Divider(height: 1, indent: 56),
-                        itemBuilder: (_, i) {
-                          final item = _items[i];
-                          final isSending = _sendingId == item.id;
-                          return ListTile(
-                            leading: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF5B7FD4)
-                                    .withValues(alpha: 0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.music_note_rounded,
-                                color: Color(0xFF5B7FD4),
-                                size: 20,
-                              ),
-                            ),
-                            title: Text(
-                              item.title,
-                              style: const TextStyle(
-                                fontFamily: 'SF Pro',
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF272942),
-                              ),
-                            ),
-                            subtitle: Text(
-                              _fmtDuration(item.duration),
-                              style: const TextStyle(
-                                fontFamily: 'SF Pro',
-                                fontSize: 12,
-                                color: Color(0xFFAAAAAA),
-                              ),
-                            ),
-                            trailing: isSending
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Color(0xFF5B7FD4),
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.send_rounded,
-                                    color: Color(0xFF5B7FD4),
-                                    size: 20,
-                                  ),
-                            onTap: _sendingId == null
-                                ? () => _send(item)
-                                : null,
-                          );
-                        },
-                      ),
           ),
         ],
       ),

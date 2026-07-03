@@ -219,69 +219,6 @@ class ChatService {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> fetchAudioStorage() async {
-    final data = await _get('/chats/audio-storage/');
-    final results = data['results'];
-    if (results is! List) return [];
-    return results.cast<Map<String, dynamic>>();
-  }
-
-  static Future<Map<String, dynamic>> uploadAudioStorage(
-    File file, {
-    String? title,
-  }) async {
-    final token = await TokenService.getAccessToken();
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('$chatApiBaseUrl/chats/audio-storage/'),
-    );
-    if (token != null) request.headers['Authorization'] = 'Bearer $token';
-    if (title != null && title.isNotEmpty) request.fields['title'] = title;
-    request.files.add(await http.MultipartFile.fromPath('file', file.path));
-    final streamed = await request.send();
-    final body = await streamed.stream.bytesToString();
-    if (streamed.statusCode == 201) {
-      return jsonDecode(body) as Map<String, dynamic>;
-    }
-    String detail;
-    try {
-      final parsed = jsonDecode(body) as Map<String, dynamic>;
-      detail = parsed['detail']?.toString() ??
-          'Upload failed (${streamed.statusCode})';
-    } catch (_) {
-      detail = 'Upload failed (${streamed.statusCode})';
-    }
-    throw ApiException(detail, statusCode: streamed.statusCode);
-  }
-
-  static Future<void> sendStorageAudio(
-    String slug,
-    int audioId, {
-    String? replyToId,
-  }) async {
-    final token = await TokenService.getAccessToken();
-    final body = <String, dynamic>{
-      'audio_id': audioId,
-      if (replyToId != null) 'reply_to_id': int.tryParse(replyToId) ?? replyToId,
-    };
-    final response = await http.post(
-      Uri.parse('$chatApiBaseUrl/chats/channels/$slug/messages/storage-audio/'),
-      headers: _headers(token),
-      body: jsonEncode(body),
-    );
-    if (response.statusCode != 201) {
-      String detail;
-      try {
-        final parsed = jsonDecode(response.body) as Map<String, dynamic>;
-        detail = parsed['detail']?.toString() ??
-            'Failed to send audio (${response.statusCode})';
-      } catch (_) {
-        detail = 'Failed to send audio (${response.statusCode})';
-      }
-      throw ApiException(detail, statusCode: response.statusCode);
-    }
-  }
-
   static Future<void> reportMessage({
     required int messageId,
     required String reason,

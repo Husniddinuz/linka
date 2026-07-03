@@ -21,9 +21,10 @@ class PodcastTrack {
 
 class PodcastPlaybackService {
   PodcastPlaybackService._() {
+    _player.currentIndexStream.listen(_onIndexChanged);
     _player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
-        _onTrackCompleted();
+        _onQueueCompleted();
       }
     });
   }
@@ -39,40 +40,41 @@ class PodcastPlaybackService {
   bool get hasNext => _currentIndex >= 0 && _currentIndex < _queue.length - 1;
   bool get hasPrevious => _currentIndex > 0;
 
-  Future<void> _onTrackCompleted() async {
-    final finished = currentTrack.value;
-    debugPrint('[Podcast] completed id=${finished?.id} title="${finished?.title}"');
-    FacebookEventsService.logEvent('podcast_completed', parameters: {
-      'podcast_id': finished?.id ?? -1,
-      'podcast_title': finished?.title ?? '',
-      'auto_advance': hasNext,
-    });
-    if (hasNext) {
-      await _playIndex(_currentIndex + 1);
-    } else {
-      await _player.pause();
-      await _player.seek(Duration.zero);
-    }
-  }
-
-  Future<void> _playIndex(int index) async {
-    if (index < 0 || index >= _queue.length) return;
+  void _onIndexChanged(int? index) {
+    if (index == null || index < 0 || index >= _queue.length) return;
+    if (index == _currentIndex) return;
     _currentIndex = index;
-    final track = _queue[index];
-    currentTrack.value = track;
-    await _player.setAudioSource(AudioSource.uri(
-      Uri.parse(track.audioUrl),
-      tag: MediaItem(
-        id: track.audioUrl,
-        title: track.title,
-        artUri: track.imageUrl != null ? Uri.parse(track.imageUrl!) : null,
-      ),
-    ));
-    await _player.play();
+    currentTrack.value = _queue[index];
   }
 
-  /// Sets a playlist and starts playing from [startIndex]. Subsequent tracks
-  /// play automatically when the current one ends.
+  Future<void> _onQueueCompleted() async {
+    // currentTrack is null for ad-hoc playback (e.g. a chat voice message
+    // sharing this player via loadAdHoc) — that's not a podcast completion.
+    final finished = currentTrack.value;
+    if (finished != null) {
+      debugPrint('[Podcast] completed id=${finished.id} title="${finished.title}"');
+      FacebookEventsService.logEvent('podcast_completed', parameters: {
+        'podcast_id': finished.id,
+        'podcast_title': finished.title,
+        'auto_advance': false,
+      });
+    }
+    await _player.pause();
+    await _player.seek(Duration.zero);
+  }
+
+  AudioSource _sourceFor(PodcastTrack track) => AudioSource.uri(
+        Uri.parse(track.audioUrl),
+        tag: MediaItem(
+          id: track.audioUrl,
+          title: track.title,
+          artUri: track.imageUrl != null ? Uri.parse(track.imageUrl!) : null,
+        ),
+      );
+
+  /// Sets a playlist and starts playing from [startIndex]. The full queue is
+  /// handed to the native player as one playlist so lock-screen/notification
+  /// skip-next and skip-previous controls reflect the real queue position.
   Future<void> setQueue(List<PodcastTrack> tracks, int startIndex) async {
     _queue = List.of(tracks);
     if (currentTrack.value?.id == tracks[startIndex].id) {
@@ -81,15 +83,37 @@ class PodcastPlaybackService {
       _currentIndex = startIndex;
       return;
     }
-    await _playIndex(startIndex);
+    _currentIndex = startIndex;
+    currentTrack.value = tracks[startIndex];
+    await _player.setAudioSources(
+      tracks.map(_sourceFor).toList(),
+      initialIndex: startIndex,
+    );
+    await _player.play();
   }
 
   Future<void> next() async {
-    if (hasNext) await _playIndex(_currentIndex + 1);
+    if (hasNext) await _player.seekToNext();
   }
 
   Future<void> previous() async {
-    if (hasPrevious) await _playIndex(_currentIndex - 1);
+    if (hasPrevious) await _player.seekToPrevious();
+  }
+
+  /// Loads an arbitrary local/remote audio file (e.g. a chat voice message
+  /// or recording preview) into the shared player. just_audio_background
+  /// permits only one live AudioPlayer per app, so anything that plays
+  /// audio must reuse [player] rather than construct its own — otherwise
+  /// the second instance throws "supports only a single player instance".
+  /// Clears the podcast queue so the mini player and the queue-completion/
+  /// index listeners above don't act on a now-stale podcast track.
+  Future<Duration?> loadAdHoc(String id, Uri uri, {String title = ''}) {
+    _queue = [];
+    _currentIndex = -1;
+    currentTrack.value = null;
+    return _player.setAudioSource(
+      AudioSource.uri(uri, tag: MediaItem(id: id, title: title)),
+    );
   }
 
   AudioPlayer get player => _player;
@@ -106,14 +130,7 @@ class PodcastPlaybackService {
     _queue = [track];
     _currentIndex = 0;
     currentTrack.value = track;
-    await _player.setAudioSource(AudioSource.uri(
-      Uri.parse(track.audioUrl),
-      tag: MediaItem(
-        id: track.audioUrl,
-        title: track.title,
-        artUri: track.imageUrl != null ? Uri.parse(track.imageUrl!) : null,
-      ),
-    ));
+    await _player.setAudioSource(_sourceFor(track));
   }
 
   Future<void> play() => _player.play();
