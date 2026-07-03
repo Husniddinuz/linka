@@ -547,12 +547,15 @@ class _ChannelTile extends StatelessWidget {
       return Row(
         children: [
           if (senderName != null)
-            Text(
-              '$senderName: ',
-              style: const TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 14,
-                color: Color(0xFFAAAAAA),
+            Flexible(
+              child: Text(
+                '$senderName: ',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: 14,
+                  color: Color(0xFFAAAAAA),
+                ),
               ),
             ),
           const Icon(Icons.image_outlined, size: 14, color: Color(0xFFAAAAAA)),
@@ -572,12 +575,15 @@ class _ChannelTile extends StatelessWidget {
     if (channel.lastMessageIsVoice) {
       return Row(
         children: [
-          Text(
-            '$senderName: ',
-            style: const TextStyle(
-              fontFamily: 'SF Pro',
-              fontSize: 14,
-              color: Color(0xFFAAAAAA),
+          Flexible(
+            child: Text(
+              '$senderName: ',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 14,
+                color: Color(0xFFAAAAAA),
+              ),
             ),
           ),
           const Icon(Icons.headphones_rounded, size: 14, color: Color(0xFFAAAAAA)),
@@ -599,12 +605,15 @@ class _ChannelTile extends StatelessWidget {
       return Row(
         children: [
           if (senderName != null)
-            Text(
-              '$senderName: ',
-              style: const TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 14,
-                color: Color(0xFFAAAAAA),
+            Flexible(
+              child: Text(
+                '$senderName: ',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: 14,
+                  color: Color(0xFFAAAAAA),
+                ),
               ),
             ),
           const Icon(Icons.image_outlined, size: 14, color: Color(0xFFAAAAAA)),

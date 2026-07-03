@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/mock_test_styles.dart';
 
 class MockTestResultScreen extends StatelessWidget {
   const MockTestResultScreen({super.key, required this.attempt});
@@ -13,22 +14,59 @@ class MockTestResultScreen extends StatelessWidget {
     final details = ((attempt['result_detail'] as List?) ?? const []).cast<Map<String, dynamic>>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Result')),
+      backgroundColor: Colors.white,
+      appBar: mtAppBar(context, title: 'Result'),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          Center(
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 28),
+            decoration: BoxDecoration(
+              color: MockTestColors.navy,
+              borderRadius: BorderRadius.circular(20),
+            ),
             child: Column(
               children: [
-                Text('Band $band', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w800)),
+                const Text(
+                  'BAND SCORE',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white70,
+                    letterSpacing: 1.4,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                Text('$rawScore / $maxScore correct', style: const TextStyle(fontSize: 16, color: Colors.grey)),
+                Text(
+                  band,
+                  style: const TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 48,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$rawScore / $maxScore correct',
+                  style: const TextStyle(fontFamily: 'SF Pro', fontSize: 14, color: Colors.white70),
+                ),
               ],
             ),
           ),
           const SizedBox(height: 24),
-          const Text('Review', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
+          const Text(
+            'Review',
+            style: TextStyle(
+              fontFamily: 'SF Pro',
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: MockTestColors.navy,
+            ),
+          ),
+          const SizedBox(height: 10),
           ...details.map((d) {
             final correct = d['is_correct'] == true;
             final number = d['number'];
@@ -36,22 +74,56 @@ class MockTestResultScreen extends StatelessWidget {
             final label = endNumber != null ? '$number–$endNumber' : '$number';
             final submitted = _formatAnswer(d['submitted']);
             final correctAnswer = _formatAnswer(d['correct_answer']);
-            return Card(
+            return Container(
               margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: correct ? Colors.green.shade100 : Colors.red.shade100,
-                  child: Icon(
-                    correct ? Icons.check : Icons.close,
-                    color: correct ? Colors.green.shade800 : Colors.red.shade800,
+              padding: const EdgeInsets.all(12),
+              decoration: mtSoftCard(
+                color: correct ? MockTestColors.greenBg : MockTestColors.redBg,
+                radius: 12,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    correct ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                    color: correct ? MockTestColors.green : MockTestColors.red,
                     size: 20,
                   ),
-                ),
-                title: Text('Question $label'),
-                subtitle: Text(
-                  correct ? 'Your answer: $submitted' : 'Your answer: $submitted\nCorrect: $correctAnswer',
-                ),
-                isThreeLine: !correct,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Question $label',
+                          style: const TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                            color: MockTestColors.navy,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Your answer: $submitted',
+                          style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: MockTestColors.grey),
+                        ),
+                        if (!correct) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Correct: $correctAnswer',
+                            style: const TextStyle(
+                              fontFamily: 'SF Pro',
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: MockTestColors.green,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
             );
           }),

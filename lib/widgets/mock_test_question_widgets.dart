@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'mock_test_styles.dart';
 
 /// Returns this question's own options, falling back to the group's shared
 /// legend (matching/true-false/MCQ groups usually only store options once,
@@ -19,6 +20,78 @@ String questionLabel(Map<String, dynamic> question) {
   return end != null ? '$n–$end' : '$n';
 }
 
+const _promptStyle = TextStyle(
+  fontFamily: 'SF Pro',
+  fontSize: 14.5,
+  height: 1.45,
+  color: MockTestColors.navy,
+);
+
+class _QuestionShell extends StatelessWidget {
+  const _QuestionShell({required this.question, required this.child});
+  final Map<String, dynamic> question;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final prompt = (question['prompt_text'] as String?) ?? '';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _QuestionNumberBadge(label: questionLabel(question)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (prompt.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8, top: 3),
+                    child: Text(prompt, style: _promptStyle),
+                  )
+                else
+                  const SizedBox(height: 3),
+                child,
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Question-number badge. Sized to fit its content (rather than a fixed
+/// circle) so multi-question ranges like "37–40" don't wrap or clip.
+class _QuestionNumberBadge extends StatelessWidget {
+  const _QuestionNumberBadge({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(color: MockTestColors.navy, borderRadius: BorderRadius.circular(14)),
+      alignment: Alignment.center,
+      child: Text(
+        label,
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.visible,
+        style: const TextStyle(
+          fontFamily: 'SF Pro',
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          fontSize: 11.5,
+        ),
+      ),
+    );
+  }
+}
+
 class TextAnswerField extends StatelessWidget {
   const TextAnswerField({
     super.key,
@@ -33,39 +106,27 @@ class TextAnswerField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final prompt = (question['prompt_text'] as String?) ?? '';
     final controller = TextEditingController(text: value ?? '');
     controller.selection = TextSelection.collapsed(offset: controller.text.length);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _QuestionBadge(label: questionLabel(question)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (prompt.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(prompt, style: const TextStyle(fontSize: 14.5, height: 1.4)),
-                  ),
-                TextField(
-                  controller: controller,
-                  onChanged: onChanged,
-                  decoration: InputDecoration(
-                    isDense: true,
-                    hintText: 'Your answer',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-              ],
-            ),
+    return _QuestionShell(
+      question: question,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F5F7),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: TextField(
+          controller: controller,
+          onChanged: onChanged,
+          style: const TextStyle(fontFamily: 'SF Pro', fontSize: 14.5, color: MockTestColors.navy),
+          decoration: const InputDecoration(
+            isDense: true,
+            hintText: 'Your answer',
+            hintStyle: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.greyLight),
+            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            border: InputBorder.none,
           ),
-        ],
+        ),
       ),
     );
   }
@@ -87,68 +148,50 @@ class SingleChoiceField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final prompt = (question['prompt_text'] as String?) ?? '';
     final options = questionOptions(question, group);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _QuestionBadge(label: questionLabel(question)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (prompt.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(prompt, style: const TextStyle(fontSize: 14.5, height: 1.4)),
-                  ),
-                ...options.map((opt) {
-                  final optValue = opt['value']?.toString() ?? '';
-                  final selected = value == optValue;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: () => onChanged(optValue),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: selected ? Theme.of(context).colorScheme.primary : Colors.grey.shade300,
-                            width: selected ? 1.6 : 1,
-                          ),
-                          color: selected
-                              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.06)
-                              : null,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                              size: 18,
-                              color: selected ? Theme.of(context).colorScheme.primary : Colors.grey,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                opt['label']?.toString() ?? optValue,
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                            ),
-                          ],
+    return _QuestionShell(
+      question: question,
+      child: Column(
+        children: options.map((opt) {
+          final optValue = opt['value']?.toString() ?? '';
+          final selected = value == optValue;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: GestureDetector(
+              onTap: () => onChanged(optValue),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: selected ? MockTestColors.navy : const Color(0xFFF5F5F7),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+                      size: 19,
+                      color: selected ? Colors.white : MockTestColors.greyLight,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        opt['label']?.toString() ?? optValue,
+                        style: TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: selected ? Colors.white : MockTestColors.navy,
                         ),
                       ),
                     ),
-                  );
-                }),
-              ],
+                  ],
+                ),
+              ),
             ),
-          ),
-        ],
+          );
+        }).toList(),
       ),
     );
   }
@@ -171,65 +214,57 @@ class MultiSelectField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final options = questionOptions(question, group);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _QuestionBadge(label: questionLabel(question)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: options.map((opt) {
-                final optValue = opt['value']?.toString() ?? '';
-                final selected = values.contains(optValue);
-                return CheckboxListTile(
-                  value: selected,
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  title: Text(opt['label']?.toString() ?? optValue, style: const TextStyle(fontSize: 14)),
-                  onChanged: (checked) {
-                    final next = List<String>.from(values);
-                    if (checked == true) {
-                      if (!next.contains(optValue)) next.add(optValue);
-                    } else {
-                      next.remove(optValue);
-                    }
-                    onChanged(next);
-                  },
-                );
-              }).toList(),
+    return _QuestionShell(
+      question: question,
+      child: Column(
+        children: options.map((opt) {
+          final optValue = opt['value']?.toString() ?? '';
+          final selected = values.contains(optValue);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: GestureDetector(
+              onTap: () {
+                final next = List<String>.from(values);
+                if (selected) {
+                  next.remove(optValue);
+                } else {
+                  next.add(optValue);
+                }
+                onChanged(next);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: selected ? MockTestColors.navy : const Color(0xFFF5F5F7),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      selected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                      size: 19,
+                      color: selected ? Colors.white : MockTestColors.greyLight,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        opt['label']?.toString() ?? optValue,
+                        style: TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: selected ? Colors.white : MockTestColors.navy,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QuestionBadge extends StatelessWidget {
-  const _QuestionBadge({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 30,
-      height: 30,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: Theme.of(context).colorScheme.primary,
-        ),
+          );
+        }).toList(),
       ),
     );
   }

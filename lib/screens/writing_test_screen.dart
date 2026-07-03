@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/mock_test_service.dart';
+import '../widgets/mock_test_styles.dart';
 import 'writing_result_screen.dart';
 
 class WritingTestScreen extends StatefulWidget {
@@ -60,30 +61,47 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
   Widget build(BuildContext context) {
     final belowMin = _wordCount < _minWords;
     return Scaffold(
-      appBar: AppBar(title: Text(widget.prompt['title']?.toString() ?? 'Writing task')),
+      backgroundColor: Colors.white,
+      appBar: mtAppBar(context, title: widget.prompt['title']?.toString() ?? 'Writing task'),
       body: Column(
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            padding: const EdgeInsets.all(14),
+            decoration: mtSoftCard(color: MockTestColors.chipBg, radius: 14),
             child: Text(
               widget.prompt['prompt_html']?.toString() ?? '',
-              style: const TextStyle(fontSize: 14.5, height: 1.5),
+              style: const TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 14,
+                height: 1.5,
+                color: MockTestColors.navy,
+              ),
             ),
           ),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _controller,
-                maxLines: null,
-                expands: true,
-                textAlignVertical: TextAlignVertical.top,
-                decoration: const InputDecoration(
-                  hintText: 'Write your answer here…',
-                  border: OutlineInputBorder(),
-                  alignLabelWithHint: true,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F7),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: TextField(
+                  controller: _controller,
+                  maxLines: null,
+                  expands: true,
+                  textAlignVertical: TextAlignVertical.top,
+                  style: const TextStyle(fontFamily: 'SF Pro', fontSize: 14.5, color: MockTestColors.navy, height: 1.5),
+                  decoration: const InputDecoration(
+                    hintText: 'Write your answer here…',
+                    hintStyle: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.greyLight),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.all(16),
+                    alignLabelWithHint: true,
+                  ),
                 ),
               ),
             ),
@@ -92,28 +110,27 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '$_wordCount words (min $_minWords)',
-                    style: TextStyle(color: belowMin ? Colors.red : Colors.grey.shade700),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '$_wordCount words (min $_minWords)',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: belowMin ? MockTestColors.red : MockTestColors.green,
                   ),
-                ],
+                ),
               ),
               const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _submitting ? null : _submit,
-                  child: _submitting
-                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Submit for AI grading'),
-                ),
+              MtPrimaryButton(
+                label: 'Submit for AI grading',
+                loading: _submitting,
+                onPressed: _submit,
               ),
             ],
           ),

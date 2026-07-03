@@ -76,7 +76,12 @@ class _TutorFilters {
 // ─── Screen ─────────────────────────────────────────────────────────────────────
 
 class TutorsScreen extends StatefulWidget {
-  const TutorsScreen({super.key});
+  /// True when this screen was pushed as its own route (e.g. from Mock
+  /// Tests' "Speaking" button) rather than shown as a bottom-nav tab —
+  /// shows a back arrow so the user can return to where they came from.
+  final bool showBackButton;
+
+  const TutorsScreen({super.key, this.showBackButton = false});
 
   @override
   State<TutorsScreen> createState() => _TutorsScreenState();
@@ -393,6 +398,13 @@ class _TutorsScreenState extends State<TutorsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
+                  if (widget.showBackButton) ...[
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: const Icon(Icons.chevron_left_rounded, color: Color(0xFF272942), size: 30),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   // Search field
                   Expanded(
                     child: GestureDetector(

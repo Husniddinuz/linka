@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/mock_test_styles.dart';
 
 class WritingResultScreen extends StatelessWidget {
   const WritingResultScreen({super.key, required this.attempt});
@@ -11,7 +12,8 @@ class WritingResultScreen extends StatelessWidget {
     final failed = status == 'failed';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Writing result')),
+      backgroundColor: Colors.white,
+      appBar: mtAppBar(context, title: 'Writing result'),
       body: failed ? _FailedView(attempt: attempt) : _GradedView(attempt: attempt),
     );
   }
@@ -29,14 +31,22 @@ class _FailedView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.orange),
-            const SizedBox(height: 12),
-            const Text('Grading is unavailable right now', style: TextStyle(fontWeight: FontWeight.w700)),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(color: MockTestColors.redBg, shape: BoxShape.circle),
+              child: const Icon(Icons.error_outline_rounded, size: 32, color: MockTestColors.red),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Grading is unavailable right now',
+              style: TextStyle(fontFamily: 'SF Pro', fontWeight: FontWeight.w700, color: MockTestColors.navy),
+            ),
             const SizedBox(height: 8),
             Text(
               attempt['error_message']?.toString() ?? 'Please try again later.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey),
+              style: const TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 13.5),
             ),
           ],
         ),
@@ -53,22 +63,67 @@ class _GradedView extends StatelessWidget {
   Widget build(BuildContext context) {
     final overall = attempt['overall_band']?.toString() ?? '-';
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        Center(
-          child: Text('Band $overall', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w800)),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 28),
+          decoration: BoxDecoration(color: MockTestColors.navy, borderRadius: BorderRadius.circular(20)),
+          child: Column(
+            children: [
+              const Text(
+                'OVERALL BAND',
+                style: TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white70,
+                  letterSpacing: 1.4,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                overall,
+                style: const TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: 48,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 20),
-        _CriteriaRow(label: 'Task Achievement', value: attempt['task_achievement']),
-        _CriteriaRow(label: 'Coherence & Cohesion', value: attempt['coherence_cohesion']),
-        _CriteriaRow(label: 'Lexical Resource', value: attempt['lexical_resource']),
-        _CriteriaRow(label: 'Grammatical Range & Accuracy', value: attempt['grammar_accuracy']),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: mtSoftCard(radius: 14),
+          child: Column(
+            children: [
+              _CriteriaRow(label: 'Task Achievement', value: attempt['task_achievement']),
+              const Divider(height: 1, color: MockTestColors.divider),
+              _CriteriaRow(label: 'Coherence & Cohesion', value: attempt['coherence_cohesion']),
+              const Divider(height: 1, color: MockTestColors.divider),
+              _CriteriaRow(label: 'Lexical Resource', value: attempt['lexical_resource']),
+              const Divider(height: 1, color: MockTestColors.divider),
+              _CriteriaRow(label: 'Grammatical Range & Accuracy', value: attempt['grammar_accuracy']),
+            ],
+          ),
+        ),
         const SizedBox(height: 20),
-        const Text('Feedback', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-        const SizedBox(height: 8),
-        Text(
-          attempt['feedback']?.toString() ?? '',
-          style: const TextStyle(fontSize: 14.5, height: 1.5),
+        const Text(
+          'Feedback',
+          style: TextStyle(fontFamily: 'SF Pro', fontWeight: FontWeight.w700, fontSize: 15, color: MockTestColors.navy),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: mtSoftCard(color: MockTestColors.chipBg, radius: 14),
+          child: Text(
+            attempt['feedback']?.toString() ?? '',
+            style: const TextStyle(fontFamily: 'SF Pro', fontSize: 14, height: 1.5, color: MockTestColors.navy),
+          ),
         ),
       ],
     );
@@ -83,12 +138,20 @@ class _CriteriaRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 14.5)),
-          Text(value?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w700)),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontFamily: 'SF Pro', fontSize: 14, color: MockTestColors.navy),
+            ),
+          ),
+          Text(
+            value?.toString() ?? '-',
+            style: const TextStyle(fontFamily: 'SF Pro', fontWeight: FontWeight.w700, color: MockTestColors.navy),
+          ),
         ],
       ),
     );

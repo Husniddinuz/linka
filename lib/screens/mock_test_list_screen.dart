@@ -1,0 +1,261 @@
+import 'dart:ui';
+import 'package:flutter/material.dart';
+import '../services/mock_test_service.dart';
+import '../services/plus_service.dart';
+import '../services/user_service.dart';
+import '../widgets/mock_test_styles.dart';
+import 'mock_test_taking_screen.dart';
+import 'plus_subscription_screen.dart';
+
+const int _freeTestLimit = 3;
+
+/// Full list of Reading or Listening mock tests for [testType]. Non-Plus
+/// users see the first [_freeTestLimit] tests normally; the rest are shown
+/// blurred with an upgrade prompt.
+class MockTestListScreen extends StatefulWidget {
+  const MockTestListScreen({super.key, required this.testType});
+  final String testType; // 'reading' | 'listening'
+
+  @override
+  State<MockTestListScreen> createState() => _MockTestListScreenState();
+}
+
+class _MockTestListScreenState extends State<MockTestListScreen> {
+  late Future<List<Map<String, dynamic>>> _future = MockTestService.fetchTests(widget.testType);
+  bool _isLocked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPlusStatus();
+  }
+
+  Future<void> _checkPlusStatus() async {
+    if (UserService.isExemptFromPlus) return;
+    try {
+      final status = await PlusService.getMyStatus();
+      if (!mounted) return;
+      setState(() => _isLocked = !status.isActive);
+    } catch (_) {
+      // Fail open — don't block access on a Plus-status network hiccup.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isListening = widget.testType == 'listening';
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: mtAppBar(context, title: isListening ? 'Listening' : 'Reading'),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator(color: MockTestColors.yellow));
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Failed to load: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
+                ),
+              ),
+            );
+          }
+          final tests = snapshot.data ?? const [];
+          if (tests.isEmpty) {
+            return const Center(
+              child: Text(
+                'No tests available yet',
+                style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.greyLight, fontSize: 15),
+              ),
+            );
+          }
+
+          final locked = _isLocked && tests.length > _freeTestLimit;
+          final visible = locked ? tests.sublist(0, _freeTestLimit) : tests;
+          final hidden = locked ? tests.sublist(_freeTestLimit) : const <Map<String, dynamic>>[];
+
+          return RefreshIndicator(
+            color: MockTestColors.navy,
+            onRefresh: () async {
+              setState(() {
+                _future = MockTestService.fetchTests(widget.testType);
+              });
+              await _future;
+            },
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              children: [
+                for (final test in visible) ...[
+                  _TestCard(test: test, testType: widget.testType, locked: false),
+                  const SizedBox(height: 10),
+                ],
+                if (locked) _LockedTestsSection(tests: hidden, testType: widget.testType),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _TestCard extends StatelessWidget {
+  const _TestCard({required this.test, required this.testType, required this.locked});
+  final Map<String, dynamic> test;
+  final String testType;
+  final bool locked;
+
+  @override
+  Widget build(BuildContext context) {
+    final minutes = ((test['duration_seconds'] as num?)?.toInt() ?? 0) ~/ 60;
+    final icon = testType == 'listening' ? Icons.headphones_rounded : Icons.menu_book_rounded;
+    return GestureDetector(
+      onTap: locked
+          ? null
+          : () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MockTestTakingScreen(testId: test['id'] as int, testType: testType),
+                ),
+              ),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: mtSoftCard(),
+        child: Row(
+          children: [
+            MtAvatar(icon: icon),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    test['title']?.toString() ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: MockTestColors.navy,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${test['total_questions'] ?? 40} questions · $minutes min',
+                    style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: MockTestColors.grey),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              locked ? Icons.lock_rounded : Icons.chevron_right_rounded,
+              color: MockTestColors.greyLight,
+              size: locked ? 18 : 24,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LockedTestsSection extends StatelessWidget {
+  const _LockedTestsSection({required this.tests, required this.testType});
+  final List<Map<String, dynamic>> tests;
+  final String testType;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        IgnorePointer(
+          child: Column(
+            children: [
+              for (final test in tests) ...[
+                _TestCard(test: test, testType: testType, locked: true),
+                const SizedBox(height: 10),
+              ],
+            ],
+          ),
+        ),
+        Positioned.fill(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+              child: Container(color: Colors.white.withValues(alpha: 0.35)),
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PlusSubscriptionScreen()),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: MockTestColors.navy,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 16, offset: const Offset(0, 6)),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.workspace_premium_rounded, color: MockTestColors.yellow, size: 26),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Unlock ${tests.length} more tests',
+                        style: const TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Get Linka Plus for full access',
+                        style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: Colors.white70),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: MockTestColors.yellow,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'Get Plus',
+                          style: TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: MockTestColors.navy,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
