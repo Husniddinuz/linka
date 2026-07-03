@@ -60,6 +60,7 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
   @override
   Widget build(BuildContext context) {
     final belowMin = _wordCount < _minWords;
+    final imageUrl = widget.prompt['image_url'] as String?;
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: mtAppBar(context, title: widget.prompt['title']?.toString() ?? 'Writing task'),
@@ -70,14 +71,52 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
             margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             padding: const EdgeInsets.all(14),
             decoration: mtSoftCard(color: MockTestColors.chipBg, radius: 14),
-            child: Text(
-              widget.prompt['prompt_html']?.toString() ?? '',
-              style: const TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 14,
-                height: 1.5,
-                color: MockTestColors.navy,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (imageUrl != null && imageUrl.isNotEmpty) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: double.infinity,
+                      color: Colors.white,
+                      constraints: const BoxConstraints(maxHeight: 220),
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 40),
+                            child: Center(
+                              child: CircularProgressIndicator(strokeWidth: 2, color: MockTestColors.yellow),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(
+                            child: Text(
+                              'Could not load chart image',
+                              style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.greyLight, fontSize: 12.5),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Text(
+                  widget.prompt['prompt_html']?.toString() ?? '',
+                  style: const TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 14,
+                    height: 1.5,
+                    color: MockTestColors.navy,
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
