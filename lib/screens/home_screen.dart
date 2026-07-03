@@ -32,6 +32,7 @@ import 'profile_setup_screen.dart';
 import 'webinar_viewer_screen.dart';
 import 'debate_room_screen.dart';
 import '../services/debate_service.dart';
+import 'mock_tests_home_screen.dart';
 
 // ─── Data models ───────────────────────────────────────────────────────────────
 
@@ -719,6 +720,65 @@ class _HomeScreenState extends State<HomeScreen> {
                                 savedArticleIds: _savedArticleIds,
                                 onToggleBookmark: _toggleArticleBookmark,
                               ),
+
+                              if (AppFeatureService.isEnabled('mock_tests')) ...[
+                                const SizedBox(height: 28),
+                                _SectionHeader(
+                                  title: 'MOCK TESTS',
+                                  onSeeAll: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const MockTestsHomeScreen(),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 21),
+                                  child: GestureDetector(
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const MockTestsHomeScreen(),
+                                      ),
+                                    ),
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(16),
+                                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                                        border: Border.all(
+                                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.quiz_outlined, color: Theme.of(context).colorScheme.primary),
+                                          const SizedBox(width: 14),
+                                          const Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Take a full IELTS mock test',
+                                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                                                ),
+                                                SizedBox(height: 2),
+                                                Text(
+                                                  'Reading, Listening & AI-graded Writing',
+                                                  style: TextStyle(fontSize: 12.5, color: Colors.grey),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const Icon(Icons.chevron_right),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
 
                               if (AppFeatureService.isEnabled('ielts')) ...[
                                 const SizedBox(height: 28),
