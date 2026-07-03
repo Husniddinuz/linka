@@ -46,4 +46,10 @@ class MockTestService {
     final data = await ApiService.getList('/writing-attempts/');
     return data.cast<Map<String, dynamic>>();
   }
+
+  /// {is_plus, limit, used_today, remaining} — `limit`/`remaining` are null
+  /// for Plus users (unlimited).
+  static Future<Map<String, dynamic>> fetchWritingQuota() {
+    return ApiService.get('/writing-attempts/quota/');
+  }
 }

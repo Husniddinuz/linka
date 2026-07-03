@@ -3,6 +3,11 @@ import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
 import 'writing_test_screen.dart';
 
+const int _freePromptsPerTask = 2;
+
+/// Writing Task 1 & 2 prompts. Non-Plus users see the first
+/// [_freePromptsPerTask] prompts of each task normally; the rest are shown
+/// blurred with an upgrade prompt.
 class WritingPromptsListScreen extends StatefulWidget {
   const WritingPromptsListScreen({super.key});
 
@@ -12,6 +17,19 @@ class WritingPromptsListScreen extends StatefulWidget {
 
 class _WritingPromptsListScreenState extends State<WritingPromptsListScreen> {
   final Future<List<Map<String, dynamic>>> _future = MockTestService.fetchWritingPrompts();
+  bool _isLocked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPlusStatus();
+  }
+
+  Future<void> _checkPlusStatus() async {
+    final locked = await mtCheckContentLocked();
+    if (!mounted) return;
+    setState(() => _isLocked = locked);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,16 +62,31 @@ class _WritingPromptsListScreenState extends State<WritingPromptsListScreen> {
             children: [
               const _TaskSectionLabel(text: 'TASK 1'),
               const SizedBox(height: 10),
-              ...task1.map((p) => _PromptCard(prompt: p)),
+              ..._buildTaskPrompts(task1),
               const SizedBox(height: 22),
               const _TaskSectionLabel(text: 'TASK 2'),
               const SizedBox(height: 10),
-              ...task2.map((p) => _PromptCard(prompt: p)),
+              ..._buildTaskPrompts(task2),
             ],
           );
         },
       ),
     );
+  }
+
+  List<Widget> _buildTaskPrompts(List<Map<String, dynamic>> taskPrompts) {
+    final locked = _isLocked && taskPrompts.length > _freePromptsPerTask;
+    final visible = locked ? taskPrompts.sublist(0, _freePromptsPerTask) : taskPrompts;
+    final hidden = locked ? taskPrompts.sublist(_freePromptsPerTask) : const <Map<String, dynamic>>[];
+    return [
+      for (final p in visible) _PromptCard(prompt: p, locked: false),
+      if (locked)
+        MtLockedSection(
+          hiddenCount: hidden.length,
+          itemLabel: 'prompts',
+          lockedCards: [for (final p in hidden) _PromptCard(prompt: p, locked: true)],
+        ),
+    ];
   }
 }
 
@@ -77,18 +110,21 @@ class _TaskSectionLabel extends StatelessWidget {
 }
 
 class _PromptCard extends StatelessWidget {
-  const _PromptCard({required this.prompt});
+  const _PromptCard({required this.prompt, required this.locked});
   final Map<String, dynamic> prompt;
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: GestureDetector(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => WritingTestScreen(prompt: prompt)),
-        ),
+        onTap: locked
+            ? null
+            : () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => WritingTestScreen(prompt: prompt)),
+                ),
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: mtSoftCard(),
@@ -119,7 +155,11 @@ class _PromptCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: MockTestColors.greyLight),
+              Icon(
+                locked ? Icons.lock_rounded : Icons.chevron_right_rounded,
+                color: MockTestColors.greyLight,
+                size: locked ? 18 : 24,
+              ),
             ],
           ),
         ),

@@ -1,4 +1,9 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import '../screens/plus_subscription_screen.dart';
+import '../services/plus_service.dart';
+import '../services/user_service.dart';
 
 /// Shared colors/decorations for the Mock Tests feature, matching the app's
 /// existing flat design language (navy + soft grey containers, no Material
@@ -164,6 +169,110 @@ class MtPill extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(20)),
       child: child,
+    );
+  }
+}
+
+/// True when Reading/Listening/Writing content should be shown locked for
+/// the current user (no active Plus, not the exempt QA account). Fails open
+/// on a network hiccup so a status-check failure never blocks access.
+Future<bool> mtCheckContentLocked() async {
+  if (UserService.isExemptFromPlus) return false;
+  try {
+    final status = await PlusService.getMyStatus();
+    return !status.isActive;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Wraps [lockedCards] (already-built, non-interactive card widgets) in a
+/// blur + "Get Plus" overlay, matching the paywall shown on locked Reading/
+/// Listening tests and Writing prompts.
+class MtLockedSection extends StatelessWidget {
+  const MtLockedSection({super.key, required this.lockedCards, required this.hiddenCount, this.itemLabel = 'items'});
+
+  final List<Widget> lockedCards;
+  final int hiddenCount;
+  final String itemLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        IgnorePointer(child: Column(children: lockedCards)),
+        Positioned.fill(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+              child: Container(color: Colors.white.withValues(alpha: 0.35)),
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PlusSubscriptionScreen()),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: MockTestColors.navy,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 16, offset: const Offset(0, 6)),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.workspace_premium_rounded, color: MockTestColors.yellow, size: 26),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Unlock $hiddenCount more $itemLabel',
+                        style: const TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Get Linka Plus for full access',
+                        style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: Colors.white70),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: MockTestColors.yellow,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'Get Plus',
+                          style: TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: MockTestColors.navy,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

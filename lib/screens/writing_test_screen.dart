@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
+import 'plus_subscription_screen.dart';
 import 'writing_result_screen.dart';
 
 class WritingTestScreen extends StatefulWidget {
@@ -17,6 +19,8 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
   bool _submitting = false;
   int _wordCount = 0;
 
+  Map<String, dynamic>? _quota;
+
   @override
   void initState() {
     super.initState();
@@ -24,6 +28,18 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
       final words = _controller.text.trim().isEmpty ? 0 : _controller.text.trim().split(RegExp(r'\s+')).length;
       if (words != _wordCount) setState(() => _wordCount = words);
     });
+    _loadQuota();
+  }
+
+  Future<void> _loadQuota() async {
+    try {
+      final quota = await MockTestService.fetchWritingQuota();
+      if (!mounted) return;
+      setState(() => _quota = quota);
+    } catch (_) {
+      // Non-fatal — the button just won't show a live quota count; the
+      // backend still enforces the limit on submit either way.
+    }
   }
 
   @override
@@ -34,9 +50,53 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
 
   int get _minWords => (widget.prompt['min_words'] as num?)?.toInt() ?? 150;
 
+  bool get _isPlus => _quota?['is_plus'] == true;
+  int? get _remaining => (_quota?['remaining'] as num?)?.toInt();
+  bool get _quotaExhausted => _quota != null && !_isPlus && (_remaining ?? 1) <= 0;
+
+  void _showUpgradeDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.workspace_premium_rounded, color: MockTestColors.yellow),
+            SizedBox(width: 8),
+            Text('Daily limit reached', style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.navy)),
+          ],
+        ),
+        content: Text(message, style: const TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Not now', style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const PlusSubscriptionScreen()));
+            },
+            child: const Text(
+              'Get Plus',
+              style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.navy, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     if (_controller.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Write your essay before submitting')));
+      return;
+    }
+    if (_quotaExhausted) {
+      _showUpgradeDialog(
+        'You\'ve used all ${_quota!['limit']} free AI-graded essays today. Upgrade to Plus for unlimited submissions.',
+      );
       return;
     }
     setState(() => _submitting = true);
@@ -50,6 +110,14 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
         context,
         MaterialPageRoute(builder: (_) => WritingResultScreen(attempt: result)),
       );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      if (e.statusCode == 429) {
+        _showUpgradeDialog(e.message);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Submit failed: ${e.message}')));
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -63,7 +131,30 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
     final imageUrl = widget.prompt['image_url'] as String?;
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: mtAppBar(context, title: widget.prompt['title']?.toString() ?? 'Writing task'),
+      appBar: mtAppBar(
+        context,
+        title: widget.prompt['title']?.toString() ?? 'Writing task',
+        actions: [
+          if (_quota != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: MtPill(
+                  background: _quotaExhausted ? MockTestColors.redBg : MockTestColors.chipBg,
+                  child: Text(
+                    _isPlus ? 'Unlimited' : '${_remaining ?? 0}/${_quota!['limit']} left today',
+                    style: TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: _quotaExhausted ? MockTestColors.red : MockTestColors.navy,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
       body: Column(
         children: [
           Container(
@@ -167,9 +258,13 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
               ),
               const SizedBox(height: 8),
               MtPrimaryButton(
-                label: 'Submit for AI grading',
+                label: _quotaExhausted ? 'Upgrade to Plus to submit' : 'Submit for AI grading',
                 loading: _submitting,
-                onPressed: _submit,
+                onPressed: _quotaExhausted
+                    ? () => _showUpgradeDialog(
+                          'You\'ve used all ${_quota!['limit']} free AI-graded essays today. Upgrade to Plus for unlimited submissions.',
+                        )
+                    : _submit,
               ),
             ],
           ),
