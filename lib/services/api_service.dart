@@ -10,7 +10,7 @@ typedef UploadProgressCallback = void Function(int sent, int total);
 
 class ApiService {
   static const _baseUrl = apiBaseUrl;
-  static bool _refreshing = false;
+  static Future<String?>? _refreshFuture;
 
   /// Invoked when an authenticated request returns 401 and token refresh
   /// cannot recover the session. Set from main.dart to clear tokens and
@@ -56,9 +56,16 @@ class ApiService {
       };
 
   /// Attempts to refresh the access token. Returns the new token or null.
-  static Future<String?> _tryRefreshToken() async {
-    if (_refreshing) return null;
-    _refreshing = true;
+  /// Concurrent callers await the same in-flight refresh instead of each
+  /// triggering their own (or bailing out early), which used to cause
+  /// spurious forced logouts when multiple requests hit a 401 at once.
+  static Future<String?> _tryRefreshToken() {
+    return _refreshFuture ??= _doRefreshToken().whenComplete(() {
+      _refreshFuture = null;
+    });
+  }
+
+  static Future<String?> _doRefreshToken() async {
     try {
       final refresh = await TokenService.getRefreshToken();
       if (refresh == null) return null;
@@ -73,8 +80,6 @@ class ApiService {
       }
     } catch (_) {
       // Refresh failed — caller should handle as 401
-    } finally {
-      _refreshing = false;
     }
     return null;
   }
