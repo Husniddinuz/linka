@@ -1,18 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../data/speaking_sample_tutors_mock.dart';
 import '../services/podcast_playback_service.dart';
 import '../services/subtitle_service.dart';
 import '../widgets/mock_test_styles.dart';
 
 /// A tutor's real Speaking sample answer: photo/name/band score, with
-/// Part 1/2/3 kept separate. Each part has its own audio player and a
-/// live, karaoke-style transcript synced to playback via its SRT file.
-/// Read-only reference content — no submission or grading.
+/// Part 1/2/3 kept separate (some tutors may only have 2 of the 3 parts).
+/// Each part has its own audio player and a live, karaoke-style transcript
+/// synced to playback via its SRT/VTT file. Read-only reference content —
+/// no submission or grading.
 class SpeakingSampleTutorScreen extends StatefulWidget {
   const SpeakingSampleTutorScreen({super.key, required this.tutor});
 
-  final SpeakingSampleTutor tutor;
+  final Map<String, dynamic> tutor;
 
   @override
   State<SpeakingSampleTutorScreen> createState() => _SpeakingSampleTutorScreenState();
@@ -21,6 +21,9 @@ class SpeakingSampleTutorScreen extends StatefulWidget {
 class _SpeakingSampleTutorScreenState extends State<SpeakingSampleTutorScreen> {
   final _player = PodcastPlaybackService.instance;
   StreamSubscription<Duration>? _positionSub;
+
+  late final List<Map<String, dynamic>> _parts =
+      ((widget.tutor['parts'] as List?) ?? const []).cast<Map<String, dynamic>>();
 
   int _selectedPart = 0;
   List<SubtitleCue> _cues = [];
@@ -31,7 +34,7 @@ class _SpeakingSampleTutorScreenState extends State<SpeakingSampleTutorScreen> {
   void initState() {
     super.initState();
     _positionSub = _player.positionStream.listen(_updateActiveCue);
-    _loadPart(0);
+    if (_parts.isNotEmpty) _loadPart(0);
   }
 
   @override
@@ -42,20 +45,23 @@ class _SpeakingSampleTutorScreenState extends State<SpeakingSampleTutorScreen> {
   }
 
   Future<void> _loadPart(int index) async {
-    final part = widget.tutor.parts[index];
+    final part = _parts[index];
     setState(() {
       _selectedPart = index;
       _cues = [];
       _cueKeys = [];
       _activeCue = -1;
     });
-    await _player.loadAdHocAsset(
-      'speaking-tutor-${widget.tutor.id}-part${part.part}',
-      part.audioAsset,
-      title: part.title,
-    );
-    _player.play();
-    final cues = await SubtitleService.fetchCues('asset://${part.subtitleAsset}');
+    final audioUrl = part['audio_url'] as String?;
+    if (audioUrl != null && audioUrl.isNotEmpty) {
+      await _player.loadAdHoc(
+        'speaking-tutor-${widget.tutor['id']}-part${part['part']}',
+        Uri.parse(audioUrl),
+        title: part['title']?.toString() ?? '',
+      );
+      _player.play();
+    }
+    final cues = await SubtitleService.fetchCues(part['subtitle_url'] as String?);
     if (!mounted || _selectedPart != index) return;
     setState(() {
       _cues = cues;
@@ -86,74 +92,88 @@ class _SpeakingSampleTutorScreenState extends State<SpeakingSampleTutorScreen> {
   @override
   Widget build(BuildContext context) {
     final tutor = widget.tutor;
-    final part = tutor.parts[_selectedPart];
+    final name = tutor['tutor_name']?.toString() ?? '';
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: mtAppBar(context, title: tutor.name),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        children: [
-          _TutorHeader(tutor: tutor),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              for (var i = 0; i < tutor.parts.length; i++) ...[
-                if (i > 0) const SizedBox(width: 8),
-                Expanded(child: _PartChip(
-                  label: 'Part ${tutor.parts[i].part}',
-                  selected: i == _selectedPart,
-                  onTap: () => _loadPart(i),
-                )),
-              ],
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: mtSoftCard(color: MockTestColors.chipBg, radius: 14),
-            child: Text(
-              part.questionText,
-              style: const TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 14,
-                height: 1.5,
-                color: MockTestColors.navy,
+      appBar: mtAppBar(context, title: name),
+      body: _parts.isEmpty
+          ? const Center(
+              child: Text(
+                'No sample parts yet',
+                style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const _AudioBar(),
-          const SizedBox(height: 20),
-          const Text(
-            'Live transcript',
-            style: TextStyle(fontFamily: 'SF Pro', fontWeight: FontWeight.w700, fontSize: 15, color: MockTestColors.navy),
-          ),
-          const SizedBox(height: 10),
-          if (_cues.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator(color: MockTestColors.yellow)),
             )
-          else
-            _Transcript(
-              cues: _cues,
-              cueKeys: _cueKeys,
-              activeCue: _activeCue,
-              onSeek: (cue) {
-                _player.seek(cue.start);
-                if (!_player.isPlaying) _player.play();
-              },
+          : _buildBody(tutor, name),
+    );
+  }
+
+  Widget _buildBody(Map<String, dynamic> tutor, String name) {
+    final part = _parts[_selectedPart];
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        _TutorHeader(name: name, imageUrl: tutor['tutor_image_url'] as String?, bandScore: tutor['band_score']?.toString()),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            for (var i = 0; i < _parts.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(child: _PartChip(
+                label: 'Part ${_parts[i]['part']}',
+                selected: i == _selectedPart,
+                onTap: () => _loadPart(i),
+              )),
+            ],
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: mtSoftCard(color: MockTestColors.chipBg, radius: 14),
+          child: Text(
+            part['question_text']?.toString() ?? '',
+            style: const TextStyle(
+              fontFamily: 'SF Pro',
+              fontSize: 14,
+              height: 1.5,
+              color: MockTestColors.navy,
             ),
-        ],
-      ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const _AudioBar(),
+        const SizedBox(height: 20),
+        const Text(
+          'Live transcript',
+          style: TextStyle(fontFamily: 'SF Pro', fontWeight: FontWeight.w700, fontSize: 15, color: MockTestColors.navy),
+        ),
+        const SizedBox(height: 10),
+        if (_cues.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator(color: MockTestColors.yellow)),
+          )
+        else
+          _Transcript(
+            cues: _cues,
+            cueKeys: _cueKeys,
+            activeCue: _activeCue,
+            onSeek: (cue) {
+              _player.seek(cue.start);
+              if (!_player.isPlaying) _player.play();
+            },
+          ),
+      ],
     );
   }
 }
 
 class _TutorHeader extends StatelessWidget {
-  const _TutorHeader({required this.tutor});
-  final SpeakingSampleTutor tutor;
+  const _TutorHeader({required this.name, required this.imageUrl, required this.bandScore});
+  final String name;
+  final String? imageUrl;
+  final String? bandScore;
 
   @override
   Widget build(BuildContext context) {
@@ -161,7 +181,15 @@ class _TutorHeader extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: Image.asset(tutor.imageAsset, width: 68, height: 68, fit: BoxFit.cover),
+          child: (imageUrl != null && imageUrl!.isNotEmpty)
+              ? Image.network(
+                  imageUrl!,
+                  width: 68,
+                  height: 68,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => _fallbackAvatar(),
+                )
+              : _fallbackAvatar(),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -169,21 +197,33 @@ class _TutorHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                tutor.name,
+                name,
                 style: const TextStyle(fontFamily: 'SF Pro', fontSize: 17, fontWeight: FontWeight.w700, color: MockTestColors.navy),
               ),
-              const SizedBox(height: 6),
-              MtPill(
-                background: MockTestColors.navy,
-                child: Text(
-                  'IELTS ${tutor.bandScore}',
-                  style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
+              if (bandScore != null) ...[
+                const SizedBox(height: 6),
+                MtPill(
+                  background: MockTestColors.navy,
+                  child: Text(
+                    'IELTS $bandScore',
+                    style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _fallbackAvatar() {
+    return Container(
+      width: 68,
+      height: 68,
+      color: MockTestColors.chipBg,
+      alignment: Alignment.center,
+      child: const Icon(Icons.person_rounded, color: MockTestColors.greyLight, size: 32),
     );
   }
 }

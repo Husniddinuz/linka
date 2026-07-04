@@ -53,9 +53,10 @@ class MockTestService {
     return ApiService.get('/writing-attempts/quota/');
   }
 
-  static Future<List<Map<String, dynamic>>> fetchSpeakingSamples({int? part}) async {
-    final qs = part != null ? '?part=$part' : '';
-    final data = await ApiService.getList('/speaking-samples/$qs');
+  /// Tutors with real Speaking sample answers, each covering Part 1/2/3
+  /// (some tutors may only have 2 of the 3 parts).
+  static Future<List<Map<String, dynamic>>> fetchSpeakingSamples() async {
+    final data = await ApiService.getList('/speaking-samples/');
     return data.cast<Map<String, dynamic>>();
   }
 
