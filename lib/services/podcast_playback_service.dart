@@ -116,6 +116,17 @@ class PodcastPlaybackService {
     );
   }
 
+  /// Same as [loadAdHoc] but for a bundled Flutter asset (e.g.
+  /// `assets/audio/speaking_samples/part1.mp3`) rather than a network/file URI.
+  Future<Duration?> loadAdHocAsset(String id, String assetPath, {String title = ''}) {
+    _queue = [];
+    _currentIndex = -1;
+    currentTrack.value = null;
+    return _player.setAudioSource(
+      AudioSource.asset(assetPath, tag: MediaItem(id: id, title: title)),
+    );
+  }
+
   AudioPlayer get player => _player;
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
