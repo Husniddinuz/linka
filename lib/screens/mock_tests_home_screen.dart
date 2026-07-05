@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/mock_test_styles.dart';
+import 'ielts_booking_screen.dart';
 import 'mock_test_history_screen.dart';
 import 'mock_test_list_screen.dart';
 import 'speaking_samples_list_screen.dart';
@@ -72,6 +73,16 @@ class MockTestsHomeScreen extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const TutorsScreen(showBackButton: true)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _SkillButton(
+            icon: Icons.badge_rounded,
+            title: 'Book Real IELTS Test',
+            subtitle: 'Register for an official test date',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const IeltsBookingScreen()),
             ),
           ),
           const SizedBox(height: 24),
