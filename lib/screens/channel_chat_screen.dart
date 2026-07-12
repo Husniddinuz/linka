@@ -277,6 +277,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
     with WidgetsBindingObserver {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
+  bool _showScrollToBottomFab = false;
 
   List<_Message> _messages = [];
   bool _loadingInitial = true;
@@ -887,6 +888,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
                 'is_mine': isMine,
               });
               if (mounted) {
+                final wasNearBottom = _isNearBottom;
                 setState(() {
                   if (isMine && _pendingLocalId != null) {
                     // Replace optimistic local message with real server copy
@@ -911,8 +913,14 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
                     });
                   }
                 }
-                WidgetsBinding.instance
-                    .addPostFrameCallback((_) => _scrollToBottom());
+                // Only auto-scroll if the user was already at the bottom;
+                // otherwise keep their scroll position and reveal the FAB.
+                if (wasNearBottom || isMine) {
+                  WidgetsBinding.instance
+                      .addPostFrameCallback((_) => _scrollToBottom());
+                } else if (!_showScrollToBottomFab) {
+                  setState(() => _showScrollToBottomFab = true);
+                }
               }
             } else if (json['type'] == 'message_deleted') {
               final messageId = json['message_id']?.toString();
@@ -1033,10 +1041,23 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
 
   // ─── Scroll ────────────────────────────────────────────────────────────────
 
+  static const _kNearBottomThreshold = 120.0;
+
+  bool get _isNearBottom {
+    if (!_scrollController.hasClients) return true;
+    final position = _scrollController.position;
+    return position.maxScrollExtent - position.pixels <
+        _kNearBottomThreshold;
+  }
+
   void _onScroll() {
     if (_scrollController.hasClients &&
         _scrollController.position.pixels < 120) {
       _loadOlderMessages();
+    }
+    final showFab = !_isNearBottom;
+    if (showFab != _showScrollToBottomFab) {
+      setState(() => _showScrollToBottomFab = showFab);
     }
   }
 
@@ -1044,6 +1065,18 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
     }
+    if (_showScrollToBottomFab) {
+      setState(() => _showScrollToBottomFab = false);
+    }
+  }
+
+  void _scrollToBottomAnimated() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      _scrollController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
   }
 
   // ─── Send text ─────────────────────────────────────────────────────────────
@@ -1497,6 +1530,14 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
                         ),
                       ),
                     ),
+                  Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: _ScrollToBottomFab(
+                      visible: _showScrollToBottomFab,
+                      onTap: _scrollToBottomAnimated,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -4136,6 +4177,51 @@ class _ReplyBadge extends StatelessWidget {
             const Icon(Icons.keyboard_arrow_down_rounded,
                 color: Colors.white54, size: 16),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ScrollToBottomFab extends StatelessWidget {
+  final bool visible;
+  final VoidCallback onTap;
+  const _ScrollToBottomFab({required this.visible, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      ignoring: !visible,
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: const Duration(milliseconds: 180),
+        child: AnimatedScale(
+          scale: visible ? 1 : 0.6,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          child: GestureDetector(
+            onTap: onTap,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF272942),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Colors.white,
+                size: 26,
+              ),
+            ),
+          ),
         ),
       ),
     );

@@ -47,8 +47,8 @@ class IeltsConfirmationScreen extends StatelessWidget {
           const SizedBox(height: 4),
           const Center(
             child: Text(
-              'The student must log into their own IDP account to upload their ID '
-              'document and pay — this app doesn\'t handle either.',
+              'The student must log into their own IDP account to pay — this '
+              'app doesn\'t handle payment.',
               textAlign: TextAlign.center,
               style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, color: MockTestColors.grey),
             ),
@@ -94,8 +94,7 @@ class IeltsConfirmationScreen extends StatelessWidget {
 
   Future<void> _sendToPhone(BuildContext context, String receiptNumber, dynamic amount, String currency) async {
     final message = 'Your IELTS test reservation is confirmed. Receipt: $receiptNumber, '
-        'amount due: $amount $currency. Log into https://account.ielts.idp.com to upload your ID '
-        'document and complete payment.';
+        'amount due: $amount $currency. Log into https://account.ielts.idp.com to complete payment.';
     final uri = Uri(scheme: 'sms', path: mobileNumber, queryParameters: {'body': message});
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);

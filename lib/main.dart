@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'screens/splash_screen.dart';
 import 'screens/role_selection_screen.dart';
+import 'screens/tutor_profile_screen.dart';
 import 'services/api_service.dart';
 import 'services/app_feature_service.dart';
 import 'services/facebook_events_service.dart';
@@ -118,11 +119,12 @@ class _LinkaAppState extends State<LinkaApp> with WidgetsBindingObserver {
     switch (host) {
       case 'tutor':
         if (segments.isNotEmpty) {
-          final tutorId = segments[0];
-          _showDeepLinkToast('Opening tutor: $tutorId');
-          // TODO: navigatorKey.currentState?.push(
-          //   MaterialPageRoute(builder: (_) => TutorProfileScreen(id: tutorId)),
-          // );
+          final tutorId = int.tryParse(segments[0]);
+          if (tutorId != null) {
+            navigatorKey.currentState?.push(
+              MaterialPageRoute(builder: (_) => TutorProfileScreen(tutorId: tutorId)),
+            );
+          }
         }
         break;
       default:

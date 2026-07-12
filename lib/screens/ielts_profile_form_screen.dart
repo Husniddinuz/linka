@@ -2,26 +2,22 @@ import 'package:flutter/material.dart';
 
 import '../services/ielts_registration_service.dart';
 import '../widgets/mock_test_styles.dart';
-import 'ielts_confirmation_screen.dart';
+import 'ielts_id_upload_screen.dart';
 
 /// Candidate profile + registration submission — the core of the flow.
 /// Loads reference data directly from IDP, lets the tutor fill in the
-/// candidate's details, then submits registration with our partner ID.
+/// candidate's details across a short wizard, then submits registration
+/// with our partner ID. ID document upload + biometric consent happen on
+/// [IeltsIdUploadScreen] afterwards, matching the real site's own order.
 class IeltsProfileFormScreen extends StatefulWidget {
   const IeltsProfileFormScreen({
     super.key,
     required this.session,
     required this.email,
-    required this.firstName,
-    required this.lastName,
-    required this.mobileNumber,
   });
 
   final Map<String, dynamic> session;
   final String email;
-  final String firstName;
-  final String lastName;
-  final String mobileNumber;
 
   @override
   State<IeltsProfileFormScreen> createState() => _IeltsProfileFormScreenState();
@@ -29,6 +25,15 @@ class IeltsProfileFormScreen extends StatefulWidget {
 
 class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _pageController = PageController();
+  static const _stepTitles = [
+    'Speaking test time',
+    'Personal details',
+    'Address',
+    'Identity document',
+    'Study background',
+  ];
+  int _step = 0;
 
   bool _loadingReferenceData = true;
   String? _loadError;
@@ -51,6 +56,8 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
 
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
+  final _mobileController = TextEditingController(text: '+998');
+  final _studyingEnglishAtController = TextEditingController();
   final _cityController = TextEditingController();
   final _postCodeController = TextEditingController();
   final _street1Controller = TextEditingController();
@@ -71,7 +78,6 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
   String? _occupationLevelId;
   String? _occupationSectorId;
   String? _testReasonId;
-  bool _biometricConsent = false;
 
   Map<String, dynamic> get _testLocation => widget.session['testLocation'] as Map<String, dynamic>;
   String get _testLocationId => _testLocation['externalReferenceId'] as String;
@@ -80,15 +86,16 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
   @override
   void initState() {
     super.initState();
-    _firstNameController.text = widget.firstName;
-    _lastNameController.text = widget.lastName;
     _loadReferenceData();
   }
 
   @override
   void dispose() {
+    _pageController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _mobileController.dispose();
+    _studyingEnglishAtController.dispose();
     _cityController.dispose();
     _postCodeController.dispose();
     _street1Controller.dispose();
@@ -151,11 +158,18 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
         _loadingReferenceData = false;
       });
     } catch (e) {
+      // TODO: temporary — surfaces the real API error for debugging, revert
+      // to a plain "Could not load..." message once the cause is fixed.
       setState(() {
-        _loadError = 'Could not load registration form. Please try again.';
+        _loadError = 'Could not load registration form: $e';
         _loadingReferenceData = false;
       });
     }
+  }
+
+  void _goToStep(int step) {
+    setState(() => _step = step);
+    _pageController.animateToPage(step, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
   }
 
   Future<void> _submit() async {
@@ -174,10 +188,6 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
       setState(() => _submitError = 'Please fill in every field.');
       return;
     }
-    if (!_biometricConsent) {
-      setState(() => _submitError = 'Biometric consent is required by the test centre.');
-      return;
-    }
     if (_selectedSpeakingStartUtc == null) {
       setState(() => _submitError = 'No Speaking slot is available for this date at this centre.');
       return;
@@ -194,7 +204,7 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
         'firstName': _firstNameController.text.trim(),
         'lastName': _lastNameController.text.trim(),
         'emailAddress': widget.email,
-        'mobileNumber': widget.mobileNumber,
+        'mobileNumber': _mobileController.text.trim(),
         'dateOfBirth': _dateOfBirth!.toIso8601String().split('T').first,
         'genderId': _genderId,
         'nationalityId': _nationalityId,
@@ -214,6 +224,7 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
         },
         'marketingDetails': {
           'countryApplyingToId': _countryId,
+          'currentlyStudyingEnglishAt': _studyingEnglishAtController.text.trim(),
           'educationLevelId': _educationLevelId,
           'occupationLevelId': _occupationLevelId,
           'occupationSectorId': _occupationSectorId,
@@ -222,7 +233,11 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
         },
       };
 
-      await IeltsRegistrationService.updateUserProfile(_userProfileId!, profile);
+      // The account-level profile (api.account.ielts.idp.com) was already
+      // provisioned back on the signup screen — it's a placeholder there and
+      // stays one; the test-taker profile below is what actually carries the
+      // candidate's real name/mobile for registration.
+      final updatedProfile = await IeltsRegistrationService.updateUserProfile(_userProfileId!, profile);
       await IeltsRegistrationService.checkBanned(_userProfileId!);
 
       final lrwStart = DateTime.parse(widget.session['testStartUtcDatetime'] as String);
@@ -239,25 +254,44 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
         countryId: _countryId!,
         nationalityId: _nationalityId!,
       );
-      // Linking the profile + biometric consent both require a real
-      // uploaded ID document image server-side ("Your ID image couldn't be
-      // saved..." if it's missing) — that's sensitive personal data we
-      // deliberately don't handle in-app, same reasoning as payment. The
-      // student finishes that themselves by logging into their own IDP
-      // account, which the confirmation screen points them to.
+
+      // "Reserve now" — confirmed live to be a required step between
+      // registering and ID upload, not just a payment-summary formality:
+      // IDP rejects the ID image ("couldn't be saved") if this hasn't run
+      // yet. The test centre currently only offers one method (in-person/
+      // offline), so there's nothing for the tutor to choose here.
+      final applicationId = application['id'] as String;
+      final applicationPaymentId =
+          ((application['applicationPayments'] as List).first as Map<String, dynamic>)['id'] as String;
+      final paymentMethods = await IeltsRegistrationService.getTestCentrePaymentMethods();
+      final offlineMethod = paymentMethods.cast<Map<String, dynamic>>().firstWhere(
+            (m) => (m['paymentMethod'] as Map<String, dynamic>)['code'] == 'OFFLINE',
+          );
+      await IeltsRegistrationService.createReceipt(
+        applicationId: applicationId,
+        applicationPaymentId: applicationPaymentId,
+        testCentrePaymentMethodId: offlineMethod['id'] as String,
+      );
+      final reservedApplication = await IeltsRegistrationService.getApplication(applicationId);
 
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => IeltsConfirmationScreen(
-            application: application,
-            mobileNumber: widget.mobileNumber,
+          builder: (_) => IeltsIdUploadScreen(
+            application: reservedApplication,
+            // The `/applications/{id}/userProfile` link endpoint expects the
+            // profile's id under `id` (confirmed live) — the userProfiles
+            // PUT response above uses `userProfileId` instead, so relabel.
+            profile: {...updatedProfile, 'id': _userProfileId},
+            mobileNumber: _mobileController.text.trim(),
           ),
         ),
       );
     } catch (e) {
-      setState(() => _submitError = 'Registration failed. Please review the details and try again.');
+      // TODO: temporary — surfaces the real API error for debugging, revert
+      // to a plain "Registration failed..." message once the cause is fixed.
+      setState(() => _submitError = 'Registration failed: $e');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -284,174 +318,250 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
                     ),
                   ),
                 )
-              : _buildForm(),
+              : _buildWizard(),
     );
   }
 
-  Widget _buildForm() {
+  Widget _buildWizard() {
     return Form(
       key: _formKey,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      child: Column(
         children: [
-          _sectionTitle('Speaking test time'),
-          if (_speakingSlots.isEmpty)
-            const Text(
-              'No Speaking slot available on this date at this centre.',
-              style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, color: MockTestColors.red),
-            )
-          else
-            _dropdown<String>(
-              label: 'Speaking time',
-              value: _selectedSpeakingStartUtc,
-              items: _speakingSlots.map((s) => s['testStartUtcDatetime'] as String).toList(),
-              labelOf: (utc) {
-                final local = DateTime.parse(
-                  _speakingSlots.firstWhere((s) => s['testStartUtcDatetime'] == utc)['testStartLocalDatetime'] as String,
-                );
-                return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-              },
-              onChanged: (v) => setState(() => _selectedSpeakingStartUtc = v),
-            ),
-          const SizedBox(height: 24),
-          _sectionTitle('Personal details'),
-          _dropdown(
-            label: 'Title',
-            value: _title,
-            items: const ['MR', 'MRS', 'MS', 'MISS', 'DR'],
-            labelOf: (v) => v,
-            onChanged: (v) => setState(() => _title = v!),
-          ),
-          const SizedBox(height: 12),
-          _textField(_firstNameController, 'First name'),
-          const SizedBox(height: 12),
-          _textField(_lastNameController, 'Last name'),
-          const SizedBox(height: 12),
-          _datePicker(
-            label: 'Date of birth',
-            value: _dateOfBirth,
-            firstDate: DateTime(1940),
-            lastDate: DateTime.now(),
-            onChanged: (d) => setState(() => _dateOfBirth = d),
-          ),
-          const SizedBox(height: 12),
-          _refDropdown(label: 'Gender', items: _genders, value: _genderId, onChanged: (v) => setState(() => _genderId = v)),
-          const SizedBox(height: 12),
-          _refDropdown(
-            label: 'Nationality',
-            items: _nationalities,
-            value: _nationalityId,
-            onChanged: (v) => setState(() => _nationalityId = v),
-          ),
-          const SizedBox(height: 12),
-          _refDropdown(
-            label: 'First language',
-            items: _languages,
-            value: _languageId,
-            onChanged: (v) => setState(() => _languageId = v),
-          ),
-          const SizedBox(height: 24),
-          _sectionTitle('Address'),
-          _refDropdown(
-            label: 'Country',
-            items: _countries,
-            value: _countryId,
-            onChanged: (v) => setState(() => _countryId = v),
-          ),
-          const SizedBox(height: 12),
-          _textField(_cityController, 'City'),
-          const SizedBox(height: 12),
-          _textField(_postCodeController, 'Post code'),
-          const SizedBox(height: 12),
-          _textField(_street1Controller, 'Street address'),
-          const SizedBox(height: 12),
-          _textField(_street2Controller, 'Street address 2 (optional)', required: false),
-          const SizedBox(height: 24),
-          _sectionTitle('Identity document'),
-          _refDropdown(
-            label: 'Document type',
-            items: _identificationTypes,
-            value: _identificationTypeId,
-            onChanged: (v) => setState(() => _identificationTypeId = v),
-          ),
-          const SizedBox(height: 12),
-          _textField(_idNumberController, 'Document number'),
-          const SizedBox(height: 12),
-          _datePicker(
-            label: 'Document expiry date',
-            value: _idExpiryDate,
-            firstDate: DateTime.now(),
-            lastDate: DateTime(2099),
-            onChanged: (d) => setState(() => _idExpiryDate = d),
-          ),
-          const SizedBox(height: 12),
-          _textField(_idIssuingAuthorityController, 'Issuing authority'),
-          const SizedBox(height: 24),
-          _sectionTitle('Study background'),
-          _refDropdown(
-            label: 'Education level',
-            items: _educationLevels,
-            value: _educationLevelId,
-            onChanged: (v) => setState(() => _educationLevelId = v),
-          ),
-          const SizedBox(height: 12),
-          _refDropdown(
-            label: 'Occupation level',
-            items: _occupationLevels,
-            value: _occupationLevelId,
-            onChanged: (v) => setState(() => _occupationLevelId = v),
-          ),
-          const SizedBox(height: 12),
-          _refDropdown(
-            label: 'Occupation sector',
-            items: _occupationSectors,
-            value: _occupationSectorId,
-            onChanged: (v) => setState(() => _occupationSectorId = v),
-          ),
-          const SizedBox(height: 12),
-          _refDropdown(
-            label: 'Reason for taking the test',
-            items: _testReasons,
-            value: _testReasonId,
-            onChanged: (v) => setState(() => _testReasonId = v),
-          ),
-          const SizedBox(height: 12),
-          _textField(_yearsOfStudyController, 'Years of English study', keyboardType: TextInputType.number),
-          const SizedBox(height: 20),
-          CheckboxListTile(
-            value: _biometricConsent,
-            onChanged: (v) => setState(() => _biometricConsent = v ?? false),
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            title: const Text(
-              'I consent to biometric data collection, as required by the test centre.',
-              style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, color: MockTestColors.navy),
+          _stepHeader(),
+          Expanded(
+            child: PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _stepSpeakingTime(),
+                _stepPersonalDetails(),
+                _stepAddress(),
+                _stepIdentityDocument(),
+                _stepStudyBackground(),
+              ],
             ),
           ),
-          if (_submitError != null) ...[
-            const SizedBox(height: 8),
-            Text(_submitError!, style: const TextStyle(fontFamily: 'SF Pro', fontSize: 13, color: MockTestColors.red)),
-          ],
-          const SizedBox(height: 20),
-          MtPrimaryButton(label: 'Register', loading: _submitting, onPressed: _submit),
+          _stepFooter(),
         ],
       ),
     );
   }
 
-  Widget _sectionTitle(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Text(
-          text.toUpperCase(),
-          style: const TextStyle(
-            fontFamily: 'SF Pro',
-            fontSize: 12.5,
-            fontWeight: FontWeight.w700,
-            color: MockTestColors.greyLight,
-            letterSpacing: 0.8,
+  Widget _stepHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Step ${_step + 1} of ${_stepTitles.length} · ${_stepTitles[_step]}',
+            style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, fontWeight: FontWeight.w600, color: MockTestColors.grey),
           ),
-        ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: (_step + 1) / _stepTitles.length,
+              minHeight: 4,
+              backgroundColor: MockTestColors.softBg,
+              color: MockTestColors.navy,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stepFooter() {
+    final isLast = _step == _stepTitles.length - 1;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_submitError != null) ...[
+            Text(_submitError!, style: const TextStyle(fontFamily: 'SF Pro', fontSize: 13, color: MockTestColors.red)),
+            const SizedBox(height: 12),
+          ],
+          Row(
+            children: [
+              if (_step > 0) ...[
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _goToStep(_step - 1),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: MockTestColors.navy,
+                      side: const BorderSide(color: MockTestColors.divider),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Back'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                flex: 2,
+                child: MtPrimaryButton(
+                  label: isLast ? 'Register' : 'Next',
+                  loading: _submitting,
+                  onPressed: isLast ? _submit : () => _goToStep(_step + 1),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stepBody(List<Widget> children) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
       );
+
+  Widget _stepSpeakingTime() {
+    return _stepBody([
+      if (_speakingSlots.isEmpty)
+        const Text(
+          'No Speaking slot available on this date at this centre.',
+          style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, color: MockTestColors.red),
+        )
+      else
+        _dropdown<String>(
+          label: 'Speaking time',
+          value: _selectedSpeakingStartUtc,
+          items: _speakingSlots.map((s) => s['testStartUtcDatetime'] as String).toList(),
+          labelOf: (utc) {
+            final local = DateTime.parse(
+              _speakingSlots.firstWhere((s) => s['testStartUtcDatetime'] == utc)['testStartLocalDatetime'] as String,
+            );
+            return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+          },
+          onChanged: (v) => setState(() => _selectedSpeakingStartUtc = v),
+        ),
+    ]);
+  }
+
+  Widget _stepPersonalDetails() {
+    return _stepBody([
+      _dropdown(
+        label: 'Title',
+        value: _title,
+        items: const ['MR', 'MRS', 'MS', 'MISS', 'DR'],
+        labelOf: (v) => v,
+        onChanged: (v) => setState(() => _title = v!),
+      ),
+      const SizedBox(height: 12),
+      _textField(_firstNameController, 'First name'),
+      const SizedBox(height: 12),
+      _textField(_lastNameController, 'Last name'),
+      const SizedBox(height: 12),
+      _textField(_mobileController, 'Mobile number', keyboardType: TextInputType.phone),
+      const SizedBox(height: 12),
+      _datePicker(
+        label: 'Date of birth',
+        value: _dateOfBirth,
+        firstDate: DateTime(1940),
+        lastDate: DateTime.now(),
+        onChanged: (d) => setState(() => _dateOfBirth = d),
+      ),
+      const SizedBox(height: 12),
+      _refDropdown(label: 'Gender', items: _genders, value: _genderId, onChanged: (v) => setState(() => _genderId = v)),
+      const SizedBox(height: 12),
+      _refDropdown(
+        label: 'Nationality',
+        items: _nationalities,
+        value: _nationalityId,
+        onChanged: (v) => setState(() => _nationalityId = v),
+      ),
+      const SizedBox(height: 12),
+      _refDropdown(
+        label: 'First language',
+        items: _languages,
+        value: _languageId,
+        onChanged: (v) => setState(() => _languageId = v),
+      ),
+      const SizedBox(height: 12),
+      _textField(_studyingEnglishAtController, 'Which country are you currently studying English?'),
+    ]);
+  }
+
+  Widget _stepAddress() {
+    return _stepBody([
+      _refDropdown(
+        label: 'Country',
+        items: _countries,
+        value: _countryId,
+        onChanged: (v) => setState(() => _countryId = v),
+      ),
+      const SizedBox(height: 12),
+      _textField(_cityController, 'City'),
+      const SizedBox(height: 12),
+      _textField(_postCodeController, 'Post code'),
+      const SizedBox(height: 12),
+      _textField(_street1Controller, 'Street address'),
+      const SizedBox(height: 12),
+      _textField(_street2Controller, 'Street address 2 (optional)', required: false),
+    ]);
+  }
+
+  Widget _stepIdentityDocument() {
+    return _stepBody([
+      _refDropdown(
+        label: 'Document type',
+        items: _identificationTypes,
+        value: _identificationTypeId,
+        onChanged: (v) => setState(() => _identificationTypeId = v),
+      ),
+      const SizedBox(height: 12),
+      _textField(_idNumberController, 'Document number'),
+      const SizedBox(height: 12),
+      _datePicker(
+        label: 'Document expiry date',
+        value: _idExpiryDate,
+        firstDate: DateTime.now(),
+        lastDate: DateTime(2099),
+        onChanged: (d) => setState(() => _idExpiryDate = d),
+      ),
+      const SizedBox(height: 12),
+      _textField(_idIssuingAuthorityController, 'Issuing authority'),
+    ]);
+  }
+
+  Widget _stepStudyBackground() {
+    return _stepBody([
+      _refDropdown(
+        label: 'Education level',
+        items: _educationLevels,
+        value: _educationLevelId,
+        onChanged: (v) => setState(() => _educationLevelId = v),
+      ),
+      const SizedBox(height: 12),
+      _refDropdown(
+        label: 'Occupation level',
+        items: _occupationLevels,
+        value: _occupationLevelId,
+        onChanged: (v) => setState(() => _occupationLevelId = v),
+      ),
+      const SizedBox(height: 12),
+      _refDropdown(
+        label: 'Occupation sector',
+        items: _occupationSectors,
+        value: _occupationSectorId,
+        onChanged: (v) => setState(() => _occupationSectorId = v),
+      ),
+      const SizedBox(height: 12),
+      _refDropdown(
+        label: 'Reason for taking the test',
+        items: _testReasons,
+        value: _testReasonId,
+        onChanged: (v) => setState(() => _testReasonId = v),
+      ),
+      const SizedBox(height: 12),
+      _textField(_yearsOfStudyController, 'Years of English study', keyboardType: TextInputType.number),
+    ]);
+  }
 
   Widget _textField(
     TextEditingController controller,
@@ -475,6 +585,78 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
     );
   }
 
+  /// Opens a search-as-you-type sheet instead of a long plain dropdown —
+  /// several of these lists (countries, nationalities) run past 100 items.
+  Future<T?> _searchSelect<T>({
+    required String label,
+    required List<T> items,
+    required String Function(T) labelOf,
+  }) {
+    return showModalBottomSheet<T>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) {
+        var query = '';
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final filtered = query.isEmpty
+                ? items
+                : items.where((e) => labelOf(e).toLowerCase().contains(query.toLowerCase())).toList();
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+              child: SizedBox(
+                height: MediaQuery.of(ctx).size.height * 0.75,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: Text(
+                        label,
+                        style: const TextStyle(fontFamily: 'SF Pro', fontSize: 16, fontWeight: FontWeight.w700, color: MockTestColors.navy),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: TextField(
+                        autofocus: true,
+                        onChanged: (v) => setSheetState(() => query = v),
+                        style: const TextStyle(fontFamily: 'SF Pro', fontSize: 15),
+                        decoration: InputDecoration(
+                          hintText: 'Search',
+                          prefixIcon: const Icon(Icons.search, size: 20, color: MockTestColors.grey),
+                          filled: true,
+                          fillColor: MockTestColors.softBg,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? const Center(
+                              child: Text('No matches', style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey)),
+                            )
+                          : ListView.builder(
+                              itemCount: filtered.length,
+                              itemBuilder: (ctx, i) => ListTile(
+                                title: Text(labelOf(filtered[i]), style: const TextStyle(fontFamily: 'SF Pro', fontSize: 15, color: MockTestColors.navy)),
+                                onTap: () => Navigator.pop(ctx, filtered[i]),
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _dropdown<T>({
     required String label,
     required T? value,
@@ -482,20 +664,29 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
     required String Function(T) labelOf,
     required void Function(T?) onChanged,
   }) {
-    return DropdownButtonFormField<T>(
-      initialValue: value,
-      isExpanded: true,
-      items: items.map((e) => DropdownMenuItem(value: e, child: Text(labelOf(e)))).toList(),
-      onChanged: onChanged,
-      validator: (v) => v == null ? 'Required' : null,
-      style: const TextStyle(fontFamily: 'SF Pro', fontSize: 15, color: MockTestColors.navy),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey),
-        filled: true,
-        fillColor: MockTestColors.softBg,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () async {
+        final picked = await _searchSelect<T>(label: label, items: items, labelOf: labelOf);
+        if (picked != null) onChanged(picked);
+      },
+      child: InputDecorator(
+        isEmpty: value == null,
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey),
+          filled: true,
+          fillColor: MockTestColors.softBg,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+          // Extra top padding vs. bottom (Flutter's own filled-field default
+          // is 20/12) — a floating label needs that room above the value or
+          // it clips against the box's top edge.
+          contentPadding: const EdgeInsets.fromLTRB(16, 20, 16, 14),
+        ),
+        child: Text(
+          value == null ? 'Select' : labelOf(value),
+          style: const TextStyle(fontFamily: 'SF Pro', fontSize: 15, color: MockTestColors.navy),
+        ),
       ),
     );
   }
@@ -536,13 +727,14 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
         if (picked != null) onChanged(picked);
       },
       child: InputDecorator(
+        isEmpty: value == null,
         decoration: InputDecoration(
           labelText: label,
           labelStyle: const TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey),
           filled: true,
           fillColor: MockTestColors.softBg,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.fromLTRB(16, 20, 16, 14),
         ),
         child: Text(
           value == null ? 'Select date' : '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}',

@@ -6,6 +6,9 @@ class PrefsService {
   static const _readNotificationsKey = 'read_notifications';
   static const _viewedNewsKey = 'viewed_news';
   static const _speakingTermsKey = 'speaking_terms_agreed';
+  static const _passageHighlightPrefix = 'passage_highlights_';
+  static const _readerBgColorKey = 'reading_passage_bg_color';
+  static const _readerFontScaleKey = 'reading_passage_font_scale';
 
   static SharedPreferences? _prefs;
 
@@ -81,5 +84,60 @@ class PrefsService {
       list.add(newsId);
       await prefs.setStringList(_viewedNewsKey, list);
     }
+  }
+
+  // ─── Reading Passage Highlights ───────────────────────────────────────
+  //
+  // Highlights are stored as the highlighted plain-text phrases themselves
+  // (not character offsets), keyed per passage. On render each phrase is
+  // located again with a plain substring search — the same approach the
+  // writing sample screen uses for examiner annotations — so highlights
+  // survive passage HTML/whitespace changes between fetches.
+
+  static Future<List<String>> getPassageHighlights(String passageKey) async {
+    final prefs = await _instance;
+    return prefs.getStringList('$_passageHighlightPrefix$passageKey') ?? [];
+  }
+
+  static Future<void> addPassageHighlight(String passageKey, String text) async {
+    final prefs = await _instance;
+    final key = '$_passageHighlightPrefix$passageKey';
+    final list = prefs.getStringList(key) ?? [];
+    if (!list.contains(text)) {
+      list.add(text);
+      await prefs.setStringList(key, list);
+    }
+  }
+
+  static Future<void> removePassageHighlight(String passageKey, String text) async {
+    final prefs = await _instance;
+    final key = '$_passageHighlightPrefix$passageKey';
+    final list = prefs.getStringList(key) ?? [];
+    if (list.remove(text)) {
+      await prefs.setStringList(key, list);
+    }
+  }
+
+  // ─── Reading Passage Display Settings ──────────────────────────────────
+
+  static Future<int?> getReaderBackgroundColor() async {
+    final prefs = await _instance;
+    final value = prefs.getInt(_readerBgColorKey);
+    return value;
+  }
+
+  static Future<void> setReaderBackgroundColor(int colorValue) async {
+    final prefs = await _instance;
+    await prefs.setInt(_readerBgColorKey, colorValue);
+  }
+
+  static Future<double> getReaderFontScale() async {
+    final prefs = await _instance;
+    return prefs.getDouble(_readerFontScaleKey) ?? 1.0;
+  }
+
+  static Future<void> setReaderFontScale(double scale) async {
+    final prefs = await _instance;
+    await prefs.setDouble(_readerFontScaleKey, scale);
   }
 }

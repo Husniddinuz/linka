@@ -80,9 +80,9 @@
 		<key>NSUserTrackingUsageDescription</key>
 		<string>This identifier will be used to deliver personalized ads and measure the effectiveness of our advertising.</string>
 		<key>FacebookAppID</key>
-		<string>1582010776774511</string>
+		<string>1473817471099259</string>
 		<key>FacebookClientToken</key>
-		<string>2918e7e8f5535e181c2bc07cabeb27e7</string>
+		<string>44ab19667cbe2bd4528cee817ffb4a4a</string>
 		<key>FacebookDisplayName</key>
 		<string>Linka</string>
 		<key>FacebookAutoLogAppEventsEnabled</key>

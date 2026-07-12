@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/ielts_registration_service.dart';
 import '../widgets/mock_test_styles.dart';
 import 'ielts_profile_form_screen.dart';
+import 'ielts_resume_upload_screen.dart';
 
 /// First step of the real IELTS registration flow: creates (or signs into)
 /// the candidate's own IDP "One Account". This has to be a real account the
@@ -19,18 +20,14 @@ class IeltsSignupScreen extends StatefulWidget {
 
 class _IeltsSignupScreenState extends State<IeltsSignupScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _phoneController = TextEditingController(text: '+998');
   final _passwordController = TextEditingController();
   bool _submitting = false;
   String? _error;
 
   @override
   void dispose() {
-    _nameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -42,31 +39,36 @@ class _IeltsSignupScreenState extends State<IeltsSignupScreen> {
       _error = null;
     });
 
-    final fullName = _nameController.text.trim();
-    final nameParts = fullName.split(RegExp(r'\s+'));
-    final firstName = nameParts.first;
-    final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : firstName;
     final email = _emailController.text.trim();
-    final phone = _phoneController.text.trim();
     final password = _passwordController.text;
 
     try {
+      // Full name and mobile number aren't collected here — same as the IDP
+      // website, they're asked for on the candidate profile step right after
+      // sign-in, not during account creation.
       await IeltsRegistrationService.signInOrSignUp(
         email: email,
         password: password,
-        fullName: fullName,
+        fullName: email,
       );
+
       try {
+        // Provisions the test-taker profile that the next screen's
+        // `getUserProfile()` depends on — confirmed live: for a genuinely
+        // new account, skipping this makes that call 404 (only worked in
+        // earlier testing because the test account already had one from a
+        // prior session). "Unknown" mirrors IDP's own frontend, which uses
+        // that exact literal for fields not yet collected. Non-fatal: for a
+        // returning student the account profile already exists and this
+        // 500s harmlessly — the test-taker profile update in the wizard is
+        // what carries the real name/mobile.
         await IeltsRegistrationService.createAccountProfile(
           email: email,
-          firstName: firstName,
-          lastName: lastName,
-          mobileNumber: phone,
+          firstName: 'Unknown',
+          lastName: 'Unknown',
+          mobileNumber: 'Unknown',
         );
-      } catch (_) {
-        // Non-fatal: the account-level profile may already exist for a
-        // returning student — the test-taker profile below is what matters.
-      }
+      } catch (_) {}
 
       if (!mounted) return;
       Navigator.push(
@@ -75,15 +77,14 @@ class _IeltsSignupScreenState extends State<IeltsSignupScreen> {
           builder: (_) => IeltsProfileFormScreen(
             session: widget.session,
             email: email,
-            firstName: firstName,
-            lastName: lastName,
-            mobileNumber: phone,
           ),
         ),
       );
     } catch (e) {
+      // TODO: temporary — surfaces the real error for debugging, revert to
+      // plain user-facing copy once the flow is confirmed stable.
       setState(() {
-        _error = 'Could not create the IDP account. Check the details and try again.';
+        _error = 'Could not create the IDP account: $e';
       });
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -107,23 +108,10 @@ class _IeltsSignupScreenState extends State<IeltsSignupScreen> {
             ),
             const SizedBox(height: 20),
             _field(
-              controller: _nameController,
-              label: 'Full name',
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            _field(
               controller: _emailController,
               label: 'Email',
               keyboardType: TextInputType.emailAddress,
               validator: (v) => (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
-            ),
-            const SizedBox(height: 14),
-            _field(
-              controller: _phoneController,
-              label: 'Mobile number',
-              keyboardType: TextInputType.phone,
-              validator: (v) => (v == null || v.trim().length < 9) ? 'Enter a valid phone number' : null,
             ),
             const SizedBox(height: 14),
             _field(
@@ -144,6 +132,19 @@ class _IeltsSignupScreenState extends State<IeltsSignupScreen> {
             ],
             const SizedBox(height: 24),
             MtPrimaryButton(label: 'Continue', loading: _submitting, onPressed: _submit),
+            const SizedBox(height: 12),
+            Center(
+              child: TextButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const IeltsResumeUploadScreen()),
+                ),
+                child: const Text(
+                  'Resume an existing application (dev)',
+                  style: TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: MockTestColors.grey),
+                ),
+              ),
+            ),
           ],
         ),
       ),

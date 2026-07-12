@@ -3,8 +3,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:video_player/video_player.dart';
 import '../services/api_service.dart';
 import '../services/app_feature_service.dart';
+import '../services/share_service.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/cached_avatar.dart';
+import '../widgets/skeleton.dart';
 import 'availability_screen.dart';
 
 class TutorProfileScreen extends StatefulWidget {
@@ -123,13 +125,38 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
     return d % 1 == 0 ? '${d.toInt()}.0' : '$d';
   }
 
+  void _shareProfile() {
+    final t = _tutor;
+    final name = '${t?['first_name'] ?? ''} ${t?['last_name'] ?? ''}'.trim();
+    ShareService.shareTutorProfile(tutorId: widget.tutorId, tutorName: name);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        backgroundColor: Color(0xFFF5F5F7),
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF272942)),
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            physics: NeverScrollableScrollPhysics(),
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Skeleton(height: 340, borderRadius: 24),
+                  SizedBox(height: 20),
+                  Skeleton(width: 180, height: 22, borderRadius: 6),
+                  SizedBox(height: 10),
+                  Skeleton(width: 120, height: 14, borderRadius: 6),
+                  SizedBox(height: 24),
+                  Skeleton(height: 90, borderRadius: 16),
+                  SizedBox(height: 20),
+                  Skeleton(height: 120, borderRadius: 16),
+                ],
+              ),
+            ),
+          ),
         ),
       );
     }
@@ -150,6 +177,12 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
       ('Writing', _formatScore(t?['writing_score'])),
       ('Speaking', _formatScore(t?['speaking_score'])),
     ];
+    final isFeatured = t?['pin_status'] as bool? ?? false;
+    final isEnrollable = t?['is_enrollable'] as bool? ?? true;
+    final hasCertificate = (t?['ielts_certificate'] as String?)?.isNotEmpty ?? false;
+    final ratings = _reviews.map((r) => (r['rating'] as num?)?.toDouble() ?? 0).toList();
+    final avgRating = ratings.isEmpty ? null : ratings.reduce((a, b) => a + b) / ratings.length;
+    final reviewCount = _reviews.length;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F7),
@@ -166,16 +199,29 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _AppBar(
-                          isBookmarked: _isBookmarked,
-                          onBookmarkTap: _toggleBookmark,
-                        ),
-                        _TutorInfoCard(
+                        _ProfileHero(
                           name: name,
                           imageUrl: imageUrl,
                           experience: experience,
                           ieltsScore: ieltsScore,
+                          isFeatured: isFeatured,
+                          isBookmarked: _isBookmarked,
+                          avgRating: avgRating,
+                          reviewCount: reviewCount,
+                          reviewsLoading: _reviewsLoading,
+                          onBookmarkTap: _toggleBookmark,
+                          onShareTap: _shareProfile,
+                          onBackTap: () => Navigator.of(context).pop(),
                         ),
+                        if (hasCertificate) ...[
+                          const SizedBox(height: 14),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: _CertificateBadge(
+                              onTap: () => _showCertificate(t!['ielts_certificate'] as String),
+                            ),
+                          ),
+                        ],
                         if (t?['intro_video'] != null) ...[
                           const SizedBox(height: 16),
                           _TutorVideo(url: t!['intro_video'] as String),
@@ -189,23 +235,20 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
 
                   // ── Bio ─────────────────────────────────────────────────────
                   Builder(builder: (_) {
                     final bio = (t?['about_me'] as String?)?.trim() ?? '';
                     if (bio.isEmpty) return const SizedBox.shrink();
-                    return Container(
-                      width: double.infinity,
-                      color: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                    return _PremiumCard(
                       child: _BioSection(bio: bio),
                     );
                   }),
 
                   Builder(builder: (_) {
                     final bio = (t?['about_me'] as String?)?.trim() ?? '';
-                    return bio.isEmpty ? const SizedBox.shrink() : const SizedBox(height: 8);
+                    return bio.isEmpty ? const SizedBox.shrink() : const SizedBox(height: 16);
                   }),
 
                   // ── Lesson duration (info) ──────────────────────────────────
@@ -220,52 +263,56 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
                       final formatted = _formatAmount(price);
                       return ('$mins min', '$formatted UZS');
                     }).toList();
-                    return Container(
-                      color: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                    return _PremiumCard(
                       child: _LessonDurationSection(durations: durations),
                     );
                   }),
 
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
 
                   // ── Reviews ────────────────────────────────────────────────
                   if (_reviewsLoading || _reviews.isNotEmpty) ...[
-                    Container(
-                      color: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 20),
+                    _PremiumCard(
+                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 0),
                       child: _ReviewsSection(
                         reviews: _reviews,
                         loading: _reviewsLoading,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 16),
                   ],
                 ],
               ),
             ),
           ),
 
-          // ── Sticky Schedule button ─────────────────────────────────────────
+          // ── Sticky Book Lesson button ───────────────────────────────────────
           Container(
             color: Colors.white,
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
             child: SizedBox(
               width: double.infinity,
+              height: 56,
               child: ElevatedButton(
-                onPressed: _openAvailability,
+                onPressed: isEnrollable ? _openAvailability : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF272942),
+                  disabledBackgroundColor: const Color(0xFFDDDDDD),
                   foregroundColor: Colors.white,
                   elevation: 0,
+                  shadowColor: const Color(0xFF272942).withValues(alpha: 0.35),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: const Text(
-                  'Schedule',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                child: Text(
+                  isEnrollable ? 'Book Lesson' : 'Fully booked',
+                  style: const TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -274,42 +321,42 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
       ),
     );
   }
-}
 
-// ─── App bar ───────────────────────────────────────────────────────────────────
-
-class _AppBar extends StatelessWidget {
-  final bool isBookmarked;
-  final VoidCallback onBookmarkTap;
-
-  const _AppBar({
-    required this.isBookmarked,
-    required this.onBookmarkTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
+  void _showCertificate(String url) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Stack(
+          alignment: Alignment.topRight,
           children: [
-            GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: const Icon(
-                Icons.chevron_left_rounded,
-                size: 30,
-                color: Color(0xFF272942),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                url,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => Container(
+                  height: 200,
+                  color: Colors.white,
+                  child: const Center(child: Icon(Icons.broken_image_outlined)),
+                ),
               ),
             ),
-            const Spacer(),
-            GestureDetector(
-              onTap: onBookmarkTap,
-              child: Icon(
-                isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                size: 26,
-                color: isBookmarked ? const Color(0xFF272942) : const Color(0xFF9E9E9E),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 20),
+                ),
               ),
             ),
           ],
@@ -318,6 +365,8 @@ class _AppBar extends StatelessWidget {
     );
   }
 }
+
+// ─── App bar ───────────────────────────────────────────────────────────────────
 
 // ─── Tutor video ──────────────────────────────────────────────────────────────
 
@@ -490,118 +539,245 @@ class _TutorVideoState extends State<_TutorVideo> {
   }
 }
 
-// ─── Tutor info card ───────────────────────────────────────────────────────────
+// ─── Profile hero ──────────────────────────────────────────────────────────────
 
-class _TutorInfoCard extends StatelessWidget {
+class _ProfileHero extends StatelessWidget {
   final String name;
   final String? imageUrl;
   final int experience;
   final double ieltsScore;
+  final bool isFeatured;
+  final bool isBookmarked;
+  final double? avgRating;
+  final int reviewCount;
+  final bool reviewsLoading;
+  final VoidCallback onBookmarkTap;
+  final VoidCallback onShareTap;
+  final VoidCallback onBackTap;
 
-  const _TutorInfoCard({
+  const _ProfileHero({
     required this.name,
     this.imageUrl,
     required this.experience,
     required this.ieltsScore,
+    required this.isFeatured,
+    required this.isBookmarked,
+    required this.avgRating,
+    required this.reviewCount,
+    required this.reviewsLoading,
+    required this.onBookmarkTap,
+    required this.onShareTap,
+    required this.onBackTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+    final scoreLabel = ieltsScore % 1 == 0 ? ieltsScore.toInt().toString() : ieltsScore.toString();
+    return SizedBox(
+      height: 340,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Portrait photo
+          imageUrl != null
+              ? Image.network(
+                  imageUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    color: const Color(0xFFE0E0E0),
+                    child: const Icon(Icons.person, size: 64, color: Color(0xFFAAAAAA)),
+                  ),
+                )
+              : Container(
+                  color: const Color(0xFFE0E0E0),
+                  child: const Icon(Icons.person, size: 64, color: Color(0xFFAAAAAA)),
+                ),
+
+          // Top scrim for icon legibility
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0x99000000), Colors.transparent],
+                stops: [0.0, 0.28],
+              ),
+            ),
+          ),
+          // Bottom scrim for text legibility
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Color(0xE6000000)],
+                stops: [0.45, 1.0],
+              ),
+            ),
+          ),
+
+          // Floating top bar
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  _heroIconButton(Icons.chevron_left_rounded, onBackTap, size: 26),
+                  const Spacer(),
+                  _heroIconButton(Icons.ios_share_rounded, onShareTap, size: 19),
+                  const SizedBox(width: 10),
+                  _heroIconButton(
+                    isBookmarked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                    onBookmarkTap,
+                    size: 19,
+                    tint: isBookmarked ? const Color(0xFFE53935) : Colors.white,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Featured ribbon — real signal from admin-curated pin_status
+          if (isFeatured)
+            Positioned(
+              top: 64,
+              left: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFFFFD451), Color(0xFFF5B81E)]),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  '★ FEATURED TUTOR',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF272942),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+
+          // Name + quick facts overlay
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 20,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _heroPill(
+                      'IELTS $scoreLabel',
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFE53935), Color(0xFFC62828)],
+                      ),
+                    ),
+                    _heroPill('+$experience yrs experience'),
+                    if (reviewsLoading)
+                      _heroPill('Loading reviews…')
+                    else if (avgRating != null)
+                      _heroPill(
+                        '★ ${avgRating!.toStringAsFixed(1)} ($reviewCount)',
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _heroIconButton(IconData icon, VoidCallback onTap, {required double size, Color tint = Colors.white}) {
+    return GestureDetector(
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(8),
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.32),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, size: size, color: tint),
+      ),
+    );
+  }
+
+  Widget _heroPill(String label, {Gradient? gradient}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        color: gradient == null ? Colors.white.withValues(alpha: 0.18) : null,
+        borderRadius: BorderRadius.circular(20),
+        border: gradient == null ? Border.all(color: Colors.white.withValues(alpha: 0.3)) : null,
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontFamily: 'SF Pro',
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+          height: 1.0,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Certificate badge ─────────────────────────────────────────────────────────
+
+class _CertificateBadge extends StatelessWidget {
+  final VoidCallback onTap;
+  const _CertificateBadge({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: const Color(0xFFF5F5F7),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            // Avatar with yellow ring
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFF5C542), width: 3),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(3),
-                child: ClipOval(
-                  child: imageUrl != null
-                      ? Image.network(
-                          imageUrl!,
-                          fit: BoxFit.cover,
-                          width: 60,
-                          height: 60,
-                          errorBuilder: (_, _, _) => const Icon(
-                            Icons.person,
-                            size: 30,
-                            color: Color(0xFFAAAAAA),
-                          ),
-                        )
-                      : const Icon(
-                          Icons.person,
-                          size: 30,
-                          color: Color(0xFFAAAAAA),
-                        ),
+            const Icon(Icons.verified_rounded, size: 18, color: Color(0xFF2E7D32)),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'IELTS certificate verified',
+                style: TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF272942),
                 ),
               ),
             ),
-            const SizedBox(width: 10),
-            // Name, experience, IELTS — white block
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF272942),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Experience: +$experience yrs',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF9E9E9E),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F7),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'IELTS ${ieltsScore % 1 == 0 ? ieltsScore.toInt() : ieltsScore}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFFE53935),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF9E9E9E)),
           ],
         ),
       ),
@@ -660,6 +836,40 @@ class _ScoresGrid extends StatelessWidget {
             );
           }),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Premium card wrapper ──────────────────────────────────────────────────────
+
+class _PremiumCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsets padding;
+  const _PremiumCard({
+    required this.child,
+    this.padding = const EdgeInsets.all(20),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        width: double.infinity,
+        padding: padding,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: child,
       ),
     );
   }

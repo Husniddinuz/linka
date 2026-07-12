@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../services/app_feature_service.dart';
 import '../services/auth_service.dart';
 import '../services/plus_service.dart';
+import '../services/share_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 import '../services/wallet_service.dart';
@@ -83,6 +84,13 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
     } else if (mounted) {
       AppNotify.show(context, message: 'Could not open support chat.');
     }
+  }
+
+  void _shareMyProfile() {
+    final tutorId = UserService.current?.tutorProfileId;
+    if (tutorId == null) return;
+    final name = '${_profile?['first_name'] ?? ''} ${_profile?['last_name'] ?? ''}'.trim();
+    ShareService.shareTutorProfile(tutorId: tutorId, tutorName: name);
   }
 
   Future<void> _openPlusSubscription() async {
@@ -280,6 +288,16 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                               MaterialPageRoute(
                                   builder: (_) => const TutorScheduleScreen()),
                             ),
+                          ),
+                          const _Divider(),
+                          _MenuRow(
+                            iconWidget: const Icon(
+                              Icons.ios_share_rounded,
+                              size: 22,
+                              color: Color(0xFF272942),
+                            ),
+                            label: 'Share profile',
+                            onTap: _shareMyProfile,
                           ),
                           const _Divider(),
                         ],
@@ -544,15 +562,17 @@ class _Divider extends StatelessWidget {
 // ─── Menu row ───────────────────────────────────────────────────────────────
 
 class _MenuRow extends StatelessWidget {
-  final String icon;
+  final String? icon;
+  final Widget? iconWidget;
   final String label;
   final VoidCallback onTap;
 
   const _MenuRow({
-    required this.icon,
+    this.icon,
+    this.iconWidget,
     required this.label,
     required this.onTap,
-  });
+  }) : assert(icon != null || iconWidget != null);
 
   @override
   Widget build(BuildContext context) {
@@ -563,7 +583,7 @@ class _MenuRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            SvgPicture.asset(icon, width: 22, height: 22),
+            iconWidget ?? SvgPicture.asset(icon!, width: 22, height: 22),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
