@@ -287,6 +287,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
   String? _pendingLocalId;
 
   _Message? _replyingTo;
+  _Message? _pinnedMessage;
 
   bool _isRecording = false;
   int _recordSeconds = 0;
@@ -799,11 +800,13 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
           .map(_Message.fromJson)
           .where((m) => !m.isDeleted)
           .toList();
+      final pinnedJson = data['pinned_message'] as Map<String, dynamic>?;
       if (mounted) {
         setState(() {
           _messages = msgs;
           _hasMore = data['has_more'] as bool? ?? false;
           _loadingInitial = false;
+          _pinnedMessage = pinnedJson != null ? _Message.fromJson(pinnedJson) : null;
         });
         if (widget.initialScrollToId != null) {
           WidgetsBinding.instance.addPostFrameCallback(
@@ -929,6 +932,19 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
                   _messages = _messages.where((m) => m.id != messageId).toList();
                 });
               }
+            } else if (json['type'] == 'message_pinned') {
+              final msgData = json['message'] as Map<String, dynamic>?;
+              if (msgData != null && mounted) {
+                final senderId = (msgData['sender_id'] as num?)?.toInt().toString();
+                setState(() {
+                  _pinnedMessage = _Message.fromJson({
+                    ...msgData,
+                    'is_mine': _currentUserId != null && senderId == _currentUserId,
+                  });
+                });
+              }
+            } else if (json['type'] == 'message_unpinned') {
+              if (mounted) setState(() => _pinnedMessage = null);
             } else if (json['type'] == 'typing' && mounted) {
               final userId = (json['user_id'] as num?)?.toInt();
               final userName = json['user_name'] as String?;
@@ -1217,6 +1233,40 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
       await ChatService.deleteMessage(widget.channel.id, msg.id);
     } catch (_) {
       if (mounted) setState(() => _messages = snapshot);
+    }
+  }
+
+  // ─── Pin message ───────────────────────────────────────────────────────────
+
+  Future<void> _pinMessage(_Message msg) async {
+    final previous = _pinnedMessage;
+    setState(() => _pinnedMessage = msg);
+    try {
+      await ChatService.pinMessage(widget.channel.id, msg.id);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _pinnedMessage = previous);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e is ApiException ? e.message : 'Failed to pin message'),
+        backgroundColor: const Color(0xFFEB3349),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
+  Future<void> _unpinMessage(_Message msg) async {
+    final previous = _pinnedMessage;
+    setState(() => _pinnedMessage = null);
+    try {
+      await ChatService.unpinMessage(widget.channel.id, msg.id);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _pinnedMessage = previous);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e is ApiException ? e.message : 'Failed to unpin message'),
+        backgroundColor: const Color(0xFFEB3349),
+        behavior: SnackBarBehavior.floating,
+      ));
     }
   }
 
@@ -1514,6 +1564,14 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         behavior: HitTestBehavior.translucent,
         child: Column(
           children: [
+            if (_pinnedMessage != null)
+              _PinnedBanner(
+                message: _pinnedMessage!,
+                onTap: () => _scrollToOriginal(_pinnedMessage!.id),
+                onUnpin: _currentUserIsTutor
+                    ? () => _unpinMessage(_pinnedMessage!)
+                    : null,
+              ),
             Expanded(
               child: Stack(
                 children: [
@@ -1661,6 +1719,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
                       ? () => _confirmBlock(msg)
                       : null,
                   hideTutorIdentity: _isTutorOnlyChannel,
+                  isPinned: _pinnedMessage?.id == msg.id,
+                  onPin: _currentUserIsTutor ? () => _pinMessage(msg) : null,
+                  onUnpin: _currentUserIsTutor ? () => _unpinMessage(msg) : null,
                   quizSubmitting: msg.quiz != null &&
                       _quizSubmitting.contains(msg.quiz!.id),
                   quizPendingOptionId: msg.quiz != null
@@ -1790,6 +1851,9 @@ class _MessageBubble extends StatelessWidget {
   final void Function(int)? onQuizOptionTap;
   final void Function(String replyToId)? onScrollToOriginal;
   final bool hideTutorIdentity;
+  final bool isPinned;
+  final VoidCallback? onPin;
+  final VoidCallback? onUnpin;
 
   const _MessageBubble({
     super.key,
@@ -1809,6 +1873,9 @@ class _MessageBubble extends StatelessWidget {
     this.onQuizOptionTap,
     this.onScrollToOriginal,
     this.hideTutorIdentity = false,
+    this.isPinned = false,
+    this.onPin,
+    this.onUnpin,
   });
 
   String _timeLabel(DateTime dt) {
@@ -1822,7 +1889,9 @@ class _MessageBubble extends StatelessWidget {
     final canDelete = onDelete != null;
     final canReport = onReport != null;
     final canBlock = onBlock != null;
-    if (!canReply && !canDelete && !canReport && !canBlock) return;
+    final canPin = !message.isDeleted && !isPinned && onPin != null;
+    final canUnpin = isPinned && onUnpin != null;
+    if (!canReply && !canDelete && !canReport && !canBlock && !canPin && !canUnpin) return;
 
     showModalBottomSheet<void>(
       context: context,
@@ -1834,6 +1903,30 @@ class _MessageBubble extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (canPin)
+              ListTile(
+                leading: const Icon(Icons.push_pin_outlined, color: Color(0xFF272942)),
+                title: const Text(
+                  'Pin message',
+                  style: TextStyle(fontFamily: 'SF Pro', color: Color(0xFF272942)),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  onPin!();
+                },
+              ),
+            if (canUnpin)
+              ListTile(
+                leading: const Icon(Icons.push_pin, color: Color(0xFF272942)),
+                title: const Text(
+                  'Unpin message',
+                  style: TextStyle(fontFamily: 'SF Pro', color: Color(0xFF272942)),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  onUnpin!();
+                },
+              ),
             if (canReply)
               ListTile(
                 leading: const Icon(Icons.reply_rounded, color: Color(0xFF272942)),
@@ -2294,6 +2387,84 @@ class _ReplyBar extends StatelessWidget {
           ),
         ],
       ),
+      ),
+    );
+  }
+}
+
+// ─── Pinned message banner ─────────────────────────────────────────────────────
+
+class _PinnedBanner extends StatelessWidget {
+  final _Message message;
+  final VoidCallback onTap;
+  final VoidCallback? onUnpin;
+
+  const _PinnedBanner({required this.message, required this.onTap, this.onUnpin});
+
+  @override
+  Widget build(BuildContext context) {
+    final String preview;
+    if (message.isQuiz) {
+      preview = '📊 Quiz';
+    } else if (message.isImage) {
+      preview = '🖼 Image';
+    } else if (message.isVoice) {
+      preview = '🎵 Voice message';
+    } else {
+      final t = message.text ?? '';
+      preview = t.length > 60 ? '${t.substring(0, 60)}…' : t;
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: const BoxDecoration(
+          color: Color(0xFFF8F8FF),
+          border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.push_pin_rounded, size: 16, color: Color(0xFF5B7FD4)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Pinned message',
+                    style: TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF5B7FD4),
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    preview,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 13,
+                      color: Color(0xFF888888),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (onUnpin != null)
+              GestureDetector(
+                onTap: onUnpin,
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.close_rounded, size: 18, color: Color(0xFFAAAAAA)),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

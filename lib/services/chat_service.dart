@@ -98,6 +98,42 @@ class ChatService {
     );
   }
 
+  static Future<void> pinMessage(String slug, String messageId) async {
+    final token = await TokenService.getAccessToken();
+    final response = await http.post(
+      Uri.parse('$chatApiBaseUrl/chats/channels/$slug/messages/$messageId/pin/'),
+      headers: _headers(token),
+    );
+    if (response.statusCode != 200) {
+      String detail;
+      try {
+        final parsed = jsonDecode(response.body) as Map<String, dynamic>;
+        detail = parsed['detail']?.toString() ?? 'Failed to pin (${response.statusCode})';
+      } catch (_) {
+        detail = 'Failed to pin (${response.statusCode})';
+      }
+      throw ApiException(detail, statusCode: response.statusCode);
+    }
+  }
+
+  static Future<void> unpinMessage(String slug, String messageId) async {
+    final token = await TokenService.getAccessToken();
+    final response = await http.delete(
+      Uri.parse('$chatApiBaseUrl/chats/channels/$slug/messages/$messageId/pin/'),
+      headers: _headers(token),
+    );
+    if (response.statusCode != 200) {
+      String detail;
+      try {
+        final parsed = jsonDecode(response.body) as Map<String, dynamic>;
+        detail = parsed['detail']?.toString() ?? 'Failed to unpin (${response.statusCode})';
+      } catch (_) {
+        detail = 'Failed to unpin (${response.statusCode})';
+      }
+      throw ApiException(detail, statusCode: response.statusCode);
+    }
+  }
+
   static Future<void> uploadVoiceMessage(
     String slug,
     File file,
