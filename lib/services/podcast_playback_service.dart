@@ -130,7 +130,7 @@ class PodcastPlaybackService {
   /// calling play()) since a duration of `null` is also legitimately
   /// possible for formats that report it asynchronously.
   Future<Duration?> loadAdHoc(String id, Uri uri, {String title = '', int? generation}) async {
-    final gen = generation ?? beginLoad();
+    if (generation == null) beginLoad();
     _queue = [];
     _currentIndex = -1;
     currentTrack.value = null;

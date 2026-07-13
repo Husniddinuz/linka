@@ -1423,6 +1423,11 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
     // interrupts/replaces whatever was previously loaded.
     _playerStateSub?.cancel();
     setState(() => _playingId = msg.id);
+    // Claimed before the download starts (the slow part) so a late-finishing
+    // download that lost the race to a load elsewhere (Mock Test Listening,
+    // a Speaking Sample, another voice message) can detect it and bail
+    // instead of hijacking playback with this stale audio.
+    final loadGen = PodcastPlaybackService.instance.beginLoad();
 
     try {
       debugPrint('[Voice] ▶ tapped id=${msg.id} url=${msg.voiceUrl}');
@@ -1471,6 +1476,15 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         throw Exception('Audio file too small ($fileSize bytes) — likely empty recording');
       }
 
+      if (!PodcastPlaybackService.instance.isCurrent(loadGen)) {
+        // Something else claimed the shared player while we were downloading
+        // (the user left for Mock Test Listening, a Speaking Sample, or
+        // tapped a different voice message) — don't hijack it now.
+        debugPrint('[Voice] stale load for id=${msg.id}, discarding');
+        if (mounted) setState(() => _playingId = null);
+        return;
+      }
+
       debugPrint('[Voice] setAudioSource...');
       // just_audio_background is initialized globally in main.dart, which
       // requires every AudioSource to carry a MediaItem tag or setFilePath
@@ -1479,7 +1493,13 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         'voice_${msg.id}',
         Uri.file(file.path),
         title: 'Voice message',
+        generation: loadGen,
       );
+      if (!PodcastPlaybackService.instance.isCurrent(loadGen)) {
+        debugPrint('[Voice] stale load for id=${msg.id} after setAudioSource, discarding');
+        if (mounted) setState(() => _playingId = null);
+        return;
+      }
       // Use the actual file duration; fall back to durationStream for formats
       // that report duration asynchronously (some iOS codecs).
       final actualSeconds = (dur ?? _player.duration)?.inSeconds;
