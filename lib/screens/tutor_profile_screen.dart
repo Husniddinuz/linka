@@ -4,6 +4,7 @@ import 'package:video_player/video_player.dart';
 import '../services/api_service.dart';
 import '../services/app_feature_service.dart';
 import '../services/share_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/cached_avatar.dart';
 import '../widgets/skeleton.dart';
@@ -134,9 +135,9 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
+      return Scaffold(
+        backgroundColor: context.colors.background,
+        body: const SafeArea(
           child: SingleChildScrollView(
             physics: NeverScrollableScrollPhysics(),
             child: Padding(
@@ -185,7 +186,7 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
     final reviewCount = _reviews.length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
+      backgroundColor: context.colors.surfaceAlt,
       body: Column(
         children: [
           Expanded(
@@ -193,9 +194,9 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── White top section ──────────────────────────────────────
+                  // ── Surface top section ──────────────────────────────────────
                   Container(
-                    color: Colors.white,
+                    color: context.colors.surface,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -288,7 +289,7 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
 
           // ── Sticky Book Lesson button ───────────────────────────────────────
           Container(
-            color: Colors.white,
+            color: context.colors.surface,
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
             child: SizedBox(
               width: double.infinity,
@@ -296,11 +297,11 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
               child: ElevatedButton(
                 onPressed: isEnrollable ? _openAvailability : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF272942),
-                  disabledBackgroundColor: const Color(0xFFDDDDDD),
+                  backgroundColor: context.colors.brand,
+                  disabledBackgroundColor: context.colors.border,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  shadowColor: const Color(0xFF272942).withValues(alpha: 0.35),
+                  shadowColor: context.colors.brand.withValues(alpha: 0.35),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -339,7 +340,7 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
                 fit: BoxFit.contain,
                 errorBuilder: (_, _, _) => Container(
                   height: 200,
-                  color: Colors.white,
+                  color: context.colors.surface,
                   child: const Center(child: Icon(Icons.broken_image_outlined)),
                 ),
               ),
@@ -528,9 +529,9 @@ class _TutorVideoState extends State<_TutorVideo> {
                   ),
                 )
               : Container(
-                  color: const Color(0xFFE0E0E0),
-                  child: const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF272942)),
+                  color: context.colors.border,
+                  child: Center(
+                    child: CircularProgressIndicator(color: context.colors.textPrimary),
                   ),
                 ),
         ),
@@ -584,13 +585,13 @@ class _ProfileHero extends StatelessWidget {
                   imageUrl!,
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => Container(
-                    color: const Color(0xFFE0E0E0),
-                    child: const Icon(Icons.person, size: 64, color: Color(0xFFAAAAAA)),
+                    color: context.colors.border,
+                    child: Icon(Icons.person, size: 64, color: context.colors.textTertiary),
                   ),
                 )
               : Container(
-                  color: const Color(0xFFE0E0E0),
-                  child: const Icon(Icons.person, size: 64, color: Color(0xFFAAAAAA)),
+                  color: context.colors.border,
+                  child: Icon(Icons.person, size: 64, color: context.colors.textTertiary),
                 ),
 
           // Top scrim for icon legibility
@@ -759,25 +760,25 @@ class _CertificateBadge extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F7),
+          color: context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
             const Icon(Icons.verified_rounded, size: 18, color: Color(0xFF2E7D32)),
             const SizedBox(width: 8),
-            const Expanded(
+            Expanded(
               child: Text(
                 'IELTS certificate verified',
                 style: TextStyle(
                   fontFamily: 'SF Pro',
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF9E9E9E)),
+            Icon(Icons.chevron_right_rounded, size: 18, color: context.colors.textTertiary),
           ],
         ),
       ),
@@ -798,7 +799,7 @@ class _ScoresGrid extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F7),
+          color: context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -808,26 +809,26 @@ class _ScoresGrid extends StatelessWidget {
                 margin: EdgeInsets.only(left: i == 0 ? 0 : 6),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: context.colors.surface,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Column(
                   children: [
                     Text(
                       scores[i].$1,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF272942),
+                        color: context.colors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       scores[i].$2,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFFE53935),
+                        color: context.colors.error,
                       ),
                     ),
                   ],
@@ -859,7 +860,7 @@ class _PremiumCard extends StatelessWidget {
         width: double.infinity,
         padding: padding,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -886,21 +887,21 @@ class _BioSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'BIO',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF9E9E9E),
+            color: context.colors.textTertiary,
             letterSpacing: 0.8,
           ),
         ),
         const SizedBox(height: 12),
         Text(
           bio,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 15,
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
             height: 1.5,
           ),
         ),
@@ -920,12 +921,12 @@ class _LessonDurationSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'LESSON DURATION',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF9E9E9E),
+            color: context.colors.textTertiary,
             letterSpacing: 0.8,
           ),
         ),
@@ -937,33 +938,33 @@ class _LessonDurationSection extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.access_time_rounded,
                       size: 18,
-                      color: Color(0xFF9E9E9E),
+                      color: context.colors.textTertiary,
                     ),
                     const SizedBox(width: 10),
                     Text(
                       durations[i].$1,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
-                        color: Color(0xFF272942),
+                        color: context.colors.textPrimary,
                       ),
                     ),
                     const Spacer(),
                     Text(
                       durations[i].$2,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF272942),
+                        color: context.colors.textPrimary,
                       ),
                     ),
                   ],
                 ),
               ),
               if (i < durations.length - 1)
-                const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                Divider(height: 1, color: context.colors.border),
             ],
           );
         }),
@@ -1018,14 +1019,14 @@ class _ReviewsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
             'REVIEWS',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF9E9E9E),
+              color: context.colors.textTertiary,
               letterSpacing: 0.8,
             ),
           ),
@@ -1034,8 +1035,8 @@ class _ReviewsSection extends StatelessWidget {
         SizedBox(
           height: 260,
           child: loading
-              ? const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF272942)),
+              ? Center(
+                  child: CircularProgressIndicator(color: context.colors.textPrimary),
                 )
               : ListView.builder(
                   scrollDirection: Axis.horizontal,
@@ -1053,9 +1054,9 @@ class _ReviewsSection extends StatelessWidget {
                       margin: const EdgeInsets.symmetric(horizontal: 6),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: context.colors.surface,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFEEEEEE), width: 1),
+                        border: Border.all(color: context.colors.border, width: 1),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1069,10 +1070,10 @@ class _ReviewsSection extends StatelessWidget {
                                 children: [
                                   Text(
                                     name,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
-                                      color: Color(0xFF272942),
+                                      color: context.colors.textPrimary,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
@@ -1095,9 +1096,9 @@ class _ReviewsSection extends StatelessWidget {
                           Expanded(
                             child: Text(
                               body,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
-                                color: Color(0xFF272942),
+                                color: context.colors.textPrimary,
                                 height: 1.5,
                               ),
                               overflow: TextOverflow.fade,
@@ -1106,9 +1107,9 @@ class _ReviewsSection extends StatelessWidget {
                           const SizedBox(height: 8),
                           Text(
                             date,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF9E9E9E),
+                              color: context.colors.textTertiary,
                             ),
                           ),
                         ],

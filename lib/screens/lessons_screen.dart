@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/lesson_card.dart';
 import 'lesson_meeting_screen.dart';
 
@@ -186,20 +187,20 @@ class _LessonsScreenState extends State<LessonsScreen> {
     final dayBookings = _selectedDayBookings;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
+      backgroundColor: context.colors.surfaceAlt,
       body: SafeArea(
         child: Column(
           children: [
             // Title
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
                 'My lessons',
                 style: TextStyle(
                   fontFamily: 'SF Pro',
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                 ),
               ),
             ),
@@ -207,7 +208,7 @@ class _LessonsScreenState extends State<LessonsScreen> {
             // Scrollable content
             Expanded(
               child: RefreshIndicator(
-                color: const Color(0xFF272942),
+                color: context.colors.textPrimary,
                 onRefresh: () async {
                   await Future.wait([_fetchCalendar(), _fetchBookings()]);
                 },
@@ -233,12 +234,12 @@ class _LessonsScreenState extends State<LessonsScreen> {
 
                     const SizedBox(height: 24),
 
-                    // White bottom section
+                    // Surface bottom section
                     Container(
                       width: double.infinity,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                      decoration: BoxDecoration(
+                        color: context.colors.surface,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                       ),
                       padding: const EdgeInsets.all(20),
                       child: Column(
@@ -254,10 +255,10 @@ class _LessonsScreenState extends State<LessonsScreen> {
 
                           // Loading / Lesson cards / No classes
                           if (_loadingBookings)
-                            const Center(
+                            Center(
                               child: Padding(
-                                padding: EdgeInsets.all(32),
-                                child: CircularProgressIndicator(color: Color(0xFF272942)),
+                                padding: const EdgeInsets.all(32),
+                                child: CircularProgressIndicator(color: context.colors.textPrimary),
                               ),
                             )
                           else if (dayBookings.isNotEmpty)
@@ -336,7 +337,7 @@ class _CalendarCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -346,17 +347,17 @@ class _CalendarCard extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: onPrevMonth,
-                child: const Icon(Icons.chevron_left, color: Color(0xFF272942), size: 24),
+                child: Icon(Icons.chevron_left, color: context.colors.textPrimary, size: 24),
               ),
               Expanded(
                 child: Center(
                   child: Text(
                     '${_monthNames[month]} $year',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                       letterSpacing: 1,
                     ),
                   ),
@@ -364,7 +365,7 @@ class _CalendarCard extends StatelessWidget {
               ),
               GestureDetector(
                 onTap: onNextMonth,
-                child: const Icon(Icons.chevron_right, color: Color(0xFF272942), size: 24),
+                child: Icon(Icons.chevron_right, color: context.colors.textPrimary, size: 24),
               ),
             ],
           ),
@@ -378,11 +379,11 @@ class _CalendarCard extends StatelessWidget {
                       child: Center(
                         child: Text(
                           d,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'SF Pro',
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFFAAAAAA),
+                            color: context.colors.textTertiary,
                             letterSpacing: 0.5,
                           ),
                         ),
@@ -417,10 +418,10 @@ class _CalendarCard extends StatelessWidget {
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFF272942) : null,
+                            color: isSelected ? context.colors.brand : null,
                             borderRadius: BorderRadius.circular(8),
                             border: isToday && !isSelected
-                                ? Border.all(color: const Color(0xFF272942), width: 1.5)
+                                ? Border.all(color: context.colors.brand, width: 1.5)
                                 : null,
                           ),
                           child: Stack(
@@ -434,7 +435,7 @@ class _CalendarCard extends StatelessWidget {
                                   fontWeight: FontWeight.w500,
                                   color: isSelected
                                       ? Colors.white
-                                      : const Color(0xFF272942),
+                                      : context.colors.textPrimary,
                                 ),
                               ),
                               if (hasLesson)
@@ -446,7 +447,7 @@ class _CalendarCard extends StatelessWidget {
                                     decoration: BoxDecoration(
                                       color: isSelected
                                           ? Colors.white
-                                          : const Color(0xFF4CAF50),
+                                          : context.colors.success,
                                       shape: BoxShape.circle,
                                     ),
                                   ),
@@ -492,11 +493,11 @@ class _DateHeader extends StatelessWidget {
         children: [
           Text(
             '$day ${_monthNames[month.month]}, $weekday',
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF6C6C6C),
+              color: context.colors.textSecondary,
             ),
           ),
           const Spacer(),
@@ -504,13 +505,13 @@ class _DateHeader extends StatelessWidget {
             final now = DateTime.now();
             return month.month == now.month && month.year == now.year && day == now.day;
           }())
-            const Text(
+            Text(
               'Today',
               style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF2B85DB),
+                color: context.colors.accentBlue,
                 height: 1.0,
                 letterSpacing: 0,
               ),
@@ -534,7 +535,7 @@ class _NoClassesCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 28),
             decoration: BoxDecoration(
-              color: const Color(0xFFEEEEEE),
+              color: context.colors.surfaceAlt,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
@@ -545,13 +546,13 @@ class _NoClassesCard extends StatelessWidget {
                   height: 32,
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'There are no classes',
                   style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFFAAAAAA),
+                    color: context.colors.textTertiary,
                   ),
                 ),
               ],
@@ -564,7 +565,7 @@ class _NoClassesCard extends StatelessWidget {
               width: double.infinity,
               height: 46,
               decoration: BoxDecoration(
-                color: const Color(0xFF272942),
+                color: context.colors.brand,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Center(
@@ -620,9 +621,9 @@ class _CancelLessonSheetState extends State<CancelLessonSheet> {
 
     return Container(
       margin: EdgeInsets.only(bottom: bottomInset),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
       child: Column(
@@ -632,7 +633,7 @@ class _CancelLessonSheetState extends State<CancelLessonSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: const Color(0xFFDDDDDD),
+              color: context.colors.border,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -640,26 +641,26 @@ class _CancelLessonSheetState extends State<CancelLessonSheet> {
           Container(
             width: 72,
             height: 72,
-            decoration: const BoxDecoration(
-              color: Color(0xFFFFEDED),
+            decoration: BoxDecoration(
+              color: context.colors.errorBg,
               shape: BoxShape.circle,
             ),
-            child: const Center(
+            child: Center(
               child: Icon(
                 Icons.warning_amber_rounded,
-                color: Color(0xFFE53935),
+                color: context.colors.error,
                 size: 40,
               ),
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Cancel Lesson?',
             style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 22,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF272942),
+              color: context.colors.textPrimary,
             ),
           ),
           const SizedBox(height: 10),
@@ -667,23 +668,23 @@ class _CancelLessonSheetState extends State<CancelLessonSheet> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFEDED),
+              color: context.colors.errorBg,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE53935).withValues(alpha: 0.35)),
+              border: Border.all(color: context.colors.error.withValues(alpha: 0.35)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.info_outline_rounded, color: Color(0xFFE53935), size: 18),
+                Icon(Icons.info_outline_rounded, color: context.colors.error, size: 18),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Your payment will NOT be refunded.\nThe lesson fee has already been charged and cancellations are non-reversible.',
                     style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: Color(0xFFB71C1C),
+                      color: context.colors.error,
                       height: 1.45,
                     ),
                   ),
@@ -695,13 +696,13 @@ class _CancelLessonSheetState extends State<CancelLessonSheet> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Reason for cancellation',
                 style: TextStyle(
                   fontFamily: 'SF Pro',
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -711,9 +712,9 @@ class _CancelLessonSheetState extends State<CancelLessonSheet> {
                 maxLines: 3,
                 decoration: InputDecoration(
                   hintText: 'Please explain why you are cancelling…',
-                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFFAAAAAA)),
+                  hintStyle: TextStyle(fontSize: 13, color: context.colors.textTertiary),
                   filled: true,
-                  fillColor: const Color(0xFFF5F5F7),
+                  fillColor: context.colors.surfaceAlt,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -722,22 +723,22 @@ class _CancelLessonSheetState extends State<CancelLessonSheet> {
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: _showError
-                        ? const BorderSide(color: Color(0xFFE53935), width: 1.5)
+                        ? BorderSide(color: context.colors.error, width: 1.5)
                         : BorderSide.none,
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF272942), width: 1.5),
+                    borderSide: BorderSide(color: context.colors.brand, width: 1.5),
                   ),
                 ),
               ),
               if (_showError) ...[
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'A reason is required to cancel.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFFE53935),
+                    color: context.colors.error,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -753,17 +754,17 @@ class _CancelLessonSheetState extends State<CancelLessonSheet> {
                   child: Container(
                     height: 50,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF2F2F4),
+                      color: context.colors.surfaceAlt,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
                         'Keep lesson',
                         style: TextStyle(
                           fontFamily: 'SF Pro',
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF272942),
+                          color: context.colors.textPrimary,
                         ),
                       ),
                     ),
@@ -777,7 +778,7 @@ class _CancelLessonSheetState extends State<CancelLessonSheet> {
                   child: Container(
                     height: 50,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE53935),
+                      color: context.colors.error,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Center(

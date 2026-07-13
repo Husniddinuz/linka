@@ -11,11 +11,14 @@ const double _cardWidth = 172;
 const double _cardHeight = 220;
 const Color _task1Accent = Color(0xFF2F6FED);
 const Color _task2Accent = Color(0xFF8B5CF6);
+const Color _tutorAccent = MockTestColors.green;
 
-/// Real Writing sample essays (Task 1 & 2) for students to study — read-only
-/// reference content, no submission/grading. Shown as swipeable, photo-led
-/// carousels per task. Non-Plus users see the first [_freeSamplesPerTask]
-/// samples of each task normally; the rest sit behind a blurred teaser card.
+/// Tutors with at least one published Writing sample — read-only reference
+/// content, no submission/grading. Tapping a tutor drills into their
+/// submitted topics (see [WritingSampleTutorTopicsScreen]), shown as
+/// swipeable, photo-led Task 1/2 carousels. Non-Plus users see the first
+/// [_freeSamplesPerTask] samples of each task normally; the rest sit behind
+/// a blurred teaser card.
 class WritingSamplesListScreen extends StatefulWidget {
   const WritingSamplesListScreen({super.key});
 
@@ -24,20 +27,7 @@ class WritingSamplesListScreen extends StatefulWidget {
 }
 
 class _WritingSamplesListScreenState extends State<WritingSamplesListScreen> {
-  final Future<List<Map<String, dynamic>>> _future = MockTestService.fetchWritingSamples();
-  bool _isLocked = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkPlusStatus();
-  }
-
-  Future<void> _checkPlusStatus() async {
-    final locked = await mtCheckContentLocked();
-    if (!mounted) return;
-    setState(() => _isLocked = locked);
-  }
+  final Future<List<Map<String, dynamic>>> _future = MockTestService.fetchWritingSampleTutors();
 
   @override
   Widget build(BuildContext context) {
@@ -62,39 +52,267 @@ class _WritingSamplesListScreenState extends State<WritingSamplesListScreen> {
               ),
             );
           }
-          final samples = snapshot.data ?? const [];
-          final task1 = samples.where((s) => s['task_number'] == 1).toList();
-          final task2 = samples.where((s) => s['task_number'] == 2).toList();
-          return ListView(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            children: [
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'Study real, examiner-scored essays — tap a card, then tap a highlight for the tutor\'s note.',
-                  style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, height: 1.4, color: MockTestColors.grey),
+          final tutors = snapshot.data ?? const [];
+          if (tutors.isEmpty) {
+            return const Center(
+              child: Text(
+                'No writing samples yet',
+                style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
+              ),
+            );
+          }
+          return GridView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 14,
+              childAspectRatio: _cardWidth / _cardHeight,
+            ),
+            itemCount: tutors.length,
+            itemBuilder: (context, i) {
+              final tutor = tutors[i];
+              final tutorId = (tutor['tutor_id'] as num?)?.toInt();
+              final tutorName = tutor['tutor_name']?.toString() ?? '';
+              final tutorImageUrl = tutor['tutor_image_url'] as String?;
+              final sampleCount = (tutor['sample_count'] as num?)?.toInt() ?? 0;
+              final writingScore = (tutor['tutor_writing_score'] as num?)?.toString();
+
+              return _TutorCard(
+                tutorName: tutorName,
+                tutorImageUrl: tutorImageUrl,
+                sampleCount: sampleCount,
+                writingScore: writingScore,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => WritingSampleTutorTopicsScreen(
+                      tutorId: tutorId,
+                      tutorName: tutorName,
+                      tutorImageUrl: tutorImageUrl,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              _TaskCarousel(
-                label: 'TASK 1',
-                icon: Icons.bar_chart_rounded,
-                accent: _task1Accent,
-                samples: task1,
-                isLocked: _isLocked,
-              ),
-              const SizedBox(height: 26),
-              _TaskCarousel(
-                label: 'TASK 2',
-                icon: Icons.edit_note_rounded,
-                accent: _task2Accent,
-                samples: task2,
-                isLocked: _isLocked,
-              ),
-              const SizedBox(height: 8),
-            ],
+              );
+            },
           );
         },
+      ),
+    );
+  }
+}
+
+/// One tutor's submitted Writing topics — same Task 1/2 carousel + Plus
+/// paywall presentation as the old flat list, just scoped to a single tutor.
+class WritingSampleTutorTopicsScreen extends StatefulWidget {
+  const WritingSampleTutorTopicsScreen({
+    super.key,
+    required this.tutorId,
+    required this.tutorName,
+    required this.tutorImageUrl,
+  });
+
+  final int? tutorId;
+  final String tutorName;
+  final String? tutorImageUrl;
+
+  @override
+  State<WritingSampleTutorTopicsScreen> createState() => _WritingSampleTutorTopicsScreenState();
+}
+
+class _WritingSampleTutorTopicsScreenState extends State<WritingSampleTutorTopicsScreen> {
+  late final Future<List<Map<String, dynamic>>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = MockTestService.fetchWritingSamples(
+      tutorId: widget.tutorId,
+      tutorName: widget.tutorId == null ? widget.tutorName : null,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: mtAppBar(context, title: widget.tutorName),
+      body: _TutorWritingSamplesBody(future: _future),
+    );
+  }
+}
+
+/// Shared Task 1/2 carousel body (with the Plus paywall gate) for one
+/// tutor's Writing samples — fed by whichever [future] the caller resolves
+/// (currently always a single tutor's topics via [WritingSampleTutorTopicsScreen]).
+class _TutorWritingSamplesBody extends StatefulWidget {
+  const _TutorWritingSamplesBody({required this.future});
+  final Future<List<Map<String, dynamic>>> future;
+
+  @override
+  State<_TutorWritingSamplesBody> createState() => _TutorWritingSamplesBodyState();
+}
+
+class _TutorWritingSamplesBodyState extends State<_TutorWritingSamplesBody> {
+  bool _isLocked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPlusStatus();
+  }
+
+  Future<void> _checkPlusStatus() async {
+    final locked = await mtCheckContentLocked();
+    if (!mounted) return;
+    setState(() => _isLocked = locked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: widget.future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator(color: MockTestColors.yellow));
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'Failed to load: ${snapshot.error}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
+              ),
+            ),
+          );
+        }
+        final samples = snapshot.data ?? const [];
+        final task1 = samples.where((s) => s['task_number'] == 1).toList();
+        final task2 = samples.where((s) => s['task_number'] == 2).toList();
+        return ListView(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Study real, examiner-scored essays — tap a card, then tap a highlight for the tutor\'s note.',
+                style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, height: 1.4, color: MockTestColors.grey),
+              ),
+            ),
+            const SizedBox(height: 20),
+            _TaskCarousel(
+              label: 'TASK 1',
+              icon: Icons.bar_chart_rounded,
+              accent: _task1Accent,
+              samples: task1,
+              isLocked: _isLocked,
+            ),
+            const SizedBox(height: 26),
+            _TaskCarousel(
+              label: 'TASK 2',
+              icon: Icons.edit_note_rounded,
+              accent: _task2Accent,
+              samples: task2,
+              isLocked: _isLocked,
+            ),
+            const SizedBox(height: 8),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Big photo-led tutor card — same visual language as [_EssayCard] (full-bleed
+/// photo, bottom gradient, name overlaid) so picking a tutor feels like the
+/// same browsing experience as picking a topic afterward.
+class _TutorCard extends StatelessWidget {
+  const _TutorCard({
+    required this.tutorName,
+    required this.tutorImageUrl,
+    required this.sampleCount,
+    required this.writingScore,
+    required this.onTap,
+  });
+  final String tutorName;
+  final String? tutorImageUrl;
+  final int sampleCount;
+  final String? writingScore;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Pressable(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (tutorImageUrl != null && tutorImageUrl!.isNotEmpty)
+              Image.network(
+                tutorImageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const _CardPlaceholder(accent: _tutorAccent),
+              )
+            else
+              const _CardPlaceholder(accent: _tutorAccent),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: const [0.4, 1],
+                  colors: [Colors.transparent, Colors.black.withValues(alpha: 0.8)],
+                ),
+              ),
+            ),
+            // The tutor's own IELTS Writing score (their credential) — not
+            // to be confused with an individual sample's band_score.
+            if (writingScore != null)
+              Positioned(
+                top: 10,
+                right: 10,
+                child: MtPill(
+                  background: MockTestColors.yellow,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  child: Text(
+                    'IELTS $writingScore',
+                    style: const TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      color: MockTestColors.navy,
+                    ),
+                  ),
+                ),
+              ),
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    tutorName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontFamily: 'SF Pro', fontSize: 14.5, fontWeight: FontWeight.w700, color: Colors.white, height: 1.25),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$sampleCount topic${sampleCount == 1 ? '' : 's'}',
+                    style: const TextStyle(fontFamily: 'SF Pro', fontSize: 11.5, color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

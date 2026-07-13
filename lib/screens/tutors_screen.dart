@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
+import '../theme/app_colors.dart';
 import 'tutor_profile_screen.dart';
 
 // ─── Data model ─────────────────────────────────────────────────────────────────
@@ -218,7 +219,7 @@ class _TutorsScreenState extends State<TutorsScreen> {
     final result = await showModalBottomSheet<_TutorFilters>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -235,12 +236,13 @@ class _TutorsScreenState extends State<TutorsScreen> {
     _loadTutors();
   }
 
-  List<Widget> _buildActiveFilterChips() {
+  List<Widget> _buildActiveFilterChips(BuildContext context) {
     final chips = <Widget>[];
 
     if (_filters.search != null && _filters.search!.isNotEmpty) {
       chips.add(
         _activeFilterChip(
+          context,
           '"${_filters.search!}"',
           () => _applyFilters(
             _TutorFilters(
@@ -257,6 +259,7 @@ class _TutorsScreenState extends State<TutorsScreen> {
     if (_filters.gender != null) {
       chips.add(
         _activeFilterChip(
+          context,
           _filters.gender!,
           () => _applyFilters(
             _TutorFilters(
@@ -273,6 +276,7 @@ class _TutorsScreenState extends State<TutorsScreen> {
     for (final score in _filters.ieltsScores) {
       chips.add(
         _activeFilterChip(
+          context,
           'IELTS $score',
           () => _applyFilters(
             _TutorFilters(
@@ -295,6 +299,7 @@ class _TutorsScreenState extends State<TutorsScreen> {
           : '${_filters.experienceMin}+ yrs';
       chips.add(
         _activeFilterChip(
+          context,
           label,
           () => _applyFilters(
             _TutorFilters(
@@ -310,11 +315,11 @@ class _TutorsScreenState extends State<TutorsScreen> {
     return chips;
   }
 
-  Widget _activeFilterChip(String label, VoidCallback onRemove) {
+  Widget _activeFilterChip(BuildContext context, String label, VoidCallback onRemove) {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 7, 8, 7),
       decoration: BoxDecoration(
-        color: const Color(0xFF272942),
+        color: context.colors.brand,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -387,7 +392,7 @@ class _TutorsScreenState extends State<TutorsScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -401,7 +406,7 @@ class _TutorsScreenState extends State<TutorsScreen> {
                   if (widget.showBackButton) ...[
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.chevron_left_rounded, color: Color(0xFF272942), size: 30),
+                      child: Icon(Icons.chevron_left_rounded, color: context.colors.textPrimary, size: 30),
                     ),
                     const SizedBox(width: 8),
                   ],
@@ -413,7 +418,7 @@ class _TutorsScreenState extends State<TutorsScreen> {
                         height: 44,
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF5F5F7),
+                          color: context.colors.surfaceAlt,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -424,14 +429,14 @@ class _TutorsScreenState extends State<TutorsScreen> {
                               height: 24,
                             ),
                             const SizedBox(width: 10),
-                            const Expanded(
+                            Expanded(
                               child: Text(
                                 'Search for a tutor',
                                 style: TextStyle(
                                   fontFamily: 'SF Pro',
                                   fontSize: 15,
                                   fontWeight: FontWeight.w400,
-                                  color: Color(0xFFAAAAAA),
+                                  color: context.colors.textTertiary,
                                 ),
                               ),
                             ),
@@ -473,8 +478,8 @@ class _TutorsScreenState extends State<TutorsScreen> {
 
             // Active filter chips
             Builder(
-              builder: (_) {
-                final chips = _buildActiveFilterChips();
+              builder: (context) {
+                final chips = _buildActiveFilterChips(context);
                 if (chips.isEmpty) return const SizedBox(height: 16);
                 return Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
@@ -489,8 +494,8 @@ class _TutorsScreenState extends State<TutorsScreen> {
                         return GestureDetector(
                           onTap: () => _applyFilters(const _TutorFilters()),
                           behavior: HitTestBehavior.opaque,
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 4),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
                             child: Center(
                               child: Text(
                                 'Clear all',
@@ -498,7 +503,7 @@ class _TutorsScreenState extends State<TutorsScreen> {
                                   fontFamily: 'SF Pro',
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF272942),
+                                  color: context.colors.textPrimary,
                                   decoration: TextDecoration.underline,
                                   height: 1.0,
                                 ),
@@ -516,16 +521,16 @@ class _TutorsScreenState extends State<TutorsScreen> {
             // Tutors grid
             Expanded(
               child: RefreshIndicator(
-                color: const Color(0xFF272942),
+                color: context.colors.textPrimary,
                 onRefresh: () => _loadTutors(showSpinner: false),
                 child: _loading
                   ? ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      children: const [
-                        SizedBox(height: 200),
+                      children: [
+                        const SizedBox(height: 200),
                         Center(
                           child: CircularProgressIndicator(
-                            color: Color(0xFF272942),
+                            color: context.colors.textPrimary,
                           ),
                         ),
                       ],
@@ -541,8 +546,8 @@ class _TutorsScreenState extends State<TutorsScreen> {
                             _error != null
                                 ? 'Failed to load tutors'
                                 : 'No tutors found',
-                            style: const TextStyle(
-                              color: Color(0xFF2B2B2B),
+                            style: TextStyle(
+                              color: context.colors.textPrimary,
                               fontSize: 15,
                               fontWeight: FontWeight.w500,
                             ),
@@ -551,8 +556,8 @@ class _TutorsScreenState extends State<TutorsScreen> {
                             const SizedBox(height: 6),
                             Text(
                               _error!,
-                              style: const TextStyle(
-                                color: Color(0xFFAAAAAA),
+                              style: TextStyle(
+                                color: context.colors.textTertiary,
                                 fontSize: 13,
                               ),
                               textAlign: TextAlign.center,
@@ -566,7 +571,7 @@ class _TutorsScreenState extends State<TutorsScreen> {
                                   vertical: 10,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF272942),
+                                  color: context.colors.brand,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Text(
@@ -636,7 +641,7 @@ class _TutorGridCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F7),
+        color: context.colors.surfaceAlt,
         borderRadius: BorderRadius.circular(14),
       ),
       clipBehavior: Clip.hardEdge,
@@ -655,20 +660,20 @@ class _TutorGridCard extends StatelessWidget {
                       fit: BoxFit.cover,
                       alignment: Alignment.center,
                       errorBuilder: (_, _, _) => Container(
-                        color: const Color(0xFFE0E0E0),
-                        child: const Icon(
+                        color: context.colors.border,
+                        child: Icon(
                           Icons.person,
                           size: 40,
-                          color: Color(0xFFAAAAAA),
+                          color: context.colors.textTertiary,
                         ),
                       ),
                     )
                   : Container(
-                      color: const Color(0xFFE0E0E0),
-                      child: const Icon(
+                      color: context.colors.border,
+                      child: Icon(
                         Icons.person,
                         size: 40,
-                        color: Color(0xFFAAAAAA),
+                        color: context.colors.textTertiary,
                       ),
                     ),
             ),
@@ -680,7 +685,7 @@ class _TutorGridCard extends StatelessWidget {
             margin: const EdgeInsets.all(6),
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.colors.surface,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -689,11 +694,11 @@ class _TutorGridCard extends StatelessWidget {
                 // Name
                 Text(
                   tutor.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF2B2B2B),
+                    color: context.colors.textPrimary,
                     height: 1.0,
                   ),
                 ),
@@ -703,11 +708,11 @@ class _TutorGridCard extends StatelessWidget {
                 // Experience
                 Text(
                   'Experience: +${tutor.experience} yrs',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
-                    color: Color(0xFF6C6C6C),
+                    color: context.colors.textSecondary,
                     height: 1.0,
                   ),
                 ),
@@ -724,16 +729,16 @@ class _TutorGridCard extends StatelessWidget {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF2F2F2),
+                        color: context.colors.surfaceAlt,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         'IELTS ${tutor.score % 1 == 0 ? tutor.score.toInt() : tutor.score}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'SF Pro',
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFFC62828),
+                          color: context.colors.error,
                           height: 1.0,
                         ),
                       ),
@@ -783,7 +788,7 @@ class _SearchView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -809,17 +814,17 @@ class _SearchView extends StatelessWidget {
                       onSubmitted: (value) {
                         if (value.trim().isNotEmpty) onSearch(value.trim());
                       },
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'SF Pro',
                         fontSize: 15,
-                        color: Color(0xFF2B2B2B),
+                        color: context.colors.textPrimary,
                       ),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Search for a tutor',
                         hintStyle: TextStyle(
                           fontFamily: 'SF Pro',
                           fontSize: 15,
-                          color: Color(0xFFAAAAAA),
+                          color: context.colors.textTertiary,
                         ),
                         border: InputBorder.none,
                       ),
@@ -827,9 +832,9 @@ class _SearchView extends StatelessWidget {
                   ),
                   GestureDetector(
                     onTap: onClose,
-                    child: const Icon(
+                    child: Icon(
                       Icons.close,
-                      color: Color(0xFF2B2B2B),
+                      color: context.colors.textPrimary,
                       size: 24,
                     ),
                   ),
@@ -837,18 +842,18 @@ class _SearchView extends StatelessWidget {
               ),
             ),
 
-            const Divider(color: Color(0xFFEEEEEE)),
+            Divider(color: context.colors.border),
 
             // Recent searches header
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 12, 20, 12),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
               child: Text(
                 'Recent searches',
                 style: TextStyle(
                   fontFamily: 'SF Pro',
                   fontSize: 13,
                   fontWeight: FontWeight.w400,
-                  color: Color(0xFFAAAAAA),
+                  color: context.colors.textTertiary,
                 ),
               ),
             ),
@@ -863,10 +868,10 @@ class _SearchView extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.access_time_rounded,
                       size: 20,
-                      color: Color(0xFFAAAAAA),
+                      color: context.colors.textTertiary,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -875,20 +880,20 @@ class _SearchView extends StatelessWidget {
                         behavior: HitTestBehavior.opaque,
                         child: Text(
                           recentSearches[i],
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'SF Pro',
                             fontSize: 15,
-                            color: Color(0xFF2B2B2B),
+                            color: context.colors.textPrimary,
                           ),
                         ),
                       ),
                     ),
                     GestureDetector(
                       onTap: () => onRemove(i),
-                      child: const Icon(
+                      child: Icon(
                         Icons.close,
                         size: 18,
-                        color: Color(0xFFAAAAAA),
+                        color: context.colors.textTertiary,
                       ),
                     ),
                   ],
@@ -1034,7 +1039,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                 height: 4,
                 margin: const EdgeInsets.only(top: 10, bottom: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDDDDDD),
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -1044,22 +1049,22 @@ class _FilterSheetState extends State<_FilterSheet> {
             Row(
               children: [
                 const Spacer(),
-                const Text(
+                Text(
                   'Filters',
                   style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF2B2B2B),
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 const Spacer(),
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Icon(
+                  child: Icon(
                     Icons.close,
                     size: 24,
-                    color: Color(0xFF2B2B2B),
+                    color: context.colors.textPrimary,
                   ),
                 ),
               ],
@@ -1069,6 +1074,7 @@ class _FilterSheetState extends State<_FilterSheet> {
 
             // Availability
             _sectionTitleSvg(
+              context,
               'assets/images/icons/calendar_outline_20.svg',
               'Availability',
             ),
@@ -1079,23 +1085,25 @@ class _FilterSheetState extends State<_FilterSheet> {
               children: [
                 ..._selectedDays.map(
                   (d) => _chipButton(
+                    context,
                     d,
                     true,
                     () => setState(() => _selectedDays.remove(d)),
                   ),
                 ),
-                _chipButton('+ Add a day', false, () {
+                _chipButton(context, '+ Add a day', false, () {
                   _openCalendarDialog(context);
                 }),
               ],
             ),
 
             const SizedBox(height: 28),
-            const Divider(color: Color(0xFFEEEEEE)),
+            Divider(color: context.colors.border),
             const SizedBox(height: 20),
 
             // Time
             _sectionTitleSvg(
+              context,
               'assets/images/icons/recent_outline_grey.svg',
               'Time',
             ),
@@ -1106,6 +1114,7 @@ class _FilterSheetState extends State<_FilterSheet> {
               children: _timeSlots
                   .map(
                     (t) => _chipButton(
+                      context,
                       t,
                       _selectedTimes.contains(t),
                       () => setState(() {
@@ -1119,11 +1128,12 @@ class _FilterSheetState extends State<_FilterSheet> {
             ),
 
             const SizedBox(height: 28),
-            const Divider(color: Color(0xFFEEEEEE)),
+            Divider(color: context.colors.border),
             const SizedBox(height: 20),
 
             // IELTS score
             _sectionTitleSvg(
+              context,
               'assets/images/icons/live_outline_20.svg',
               'IELTS score',
             ),
@@ -1134,6 +1144,7 @@ class _FilterSheetState extends State<_FilterSheet> {
               children: _ieltsScores
                   .map(
                     (s) => _chipButton(
+                      context,
                       s,
                       _selectedScores.contains(s),
                       () => setState(() {
@@ -1149,11 +1160,12 @@ class _FilterSheetState extends State<_FilterSheet> {
             ),
 
             const SizedBox(height: 28),
-            const Divider(color: Color(0xFFEEEEEE)),
+            Divider(color: context.colors.border),
             const SizedBox(height: 20),
 
             // Gender
             _sectionTitleSvg(
+              context,
               'assets/images/icons/accessibility_outline_20 (1).svg',
               'Gender',
             ),
@@ -1163,6 +1175,7 @@ class _FilterSheetState extends State<_FilterSheet> {
               children: _genders
                   .map(
                     (g) => _chipButton(
+                      context,
                       g,
                       _selectedGender == g,
                       () => setState(
@@ -1174,11 +1187,12 @@ class _FilterSheetState extends State<_FilterSheet> {
             ),
 
             const SizedBox(height: 28),
-            const Divider(color: Color(0xFFEEEEEE)),
+            Divider(color: context.colors.border),
             const SizedBox(height: 20),
 
             // Experience
             _sectionTitleSvg(
+              context,
               'assets/images/icons/work_outline_20.svg',
               'Experience',
             ),
@@ -1189,6 +1203,7 @@ class _FilterSheetState extends State<_FilterSheet> {
               children: _experiences
                   .map(
                     (e) => _chipButton(
+                      context,
                       e,
                       _selectedExperience == e,
                       () => setState(
@@ -1205,7 +1220,7 @@ class _FilterSheetState extends State<_FilterSheet> {
 
             // Apply button
             Builder(
-              builder: (_) {
+              builder: (context) {
                 final hasSelection =
                     _selectedTimes.isNotEmpty ||
                     _selectedScores.isNotEmpty ||
@@ -1219,8 +1234,8 @@ class _FilterSheetState extends State<_FilterSheet> {
                     height: 50,
                     decoration: BoxDecoration(
                       color: hasSelection
-                          ? const Color(0xFF272942)
-                          : const Color(0xFFDDDDDD),
+                          ? context.colors.brand
+                          : context.colors.border,
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Center(
@@ -1232,7 +1247,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                           fontWeight: FontWeight.w600,
                           color: hasSelection
                               ? Colors.white
-                              : const Color(0xFF6C6C6C),
+                              : context.colors.textSecondary,
                         ),
                       ),
                     ),
@@ -1248,31 +1263,31 @@ class _FilterSheetState extends State<_FilterSheet> {
     );
   }
 
-  Widget _sectionTitleSvg(String svgPath, String title) {
+  Widget _sectionTitleSvg(BuildContext context, String svgPath, String title) {
     return Row(
       children: [
         SvgPicture.asset(svgPath, width: 20, height: 20),
         const SizedBox(width: 8),
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'SF Pro',
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF2B2B2B),
+            color: context.colors.textPrimary,
           ),
         ),
       ],
     );
   }
 
-  Widget _chipButton(String label, bool selected, VoidCallback onTap) {
+  Widget _chipButton(BuildContext context, String label, bool selected, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF272942) : const Color(0xFFF5F5F7),
+          color: selected ? context.colors.brand : context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
@@ -1281,7 +1296,7 @@ class _FilterSheetState extends State<_FilterSheet> {
             fontFamily: 'SF Pro',
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: selected ? Colors.white : const Color(0xFF2B2B2B),
+            color: selected ? Colors.white : context.colors.textPrimary,
           ),
         ),
       ),
@@ -1309,7 +1324,7 @@ class _SavedTutorsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -1321,13 +1336,13 @@ class _SavedTutorsView extends StatelessWidget {
                 children: [
                   GestureDetector(
                     onTap: onClose,
-                    child: const Icon(
+                    child: Icon(
                       Icons.chevron_left_rounded,
                       size: 30,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                     ),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
                         'Saved tutors',
@@ -1335,7 +1350,7 @@ class _SavedTutorsView extends StatelessWidget {
                           fontFamily: 'SF Pro',
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF272942),
+                          color: context.colors.textPrimary,
                         ),
                       ),
                     ),
@@ -1349,8 +1364,8 @@ class _SavedTutorsView extends StatelessWidget {
             // Content
             Expanded(
               child: loading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: Color(0xFF272942)),
+                  ? Center(
+                      child: CircularProgressIndicator(color: context.colors.textPrimary),
                     )
                   : tutors.isEmpty
                       ? Center(
@@ -1363,13 +1378,13 @@ class _SavedTutorsView extends StatelessWidget {
                                 height: 40,
                               ),
                               const SizedBox(height: 12),
-                              const Text(
+                              Text(
                                 'No saved tutors yet',
                                 style: TextStyle(
                                   fontFamily: 'SF Pro',
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
-                                  color: Color(0xFFAAAAAA),
+                                  color: context.colors.textTertiary,
                                 ),
                               ),
                             ],
@@ -1475,7 +1490,7 @@ class _FilterCalendar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -1492,9 +1507,9 @@ class _FilterCalendar extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: onPrevMonth,
-                child: const Icon(
+                child: Icon(
                   Icons.chevron_left,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                   size: 24,
                 ),
               ),
@@ -1502,11 +1517,11 @@ class _FilterCalendar extends StatelessWidget {
                 child: Center(
                   child: Text(
                     '${_monthNames[month]} $year',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                       letterSpacing: 1,
                     ),
                   ),
@@ -1514,9 +1529,9 @@ class _FilterCalendar extends StatelessWidget {
               ),
               GestureDetector(
                 onTap: onNextMonth,
-                child: const Icon(
+                child: Icon(
                   Icons.chevron_right,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                   size: 24,
                 ),
               ),
@@ -1530,11 +1545,11 @@ class _FilterCalendar extends StatelessWidget {
                     child: Center(
                       child: Text(
                         d,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'SF Pro',
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFFAAAAAA),
+                          color: context.colors.textTertiary,
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -1564,11 +1579,11 @@ class _FilterCalendar extends StatelessWidget {
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFF272942) : null,
+                            color: isSelected ? context.colors.brand : null,
                             borderRadius: BorderRadius.circular(8),
                             border: isTodayDay && !isSelected
                                 ? Border.all(
-                                    color: const Color(0xFF272942),
+                                    color: context.colors.brand,
                                     width: 1.5,
                                   )
                                 : null,
@@ -1582,7 +1597,7 @@ class _FilterCalendar extends StatelessWidget {
                                 fontWeight: FontWeight.w500,
                                 color: isSelected
                                     ? Colors.white
-                                    : const Color(0xFF272942),
+                                    : context.colors.textPrimary,
                               ),
                             ),
                           ),

@@ -330,10 +330,10 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFF272942) : null,
+                            color: isSelected ? context.colors.brand : null,
                             borderRadius: BorderRadius.circular(8),
                             border: isToday && !isSelected
-                                ? Border.all(color: const Color(0xFF272942), width: 1.5)
+                                ? Border.all(color: context.colors.brand, width: 1.5)
                                 : null,
                           ),
                           child: Center(
@@ -344,10 +344,10 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                                 fontSize: 15,
                                 fontWeight: FontWeight.w500,
                                 color: isPast
-                                    ? const Color(0xFFCCCCCC)
+                                    ? context.colors.textTertiary
                                     : isSelected
                                         ? Colors.white
-                                        : const Color(0xFF272942),
+                                        : context.colors.textPrimary,
                               ),
                             ),
                           ),
@@ -372,11 +372,11 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
     final label = '${d.day} ${_monthNames[d.month - 1]}, ${_dayOfWeekNames[d.weekday - 1]}';
     return Text(
       label,
-      style: const TextStyle(
+      style: TextStyle(
         fontFamily: 'SF Pro',
         fontSize: 16,
         fontWeight: FontWeight.w700,
-        color: Color(0xFF272942),
+        color: context.colors.textPrimary,
       ),
     );
   }
@@ -388,13 +388,13 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Lesson duration',
           style: TextStyle(
             fontFamily: 'SF Pro',
             fontSize: 15,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
           ),
         ),
         const SizedBox(height: 12),
@@ -412,10 +412,10 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: selected ? const Color(0xFF272942) : Colors.white,
+                  color: selected ? context.colors.brand : context.colors.surface,
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: selected ? const Color(0xFF272942) : const Color(0xFFDDDDDD),
+                    color: selected ? context.colors.brand : context.colors.border,
                     width: 1.5,
                   ),
                 ),
@@ -425,7 +425,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                     fontFamily: 'SF Pro',
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: selected ? Colors.white : const Color(0xFF272942),
+                    color: selected ? Colors.white : context.colors.textPrimary,
                   ),
                 ),
               ),
@@ -442,33 +442,33 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Available slots',
           style: TextStyle(
             fontFamily: 'SF Pro',
             fontSize: 15,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
           ),
         ),
         const SizedBox(height: 12),
         if (_isLoadingSlots)
-          const Center(
+          Center(
             child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(vertical: 12),
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
               ),
             ),
           )
         else if (_slots.isEmpty)
-          const Text(
+          Text(
             'No available slots for this day',
             style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 14,
-              color: Color(0xFF9E9E9E),
+              color: context.colors.textSecondary,
             ),
           )
         else
@@ -485,10 +485,10 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: selected ? const Color(0xFF272942) : Colors.white,
+                    color: selected ? context.colors.brand : context.colors.surface,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: selected ? const Color(0xFF272942) : const Color(0xFFDDDDDD),
+                      color: selected ? context.colors.brand : context.colors.border,
                       width: 1.5,
                     ),
                   ),
@@ -498,7 +498,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                       fontFamily: 'SF Pro',
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: selected ? Colors.white : const Color(0xFF272942),
+                      color: selected ? Colors.white : context.colors.textPrimary,
                     ),
                   ),
                 ),
@@ -515,13 +515,13 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Time',
           style: TextStyle(
             fontFamily: 'SF Pro',
             fontSize: 15,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
           ),
         ),
         const SizedBox(height: 12),
@@ -532,12 +532,12 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Start',
                     style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 12,
-                      color: Color(0xFF9E9E9E),
+                      color: context.colors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -545,7 +545,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF5F5F7),
+                      color: context.colors.surfaceAlt,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -555,8 +555,8 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: _startTime != null
-                            ? const Color(0xFF272942)
-                            : const Color(0xFFAAAAAA),
+                            ? context.colors.textPrimary
+                            : context.colors.textTertiary,
                       ),
                     ),
                   ),
@@ -569,12 +569,12 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'End',
                     style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 12,
-                      color: Color(0xFF9E9E9E),
+                      color: context.colors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -582,7 +582,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF5F5F7),
+                      color: context.colors.surfaceAlt,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -592,8 +592,8 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: _endTime != null
-                            ? const Color(0xFF272942)
-                            : const Color(0xFFAAAAAA),
+                            ? context.colors.textPrimary
+                            : context.colors.textTertiary,
                       ),
                     ),
                   ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
 import '../services/user_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/skeleton.dart';
 
@@ -81,7 +82,7 @@ class _TutorScheduleScreenState extends State<TutorScheduleScreen> {
     final added = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -105,7 +106,7 @@ class _TutorScheduleScreenState extends State<TutorScheduleScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
+      backgroundColor: context.colors.surfaceAlt,
       body: SafeArea(
         child: Column(
           children: [
@@ -118,7 +119,7 @@ class _TutorScheduleScreenState extends State<TutorScheduleScreen> {
           ? null
           : FloatingActionButton(
               onPressed: _openAddSheet,
-              backgroundColor: const Color(0xFF272942),
+              backgroundColor: context.colors.brand,
               foregroundColor: Colors.white,
               elevation: 2,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -129,26 +130,26 @@ class _TutorScheduleScreenState extends State<TutorScheduleScreen> {
 
   Widget _buildHeader() {
     return Container(
-      color: Colors.white,
+      color: context.colors.surface,
       padding: const EdgeInsets.fromLTRB(8, 12, 16, 12),
       child: Row(
         children: [
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
             behavior: HitTestBehavior.opaque,
-            child: const Padding(
-              padding: EdgeInsets.all(8),
-              child: Icon(Icons.chevron_left_rounded, size: 28, color: Color(0xFF272942)),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Icon(Icons.chevron_left_rounded, size: 28, color: context.colors.textPrimary),
             ),
           ),
-          const Expanded(
+          Expanded(
             child: Text(
               'My Schedule',
               style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
               ),
             ),
           ),
@@ -166,7 +167,7 @@ class _TutorScheduleScreenState extends State<TutorScheduleScreen> {
     final sortedDays = grouped.keys.toList()..sort();
 
     return RefreshIndicator(
-      color: const Color(0xFF272942),
+      color: context.colors.textPrimary,
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
@@ -207,22 +208,22 @@ class _DaySection extends StatelessWidget {
           children: [
             Text(
               dayName,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
                 letterSpacing: 0.2,
               ),
             ),
             const SizedBox(width: 8),
             Text(
               '· ${slots.length} slot${slots.length == 1 ? '' : 's'}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 13,
                 fontWeight: FontWeight.w400,
-                color: Color(0xFFAAAAAA),
+                color: context.colors.textTertiary,
               ),
             ),
           ],
@@ -230,7 +231,7 @@ class _DaySection extends StatelessWidget {
         const SizedBox(height: 10),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: context.colors.surface,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
@@ -248,7 +249,7 @@ class _DaySection extends StatelessWidget {
                   onDelete: () => onDelete((slots[i]['id'] as num).toInt()),
                 ),
                 if (i < slots.length - 1)
-                  const Divider(height: 1, indent: 16, endIndent: 16, color: Color(0xFFF0F0F0)),
+                  Divider(height: 1, indent: 16, endIndent: 16, color: context.colors.border),
               ],
             ],
           ),
@@ -298,9 +299,9 @@ class _SlotRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.access_time_rounded,
-            color: Color(0xFFCCCCCC),
+            color: context.colors.textTertiary,
             size: 18,
           ),
           const SizedBox(width: 12),
@@ -312,11 +313,11 @@ class _SlotRow extends StatelessWidget {
                   children: [
                     Text(
                       from,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'SF Pro',
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF272942),
+                        color: context.colors.textPrimary,
                       ),
                     ),
                     Padding(
@@ -325,7 +326,7 @@ class _SlotRow extends StatelessWidget {
                         width: 20,
                         height: 2,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFCCCCCC),
+                          color: context.colors.textTertiary,
                           borderRadius: BorderRadius.circular(1),
                         ),
                       ),
@@ -336,7 +337,7 @@ class _SlotRow extends StatelessWidget {
                         fontFamily: 'SF Pro',
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
-                        color: until != null ? const Color(0xFF272942) : const Color(0xFFCCCCCC),
+                        color: until != null ? context.colors.textPrimary : context.colors.textTertiary,
                       ),
                     ),
                   ],
@@ -344,10 +345,10 @@ class _SlotRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   'From  ·  Until',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 11,
-                    color: Color(0xFFAAAAAA),
+                    color: context.colors.textTertiary,
                     letterSpacing: 0.3,
                   ),
                 ),
@@ -357,11 +358,11 @@ class _SlotRow extends StatelessWidget {
           GestureDetector(
             onTap: () => _confirmDelete(context),
             behavior: HitTestBehavior.opaque,
-            child: const Padding(
-              padding: EdgeInsets.all(4),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
               child: Icon(
                 Icons.delete_outline_rounded,
-                color: Color(0xFFCCCCCC),
+                color: context.colors.textTertiary,
                 size: 20,
               ),
             ),
@@ -376,22 +377,22 @@ class _SlotRow extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
+        title: Text(
           'Remove slot?',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF272942)),
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: ctx.colors.textPrimary),
         ),
-        content: const Text(
+        content: Text(
           'Remove this availability window?',
-          style: TextStyle(fontSize: 14, color: Color(0xFF555555)),
+          style: TextStyle(fontSize: 14, color: ctx.colors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF999999))),
+            child: Text('Cancel', style: TextStyle(color: ctx.colors.textSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Remove', style: TextStyle(color: Color(0xFFE74C3C))),
+            child: Text('Remove', style: TextStyle(color: ctx.colors.error)),
           ),
         ],
       ),
@@ -497,40 +498,40 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
               child: Container(
                 width: 36, height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDDDDDD),
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'Add availability',
               style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Set when you\'re available for lessons',
               style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 13,
-                color: Color(0xFFAAAAAA),
+                color: context.colors.textTertiary,
               ),
             ),
             const SizedBox(height: 24),
 
             // Day picker
-            const Text(
+            Text(
               'DAY OF WEEK',
               style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFFAAAAAA),
+                color: context.colors.textTertiary,
                 letterSpacing: 0.8,
               ),
             ),
@@ -550,11 +551,11 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: selected ? const Color(0xFF272942) : const Color(0xFFF2F2F2),
+                        color: selected ? context.colors.brand : context.colors.surfaceAlt,
                         borderRadius: BorderRadius.circular(22),
                         border: selected
                             ? null
-                            : Border.all(color: const Color(0xFFEEEEEE)),
+                            : Border.all(color: context.colors.border),
                       ),
                       child: Text(
                         _dayAbbr[i],
@@ -562,7 +563,7 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                           fontFamily: 'SF Pro',
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: selected ? Colors.white : const Color(0xFF555555),
+                          color: selected ? Colors.white : context.colors.textSecondary,
                           letterSpacing: 0.3,
                         ),
                       ),
@@ -574,13 +575,13 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
             const SizedBox(height: 24),
 
             // Time pickers
-            const Text(
+            Text(
               'TIME RANGE',
               style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFFAAAAAA),
+                color: context.colors.textTertiary,
                 letterSpacing: 0.8,
               ),
             ),
@@ -588,9 +589,9 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
             Container(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8F8FA),
+                color: context.colors.surfaceAlt,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFEEEEEE)),
+                border: Border.all(color: context.colors.border),
               ),
               child: Row(
                 children: [
@@ -599,11 +600,11 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                       children: [
                         Text(
                           'FROM',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'SF Pro',
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFFAAAAAA),
+                            color: context.colors.textTertiary,
                             letterSpacing: 0.8,
                           ),
                         ),
@@ -616,14 +617,14 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                               controller: _startHourCtrl,
                               onChanged: (i) => setState(() => _startHour = i),
                             ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 4),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
                               child: Text(
                                 ':',
                                 style: TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF272942),
+                                  color: context.colors.textPrimary,
                                 ),
                               ),
                             ),
@@ -645,7 +646,7 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                         height: 2,
                         margin: const EdgeInsets.symmetric(horizontal: 8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFDDDDDD),
+                          color: context.colors.border,
                           borderRadius: BorderRadius.circular(1),
                         ),
                       ),
@@ -656,11 +657,11 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                       children: [
                         Text(
                           'UNTIL',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'SF Pro',
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFFAAAAAA),
+                            color: context.colors.textTertiary,
                             letterSpacing: 0.8,
                           ),
                         ),
@@ -673,14 +674,14 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                               controller: _endHourCtrl,
                               onChanged: (i) => setState(() => _endHour = i),
                             ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 4),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
                               child: Text(
                                 ':',
                                 style: TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF272942),
+                                  color: context.colors.textPrimary,
                                 ),
                               ),
                             ),
@@ -707,7 +708,7 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                 height: 54,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _valid ? const Color(0xFF272942) : const Color(0xFFDDDDDD),
+                  color: _valid ? context.colors.brand : context.colors.border,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: _saving
@@ -757,7 +758,7 @@ class _DrumPicker extends StatelessWidget {
             child: Container(
               height: 40,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
@@ -781,11 +782,11 @@ class _DrumPicker extends StatelessWidget {
               builder: (_, i) => Center(
                 child: Text(
                   items[i],
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                   ),
                 ),
               ),
@@ -815,7 +816,7 @@ class _LoadingSkeleton extends StatelessWidget {
             const SizedBox(height: 10),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
@@ -863,7 +864,7 @@ class _EmptyState extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: const Color(0xFFEEEEEE),
+                color: context.colors.surfaceAlt,
                 shape: BoxShape.circle,
               ),
               child: Center(
@@ -871,31 +872,31 @@ class _EmptyState extends StatelessWidget {
                   'assets/images/icons/calendar_outline_20.svg',
                   width: 36,
                   height: 36,
-                  colorFilter: const ColorFilter.mode(
-                    Color(0xFFAAAAAA),
+                  colorFilter: ColorFilter.mode(
+                    context.colors.textTertiary,
                     BlendMode.srcIn,
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'No slots yet',
               style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Add your available windows so students know when to book you.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 14,
-                color: Color(0xFFAAAAAA),
+                color: context.colors.textTertiary,
                 height: 1.5,
               ),
             ),
@@ -905,7 +906,7 @@ class _EmptyState extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF272942),
+                  color: context.colors.brand,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Row(
@@ -951,20 +952,20 @@ class _ErrorState extends StatelessWidget {
             Container(
               width: 64,
               height: 64,
-              decoration: const BoxDecoration(
-                color: Color(0xFFEEEEEE),
+              decoration: BoxDecoration(
+                color: context.colors.surfaceAlt,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.wifi_off_rounded, color: Color(0xFFAAAAAA), size: 28),
+              child: Icon(Icons.wifi_off_rounded, color: context.colors.textTertiary, size: 28),
             ),
             const SizedBox(height: 16),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 14,
-                color: Color(0xFF999999),
+                color: context.colors.textSecondary,
                 height: 1.4,
               ),
             ),
@@ -974,7 +975,7 @@ class _ErrorState extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF272942),
+                  color: context.colors.brand,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(

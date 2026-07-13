@@ -1772,8 +1772,8 @@ class _IeltsSection extends StatelessWidget {
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 22,
+                      horizontal: 20,
+                      vertical: 14,
                     ),
                     child: Row(
                       children: [
@@ -1782,106 +1782,66 @@ class _IeltsSection extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.22),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: const Text(
-                                  'SPECIAL OFFER',
-                                  style: TextStyle(
-                                    fontFamily: 'SF Pro',
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                    letterSpacing: 1.6,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
                               const Text(
                                 'Register for IELTS',
                                 style: TextStyle(
                                   fontFamily: 'SF Pro',
-                                  fontSize: 18,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
                                   height: 1.2,
                                 ),
                               ),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 3),
                               Text(
                                 'Get 1 month of Linka Plus, free',
                                 style: TextStyle(
                                   fontFamily: 'SF Pro',
-                                  fontSize: 12,
+                                  fontSize: 11.5,
                                   fontWeight: FontWeight.w500,
                                   color: Colors.white.withValues(alpha: 0.85),
-                                  height: 1.4,
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF8A001C)
-                                          .withValues(alpha: 0.25),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      'Register now',
-                                      style: TextStyle(
-                                        fontFamily: 'SF Pro',
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFFC8102E),
-                                      ),
-                                    ),
-                                    SizedBox(width: 6),
-                                    Icon(
-                                      Icons.arrow_forward_rounded,
-                                      color: Color(0xFFC8102E),
-                                      size: 16,
-                                    ),
-                                  ],
+                                  height: 1.3,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        SizedBox(
-                          width: 80,
-                          child: Center(
-                            child: Container(
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.18),
-                                shape: BoxShape.circle,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF8A001C)
+                                    .withValues(alpha: 0.25),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
                               ),
-                              child: const Icon(
-                                Icons.school_rounded,
-                                color: Colors.white,
-                                size: 34,
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Register',
+                                style: TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFFC8102E),
+                                ),
                               ),
-                            ),
+                              SizedBox(width: 4),
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                color: Color(0xFFC8102E),
+                                size: 14,
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -1910,6 +1870,8 @@ class _IeltsSection extends StatelessWidget {
                       child: _IeltsActionButton(
                         label: 'Speaking Samples',
                         icon: Icons.record_voice_over_rounded,
+                        colors: const [Color(0xFFFF9500), Color(0xFFF08300), Color(0xFFCC6D00)],
+                        shadowColor: const Color(0xFF8F4C00),
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1924,6 +1886,8 @@ class _IeltsSection extends StatelessWidget {
                       child: _IeltsActionButton(
                         label: 'Writing Samples',
                         icon: Icons.edit_rounded,
+                        colors: const [Color(0xFF8A7EF0), Color(0xFF7C6CE8), Color(0xFF5F4FC7)],
+                        shadowColor: const Color(0xFF3F3494),
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1943,6 +1907,8 @@ class _IeltsSection extends StatelessWidget {
                     label: 'Mock Exams',
                     subtitle: 'Reading · Listening\nWriting · Speaking',
                     icon: Icons.assignment_rounded,
+                    colors: const [Color(0xFF34C759), Color(0xFF2CAF4F), Color(0xFF1F8A3D)],
+                    shadowColor: const Color(0xFF14602A),
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const MockExamsScreen()),
@@ -1965,6 +1931,8 @@ class _IeltsActionButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final bool large;
+  final List<Color> colors;
+  final Color shadowColor;
 
   const _IeltsActionButton({
     required this.label,
@@ -1972,6 +1940,8 @@ class _IeltsActionButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.large = false,
+    this.colors = const [Color(0xFFE4002B), Color(0xFFC8102E), Color(0xFFA30021)],
+    this.shadowColor = const Color(0xFF8A001C),
   });
 
   @override
@@ -1980,15 +1950,15 @@ class _IeltsActionButton extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
+          gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFE4002B), Color(0xFFC8102E), Color(0xFFA30021)],
+            colors: colors,
           ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF8A001C).withValues(alpha: 0.28),
+              color: shadowColor.withValues(alpha: 0.28),
               blurRadius: 12,
               offset: const Offset(0, 5),
             ),

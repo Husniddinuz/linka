@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../services/chat_service.dart';
+import '../theme/app_colors.dart';
 import 'channel_chat_screen.dart';
 
 // ─── Models ────────────────────────────────────────────────────────────────────
@@ -264,7 +265,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -278,8 +279,8 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF5B7FD4)),
+      return Center(
+        child: CircularProgressIndicator(color: context.colors.accentBlue),
       );
     }
     if (_error != null) {
@@ -292,14 +293,14 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Color(0xFF888888)),
+                style: TextStyle(color: context.colors.textSecondary),
               ),
               const SizedBox(height: 16),
               TextButton(
                 onPressed: _loadChannels,
-                child: const Text(
+                child: Text(
                   'Retry',
-                  style: TextStyle(color: Color(0xFF5B7FD4)),
+                  style: TextStyle(color: context.colors.accentBlue),
                 ),
               ),
             ],
@@ -309,7 +310,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     }
     return RefreshIndicator(
       onRefresh: _loadChannels,
-      color: const Color(0xFF5B7FD4),
+      color: context.colors.accentBlue,
       child: ListView.builder(
         itemCount: _channels.length,
         itemBuilder: (_, i) => _ChannelTile(
@@ -324,18 +325,18 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
 
   Widget _buildHeader() {
     return Container(
-      color: Colors.white,
+      color: context.colors.surface,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Text(
+          Text(
             'Chats',
             style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 26,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF272942),
+              color: context.colors.textPrimary,
             ),
           ),
           if (_onlineCount > 0) ...[
@@ -343,10 +344,10 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFFF0FFF4),
+                color: context.colors.successBg,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: const Color(0xFF4CAF50).withValues(alpha: 0.35),
+                  color: context.colors.success.withValues(alpha: 0.35),
                 ),
               ),
               child: Row(
@@ -355,19 +356,19 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
                   Container(
                     width: 6,
                     height: 6,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF4CAF50),
+                    decoration: BoxDecoration(
+                      color: context.colors.success,
                       shape: BoxShape.circle,
                     ),
                   ),
                   const SizedBox(width: 5),
                   Text(
                     '$_onlineCount online',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF2E7D32),
+                      color: context.colors.success,
                     ),
                   ),
                 ],
@@ -434,11 +435,11 @@ class _ChannelTile extends StatelessWidget {
                               children: [
                                 Text(
                                   '# ${channel.name}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontFamily: 'SF Pro',
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
-                                    color: Color(0xFF111111),
+                                    color: context.colors.textPrimary,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -457,8 +458,8 @@ class _ChannelTile extends StatelessWidget {
                                 fontFamily: 'SF Pro',
                                 fontSize: 12,
                                 color: channel.unreadCount > 0
-                                    ? const Color(0xFF5B7FD4)
-                                    : const Color(0xFFAAAAAA),
+                                    ? context.colors.accentBlue
+                                    : context.colors.textTertiary,
                               ),
                             ),
                         ],
@@ -466,7 +467,7 @@ class _ChannelTile extends StatelessWidget {
                       const SizedBox(height: 3),
                       Row(
                         children: [
-                          Expanded(child: _buildPreview()),
+                          Expanded(child: _buildPreview(context)),
                           if (channel.unreadCount > 0) ...[
                             const SizedBox(width: 8),
                             _UnreadBadge(count: channel.unreadCount),
@@ -480,25 +481,25 @@ class _ChannelTile extends StatelessWidget {
             ),
           ),
           if (showDivider)
-            const Padding(
-              padding: EdgeInsets.only(left: 82),
-              child: Divider(height: 1, color: Color(0xFFF0F0F0)),
+            Padding(
+              padding: const EdgeInsets.only(left: 82),
+              child: Divider(height: 1, color: context.colors.border),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildPreview() {
+  Widget _buildPreview(BuildContext context) {
     if (typingText != null) {
       return Text(
         '$typingText is typing...',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: 'SF Pro',
           fontSize: 14,
-          color: Color(0xFF5B7FD4),
+          color: context.colors.accentBlue,
           fontStyle: FontStyle.italic,
         ),
       );
@@ -508,12 +509,12 @@ class _ChannelTile extends StatelessWidget {
     final message = channel.lastMessage;
 
     if (senderName == null && message == null) {
-      return const Text(
+      return Text(
         'No messages yet',
         style: TextStyle(
           fontFamily: 'SF Pro',
           fontSize: 14,
-          color: Color(0xFFCCCCCC),
+          color: context.colors.textTertiary,
         ),
       );
     }
@@ -523,20 +524,20 @@ class _ChannelTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         text: TextSpan(
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'SF Pro',
             fontSize: 14,
-            color: Color(0xFFAAAAAA),
+            color: context.colors.textTertiary,
           ),
           children: [
             if (senderName != null)
               TextSpan(
                 text: '$senderName: ',
-                style: const TextStyle(color: Color(0xFF888888)),
+                style: TextStyle(color: context.colors.textSecondary),
               ),
-            const TextSpan(
+            TextSpan(
               text: 'Message deleted',
-              style: TextStyle(fontStyle: FontStyle.italic, color: Color(0xFFCCCCCC)),
+              style: TextStyle(fontStyle: FontStyle.italic, color: context.colors.textTertiary),
             ),
           ],
         ),
@@ -551,21 +552,21 @@ class _ChannelTile extends StatelessWidget {
               child: Text(
                 '$senderName: ',
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'SF Pro',
                   fontSize: 14,
-                  color: Color(0xFFAAAAAA),
+                  color: context.colors.textTertiary,
                 ),
               ),
             ),
-          const Icon(Icons.image_outlined, size: 14, color: Color(0xFFAAAAAA)),
+          Icon(Icons.image_outlined, size: 14, color: context.colors.textTertiary),
           const SizedBox(width: 3),
-          const Text(
+          Text(
             'Image',
             style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 14,
-              color: Color(0xFFAAAAAA),
+              color: context.colors.textTertiary,
             ),
           ),
         ],
@@ -579,21 +580,21 @@ class _ChannelTile extends StatelessWidget {
             child: Text(
               '$senderName: ',
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 14,
-                color: Color(0xFFAAAAAA),
+                color: context.colors.textTertiary,
               ),
             ),
           ),
-          const Icon(Icons.headphones_rounded, size: 14, color: Color(0xFFAAAAAA)),
+          Icon(Icons.headphones_rounded, size: 14, color: context.colors.textTertiary),
           const SizedBox(width: 3),
-          const Text(
+          Text(
             'Voice message',
             style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 14,
-              color: Color(0xFFAAAAAA),
+              color: context.colors.textTertiary,
             ),
           ),
         ],
@@ -609,21 +610,21 @@ class _ChannelTile extends StatelessWidget {
               child: Text(
                 '$senderName: ',
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'SF Pro',
                   fontSize: 14,
-                  color: Color(0xFFAAAAAA),
+                  color: context.colors.textTertiary,
                 ),
               ),
             ),
-          const Icon(Icons.image_outlined, size: 14, color: Color(0xFFAAAAAA)),
+          Icon(Icons.image_outlined, size: 14, color: context.colors.textTertiary),
           const SizedBox(width: 3),
-          const Text(
+          Text(
             'Image',
             style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 14,
-              color: Color(0xFFAAAAAA),
+              color: context.colors.textTertiary,
             ),
           ),
         ],
@@ -634,16 +635,16 @@ class _ChannelTile extends StatelessWidget {
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
       text: TextSpan(
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: 'SF Pro',
           fontSize: 14,
-          color: Color(0xFFAAAAAA),
+          color: context.colors.textTertiary,
           height: 1.3,
         ),
         children: [
           TextSpan(
             text: '$senderName: ',
-            style: const TextStyle(color: Color(0xFF888888)),
+            style: TextStyle(color: context.colors.textSecondary),
           ),
           TextSpan(text: message),
         ],
@@ -679,19 +680,19 @@ class _VoiceBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFF4CAF50).withValues(alpha: 0.12),
+        color: context.colors.success.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: const Color(0xFF4CAF50).withValues(alpha: 0.4),
+          color: context.colors.success.withValues(alpha: 0.4),
         ),
       ),
-      child: const Text(
+      child: Text(
         'Voice',
         style: TextStyle(
           fontFamily: 'SF Pro',
           fontSize: 10,
           fontWeight: FontWeight.w600,
-          color: Color(0xFF388E3C),
+          color: context.colors.success,
         ),
       ),
     );
@@ -710,7 +711,7 @@ class _UnreadBadge extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 20),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFF5B7FD4),
+        color: context.colors.accentBlue,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
