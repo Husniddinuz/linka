@@ -84,13 +84,13 @@ class _FreeMinutesDialog extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
                 child: Column(
                   children: [
-                    const Text(
+                    Text(
                       'You have spent all of your free minutes for chatting with friends. Join Linka PLUS to get unlimited chat time!',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w400,
-                        color: Color(0xFF6C6C6C),
+                        color: context.colors.textSecondary,
                         height: 1.45,
                       ),
                     ),
@@ -128,7 +128,7 @@ class _FreeMinutesDialog extends StatelessWidget {
                         child: TextButton(
                           onPressed: () => Navigator.of(context).pop(false),
                           style: TextButton.styleFrom(
-                            foregroundColor: const Color(0xFFAAAAAA),
+                            foregroundColor: context.colors.textTertiary,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),

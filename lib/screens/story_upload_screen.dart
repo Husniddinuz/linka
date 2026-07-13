@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import '../services/api_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 import '../utils/format.dart';
 
@@ -74,7 +75,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
   void _showPickerSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -87,7 +88,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFFDDDDDD),
+                color: context.colors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -509,13 +510,13 @@ class _SheetOption extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, color: const Color(0xFF272942), size: 24),
+            Icon(icon, color: context.colors.textPrimary, size: 24),
             const SizedBox(width: 16),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
                 fontWeight: FontWeight.w500,
               ),
             ),

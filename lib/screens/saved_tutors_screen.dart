@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
+import '../theme/app_colors.dart';
 import 'tutor_profile_screen.dart';
 
 class SavedTutorsScreen extends StatefulWidget {
@@ -47,7 +48,7 @@ class _SavedTutorsScreenState extends State<SavedTutorsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -59,13 +60,13 @@ class _SavedTutorsScreenState extends State<SavedTutorsScreen> {
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
-                    child: const Icon(
+                    child: Icon(
                       Icons.chevron_left_rounded,
                       size: 30,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                     ),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
                         'Saved tutors',
@@ -73,7 +74,7 @@ class _SavedTutorsScreenState extends State<SavedTutorsScreen> {
                           fontFamily: 'SF Pro',
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF272942),
+                          color: context.colors.textPrimary,
                         ),
                       ),
                     ),
@@ -87,8 +88,8 @@ class _SavedTutorsScreenState extends State<SavedTutorsScreen> {
             // Content
             Expanded(
               child: _loading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: Color(0xFF272942)),
+                  ? Center(
+                      child: CircularProgressIndicator(color: context.colors.textPrimary),
                     )
                   : _tutors.isEmpty
                       ? Center(
@@ -101,13 +102,13 @@ class _SavedTutorsScreenState extends State<SavedTutorsScreen> {
                                 height: 40,
                               ),
                               const SizedBox(height: 12),
-                              const Text(
+                              Text(
                                 'No saved tutors yet',
                                 style: TextStyle(
                                   fontFamily: 'SF Pro',
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
-                                  color: Color(0xFFAAAAAA),
+                                  color: context.colors.textTertiary,
                                 ),
                               ),
                             ],
@@ -185,7 +186,7 @@ class _SavedTutorCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F7),
+        color: context.colors.surfaceAlt,
         borderRadius: BorderRadius.circular(14),
       ),
       clipBehavior: Clip.hardEdge,
@@ -202,13 +203,13 @@ class _SavedTutorCard extends StatelessWidget {
                       width: double.infinity,
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) => Container(
-                        color: const Color(0xFFE0E0E0),
-                        child: const Icon(Icons.person, size: 40, color: Color(0xFFAAAAAA)),
+                        color: context.colors.border,
+                        child: Icon(Icons.person, size: 40, color: context.colors.textTertiary),
                       ),
                     )
                   : Container(
-                      color: const Color(0xFFE0E0E0),
-                      child: const Icon(Icons.person, size: 40, color: Color(0xFFAAAAAA)),
+                      color: context.colors.border,
+                      child: Icon(Icons.person, size: 40, color: context.colors.textTertiary),
                     ),
             ),
           ),
@@ -217,7 +218,7 @@ class _SavedTutorCard extends StatelessWidget {
             margin: const EdgeInsets.all(6),
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.colors.surface,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -225,22 +226,22 @@ class _SavedTutorCard extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF2B2B2B),
+                    color: context.colors.textPrimary,
                     height: 1.0,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   'Experience: +$experience yrs',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
-                    color: Color(0xFF6C6C6C),
+                    color: context.colors.textSecondary,
                     height: 1.0,
                   ),
                 ),
@@ -250,16 +251,16 @@ class _SavedTutorCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF2F2F2),
+                        color: context.colors.surfaceAlt,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         'IELTS ${score % 1 == 0 ? score.toInt() : score}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'SF Pro',
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFFC62828),
+                          color: context.colors.error,
                           height: 1.0,
                         ),
                       ),

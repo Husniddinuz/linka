@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../theme/app_colors.dart';
 import 'booking_page_screen.dart';
 
 class AvailabilityScreen extends StatefulWidget {
@@ -135,7 +136,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -146,9 +147,9 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
-                    child: const Icon(Icons.chevron_left_rounded, size: 30, color: Color(0xFF272942)),
+                    child: Icon(Icons.chevron_left_rounded, size: 30, color: context.colors.textPrimary),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
                         'Availability',
@@ -156,7 +157,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                           fontFamily: 'SF Pro',
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF272942),
+                          color: context.colors.textPrimary,
                         ),
                       ),
                     ),
@@ -199,8 +200,8 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                     child: OutlinedButton(
                       onPressed: () => Navigator.of(context).pop(),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF272942),
-                        side: const BorderSide(color: Color(0xFF272942), width: 1.5),
+                        foregroundColor: context.colors.textPrimary,
+                        side: BorderSide(color: context.colors.textPrimary, width: 1.5),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
@@ -213,8 +214,8 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                     child: ElevatedButton(
                       onPressed: _canProceed ? _onNext : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _canProceed ? const Color(0xFF272942) : const Color(0xFFDDDDDD),
-                        foregroundColor: _canProceed ? Colors.white : const Color(0xFF6C6C6C),
+                        backgroundColor: _canProceed ? context.colors.brand : context.colors.border,
+                        foregroundColor: _canProceed ? Colors.white : context.colors.textSecondary,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -244,9 +245,9 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEEEEEE)),
+        border: Border.all(color: context.colors.border),
       ),
       child: Column(
         children: [
@@ -257,17 +258,17 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                 onTap: () => setState(() {
                   _focusedMonth = DateTime(year, month - 1);
                 }),
-                child: const Icon(Icons.chevron_left, color: Color(0xFF272942), size: 24),
+                child: Icon(Icons.chevron_left, color: context.colors.textPrimary, size: 24),
               ),
               Expanded(
                 child: Center(
                   child: Text(
                     '${_monthNames[month - 1]} $year',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                       letterSpacing: 1,
                     ),
                   ),
@@ -277,7 +278,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                 onTap: () => setState(() {
                   _focusedMonth = DateTime(year, month + 1);
                 }),
-                child: const Icon(Icons.chevron_right, color: Color(0xFF272942), size: 24),
+                child: Icon(Icons.chevron_right, color: context.colors.textPrimary, size: 24),
               ),
             ],
           ),
@@ -288,11 +289,11 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
               child: Center(
                 child: Text(
                   d,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFFAAAAAA),
+                    color: context.colors.textTertiary,
                     letterSpacing: 0.5,
                   ),
                 ),

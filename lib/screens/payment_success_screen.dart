@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../theme/app_colors.dart';
 import 'home_screen.dart';
 
 class PaymentSuccessScreen extends StatefulWidget {
@@ -44,7 +45,7 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: Column(
         children: [
           Expanded(
@@ -70,23 +71,23 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen>
 
                   const SizedBox(height: 32),
 
-                  const Text(
+                  Text(
                     'Successfully completed!',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                     ),
                   ),
 
                   const SizedBox(height: 8),
 
-                  const Text(
+                  Text(
                     'This lesson has been added\nto your schedule.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Color(0xFF888888),
+                      color: context.colors.textSecondary,
                       height: 1.5,
                     ),
                   ),
@@ -104,7 +105,7 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen>
               child: ElevatedButton(
                 onPressed: _goToMain,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF272942),
+                  backgroundColor: context.colors.brand,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),

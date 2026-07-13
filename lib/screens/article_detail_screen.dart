@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../theme/app_colors.dart';
 
 class ArticleDetailScreen extends StatefulWidget {
   final int articleId;
@@ -53,18 +54,18 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.chevron_left, color: Color(0xFF272942), size: 28),
+          icon: Icon(Icons.chevron_left, color: context.colors.textPrimary, size: 28),
         ),
-        title: const Text(
+        title: Text(
           'Articles',
           style: TextStyle(
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -72,7 +73,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
         centerTitle: true,
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFF5C542)))
+          ? Center(child: CircularProgressIndicator(color: context.colors.accentYellow))
           : SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Column(
@@ -80,19 +81,19 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 children: [
                   Text(
                     _title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                       height: 1.3,
                     ),
                   ),
                   const SizedBox(height: 20),
                   Text(
                     _body,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
-                      color: Color(0xFF444444),
+                      color: context.colors.textSecondary,
                       height: 1.6,
                     ),
                   ),

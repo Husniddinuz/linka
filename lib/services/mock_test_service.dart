@@ -64,9 +64,25 @@ class MockTestService {
     return data.cast<Map<String, dynamic>>();
   }
 
-  static Future<List<Map<String, dynamic>>> fetchWritingSamples({int? taskNumber}) async {
-    final qs = taskNumber != null ? '?task=$taskNumber' : '';
+  static Future<List<Map<String, dynamic>>> fetchWritingSamples({
+    int? taskNumber,
+    int? tutorId,
+    String? tutorName,
+  }) async {
+    final params = <String>[];
+    if (taskNumber != null) params.add('task=$taskNumber');
+    if (tutorId != null) params.add('tutor_id=$tutorId');
+    if (tutorName != null) params.add('tutor_name=${Uri.encodeQueryComponent(tutorName)}');
+    final qs = params.isNotEmpty ? '?${params.join('&')}' : '';
     final data = await ApiService.getList('/writing-samples/$qs');
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  /// Tutors with at least one published Writing sample, sorted alphabetically
+  /// by name. `tutor_id` is null for admin-authored samples with no real
+  /// tutor account (grouped by name in that case).
+  static Future<List<Map<String, dynamic>>> fetchWritingSampleTutors() async {
+    final data = await ApiService.getList('/writing-samples/tutors/');
     return data.cast<Map<String, dynamic>>();
   }
 }

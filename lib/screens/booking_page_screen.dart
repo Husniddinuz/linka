@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 import 'payment_screen.dart';
 
 class BookingPageScreen extends StatefulWidget {
@@ -90,7 +91,7 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -101,9 +102,9 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
-                    child: const Icon(Icons.chevron_left_rounded, size: 30, color: Color(0xFF272942)),
+                    child: Icon(Icons.chevron_left_rounded, size: 30, color: context.colors.textPrimary),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
                         'Booking Page',
@@ -111,14 +112,14 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
                           fontFamily: 'SF Pro',
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF272942),
+                          color: context.colors.textPrimary,
                         ),
                       ),
                     ),
                   ),
                   GestureDetector(
                     onTap: () {},
-                    child: const Icon(Icons.more_vert, size: 24, color: Color(0xFF272942)),
+                    child: Icon(Icons.more_vert, size: 24, color: context.colors.textPrimary),
                   ),
                 ],
               ),
@@ -134,13 +135,13 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
                     const SizedBox(height: 24),
 
                     // Question
-                    const Text(
+                    Text(
                       'What specific skills or topics would you like to improve? (select all that apply)',
                       style: TextStyle(
                         fontFamily: 'SF Pro',
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF272942),
+                        color: context.colors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -162,10 +163,10 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                             decoration: BoxDecoration(
-                              color: selected ? const Color(0xFF272942) : Colors.white,
+                              color: selected ? context.colors.brand : context.colors.surface,
                               borderRadius: BorderRadius.circular(24),
                               border: Border.all(
-                                color: selected ? const Color(0xFF272942) : const Color(0xFFDDDDDD),
+                                color: selected ? context.colors.brand : context.colors.border,
                                 width: 1.5,
                               ),
                             ),
@@ -175,7 +176,7 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
                                 fontFamily: 'SF Pro',
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
-                                color: selected ? Colors.white : const Color(0xFF272942),
+                                color: selected ? Colors.white : context.colors.textPrimary,
                               ),
                             ),
                           ),
@@ -187,7 +188,7 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
                     // Goal text area
                     Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F7),
+                        color: context.colors.surfaceAlt,
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Column(
@@ -197,21 +198,21 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
                             maxLength: 300,
                             maxLines: 6,
                             onChanged: (_) => setState(() {}),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'SF Pro',
                               fontSize: 15,
-                              color: Color(0xFF272942),
+                              color: context.colors.textPrimary,
                               height: 1.5,
                             ),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               hintText: 'Describe your goals for this lesson...',
                               hintStyle: TextStyle(
                                 fontFamily: 'SF Pro',
                                 fontSize: 15,
-                                color: Color(0xFFAAAAAA),
+                                color: context.colors.textTertiary,
                               ),
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.all(16),
+                              contentPadding: const EdgeInsets.all(16),
                               counterText: '',
                             ),
                           ),
@@ -221,10 +222,10 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
                               alignment: Alignment.bottomRight,
                               child: Text(
                                 '${_goalController.text.length}/300',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: 'SF Pro',
                                   fontSize: 12,
-                                  color: Color(0xFF9E9E9E),
+                                  color: context.colors.textSecondary,
                                 ),
                               ),
                             ),
@@ -247,7 +248,7 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
                 child: ElevatedButton(
                   onPressed: _onRequestLesson,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF272942),
+                    backgroundColor: context.colors.brand,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 16),

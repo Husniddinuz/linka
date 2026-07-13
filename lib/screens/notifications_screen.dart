@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../theme/app_colors.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -47,22 +48,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
+      backgroundColor: context.colors.surfaceAlt,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: context.colors.surface,
+        surfaceTintColor: context.colors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, size: 20, color: Colors.black),
+          icon: Icon(Icons.arrow_back_ios, size: 20, color: context.colors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
-        title: const Text(
+        title: Text(
           'Notifications',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: Colors.black,
+            color: context.colors.textPrimary,
           ),
         ),
       ),
@@ -71,7 +72,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           : Container(
               margin: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
@@ -85,7 +86,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       _update('notify_lesson_reminder', v);
                     },
                   ),
-                  const Divider(height: 1, indent: 16, endIndent: 16, color: Color(0xFFEEEEEE)),
+                  Divider(height: 1, indent: 16, endIndent: 16, color: context.colors.border),
                   _ToggleRow(
                     label: 'Recommended tutors',
                     value: _recommendedTutors,
@@ -94,7 +95,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       _update('notify_recommended_tutors', v);
                     },
                   ),
-                  const Divider(height: 1, indent: 16, endIndent: 16, color: Color(0xFFEEEEEE)),
+                  Divider(height: 1, indent: 16, endIndent: 16, color: context.colors.border),
                   _ToggleRow(
                     label: 'New features',
                     value: _newFeatures,
@@ -130,10 +131,10 @@ class _ToggleRow extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
-              color: Colors.black,
+              color: context.colors.textPrimary,
             ),
           ),
           CupertinoSwitch(

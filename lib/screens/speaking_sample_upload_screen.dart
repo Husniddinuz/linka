@@ -10,9 +10,11 @@ import '../widgets/app_notify.dart';
 import 'writing_sample_upload_screen.dart' show fieldDecoration;
 
 /// Form for a tutor to record and submit their own IELTS Speaking sample
-/// (Part 1 required, Parts 2 & 3 optional) for review. Submission first
-/// creates the parent sample, then uploads each recorded part. On full
-/// success, pops with `true` so the caller can refresh its list.
+/// against an admin-curated topic. The tutor first picks a [_SpeakingTopic],
+/// which supplies the title/question for whichever parts it defines; the
+/// tutor only records audio for those parts. Submission first creates the
+/// parent sample, then uploads each recorded part. On full success, pops
+/// with `true` so the caller can refresh its list.
 class SpeakingSampleUploadScreen extends StatefulWidget {
   const SpeakingSampleUploadScreen({super.key});
 
@@ -24,34 +26,80 @@ class SpeakingSampleUploadScreen extends StatefulWidget {
 class _SpeakingSampleUploadScreenState
     extends State<SpeakingSampleUploadScreen> {
   final _bandController = TextEditingController();
-  final List<_PartInput> _parts = [_PartInput(1), _PartInput(2), _PartInput(3)];
+
+  List<_SpeakingTopic> _topics = [];
+  bool _loadingTopics = true;
+  bool _topicsFailed = false;
+  _SpeakingTopic? _selectedTopic;
+  List<_PartFormState> _parts = [];
   bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTopics();
+  }
 
   @override
   void dispose() {
     _bandController.dispose();
-    for (final p in _parts) {
-      p.dispose();
-    }
     super.dispose();
+  }
+
+  Future<void> _loadTopics() async {
+    setState(() {
+      _loadingTopics = true;
+      _topicsFailed = false;
+    });
+    try {
+      final list = await ApiService.getList('/tutor/samples/speaking/topics/');
+      if (!mounted) return;
+      setState(() {
+        _topics = list
+            .map((e) => _SpeakingTopic.fromJson(e as Map<String, dynamic>))
+            .toList();
+        _loadingTopics = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _topics = [];
+        _loadingTopics = false;
+        _topicsFailed = true;
+      });
+    }
+  }
+
+  void _selectTopic(_SpeakingTopic topic) {
+    if (_selectedTopic?.id == topic.id) return;
+    // A different topic defines different parts — discard any audio
+    // recorded for the previous topic's parts.
+    for (final p in _parts) {
+      final path = p.recordedPath;
+      if (path != null) {
+        try {
+          File(path).deleteSync();
+        } catch (_) {}
+      }
+    }
+    setState(() {
+      _selectedTopic = topic;
+      _parts = topic.parts.map((tp) => _PartFormState(tp)).toList();
+    });
   }
 
   Future<void> _submit() async {
     if (_submitting) return;
-    final part1 = _parts[0];
-    if (part1.recordedPath == null) {
-      AppNotify.show(context,
-          message: 'Part 1 audio is required before submitting.');
+    final topic = _selectedTopic;
+    if (topic == null) {
+      AppNotify.show(context, message: 'Please select a topic first.');
       return;
     }
-    for (final p in _parts) {
-      if (p.recordedPath == null) continue;
-      if (p.titleController.text.trim().isEmpty ||
-          p.questionController.text.trim().isEmpty) {
-        AppNotify.show(context,
-            message: 'Please add a title and question for Part ${p.partNumber}.');
-        return;
-      }
+    final recordedParts = _parts.where((p) => p.recordedPath != null).toList();
+    if (recordedParts.isEmpty) {
+      AppNotify.show(context,
+          message: 'Please record at least one part before submitting.');
+      return;
     }
 
     setState(() => _submitting = true);
@@ -60,6 +108,7 @@ class _SpeakingSampleUploadScreenState
       final created = await ApiService.postMultipart(
         '/tutor/samples/speaking/',
         fields: {
+          'topic': topic.id.toString(),
           if (band.isNotEmpty) 'band_score': band,
         },
       );
@@ -69,7 +118,7 @@ class _SpeakingSampleUploadScreenState
             'Something went wrong creating the sample. Please try again.');
       }
 
-      for (final p in _parts) {
+      for (final p in recordedParts) {
         final path = p.recordedPath;
         if (path == null) continue;
         await ApiService.postMultipart(
@@ -77,8 +126,6 @@ class _SpeakingSampleUploadScreenState
           files: {'audio_file': File(path)},
           fields: {
             'part': p.partNumber.toString(),
-            'title': p.titleController.text.trim(),
-            'question_text': p.questionController.text.trim(),
           },
         );
       }
@@ -106,6 +153,63 @@ class _SpeakingSampleUploadScreenState
       return;
     }
     Navigator.of(context).pop();
+  }
+
+  void _showTopicPicker() {
+    final colors = context.colors;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: colors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+          ),
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.only(bottom: 12),
+            children: [
+              const SizedBox(height: 12),
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final topic in _topics)
+                ListTile(
+                  title: Text(
+                    topic.title,
+                    style: TextStyle(
+                        color: colors.textPrimary, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    'Part${topic.parts.length > 1 ? 's' : ''} '
+                    '${topic.parts.map((p) => p.part).join(', ')}',
+                    style: TextStyle(color: colors.textSecondary, fontSize: 12.5),
+                  ),
+                  trailing: _selectedTopic?.id == topic.id
+                      ? Icon(Icons.check_rounded, color: colors.brand)
+                      : null,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _selectTopic(topic);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -143,6 +247,10 @@ class _SpeakingSampleUploadScreenState
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             children: [
+              _FieldLabel('Topic'),
+              const SizedBox(height: 6),
+              _buildTopicPicker(colors),
+              const SizedBox(height: 20),
               _FieldLabel('Band score (optional)'),
               const SizedBox(height: 6),
               TextField(
@@ -152,20 +260,40 @@ class _SpeakingSampleUploadScreenState
                 style: TextStyle(fontSize: 14, color: colors.textPrimary),
                 decoration: fieldDecoration(context, hint: 'e.g. 7.5'),
               ),
-              const SizedBox(height: 20),
-              _PartSection(part: _parts[0], required: true, enabled: !_submitting),
-              const SizedBox(height: 16),
-              _PartSection(part: _parts[1], required: false, enabled: !_submitting),
-              const SizedBox(height: 16),
-              _PartSection(part: _parts[2], required: false, enabled: !_submitting),
+              if (_selectedTopic != null) ...[
+                const SizedBox(height: 20),
+                if (_parts.isEmpty)
+                  Text(
+                    'This topic has no parts configured yet.',
+                    style: TextStyle(fontSize: 13, color: colors.textSecondary),
+                  )
+                else ...[
+                  Text(
+                    'Record at least one part before submitting.',
+                    style: TextStyle(fontSize: 12.5, color: colors.textSecondary),
+                  ),
+                  const SizedBox(height: 12),
+                  for (int i = 0; i < _parts.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 16),
+                    _PartSection(
+                      key: ValueKey(
+                          'topic_${_selectedTopic!.id}_part_${_parts[i].partNumber}'),
+                      part: _parts[i],
+                      enabled: !_submitting,
+                    ),
+                  ],
+                ],
+              ],
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _submitting ? null : _submit,
+                  onPressed:
+                      (_submitting || _selectedTopic == null) ? null : _submit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: colors.brand,
                     foregroundColor: colors.onBrand,
+                    disabledBackgroundColor: colors.surfaceAlt,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape:
                         RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -189,36 +317,140 @@ class _SpeakingSampleUploadScreenState
       ),
     );
   }
+
+  Widget _buildTopicPicker(AppColors colors) {
+    if (_loadingTopics) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+            color: colors.surfaceAlt, borderRadius: BorderRadius.circular(12)),
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2, color: colors.textPrimary),
+        ),
+      );
+    }
+    if (_topicsFailed || _topics.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+            color: colors.errorBg, borderRadius: BorderRadius.circular(12)),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                _topicsFailed
+                    ? 'Failed to load topics.'
+                    : 'No speaking topics are available yet.',
+                style: TextStyle(fontSize: 13, color: colors.error),
+              ),
+            ),
+            TextButton(onPressed: _loadTopics, child: const Text('Retry')),
+          ],
+        ),
+      );
+    }
+    return GestureDetector(
+      onTap: _submitting ? null : _showTopicPicker,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: colors.surfaceAlt,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colors.border),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                _selectedTopic?.title ?? 'Select a topic',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color:
+                      _selectedTopic != null ? colors.textPrimary : colors.textTertiary,
+                ),
+              ),
+            ),
+            Icon(Icons.expand_more_rounded, color: colors.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Topic models ───────────────────────────────────────────────────────────
+
+class _SpeakingTopic {
+  final int id;
+  final String title;
+  final List<_TopicPart> parts;
+
+  const _SpeakingTopic({required this.id, required this.title, required this.parts});
+
+  factory _SpeakingTopic.fromJson(Map<String, dynamic> j) {
+    final partsJson = (j['parts'] as List?) ?? const [];
+    final parts = partsJson
+        .map((p) => _TopicPart.fromJson(p as Map<String, dynamic>))
+        .toList()
+      ..sort((a, b) => a.part.compareTo(b.part));
+    return _SpeakingTopic(
+      id: (j['id'] as num?)?.toInt() ?? 0,
+      title: j['title']?.toString() ?? '',
+      parts: parts,
+    );
+  }
+}
+
+class _TopicPart {
+  final int id;
+  final int part;
+  final String title;
+  final String questionText;
+
+  const _TopicPart({
+    required this.id,
+    required this.part,
+    required this.title,
+    required this.questionText,
+  });
+
+  factory _TopicPart.fromJson(Map<String, dynamic> j) {
+    return _TopicPart(
+      id: (j['id'] as num?)?.toInt() ?? 0,
+      part: (j['part'] as num?)?.toInt() ?? 0,
+      title: j['title']?.toString() ?? '',
+      questionText: j['question_text']?.toString() ?? '',
+    );
+  }
 }
 
 // ─── Per-part form state ────────────────────────────────────────────────────
 
-class _PartInput {
-  final int partNumber;
-  final TextEditingController titleController = TextEditingController();
-  final TextEditingController questionController = TextEditingController();
+class _PartFormState {
+  final _TopicPart topicPart;
   String? recordedPath;
   int recordedDuration = 0;
 
-  _PartInput(this.partNumber);
+  _PartFormState(this.topicPart);
 
-  void dispose() {
-    titleController.dispose();
-    questionController.dispose();
-  }
+  int get partNumber => topicPart.part;
 }
 
 // ─── Part section ───────────────────────────────────────────────────────────
 
 class _PartSection extends StatelessWidget {
-  final _PartInput part;
-  final bool required;
+  final _PartFormState part;
   final bool enabled;
-  const _PartSection({required this.part, required this.required, required this.enabled});
+  const _PartSection({super.key, required this.part, required this.enabled});
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final topicPart = part.topicPart;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -229,56 +461,34 @@ class _PartSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                'Part ${part.partNumber}',
+          Text(
+            'Part ${topicPart.part}'
+            '${topicPart.title.isNotEmpty ? ' · ${topicPart.title}' : ''}',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: colors.textPrimary,
+            ),
+          ),
+          if (topicPart.questionText.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colors.surfaceAlt,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                topicPart.questionText,
                 style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: colors.textPrimary,
+                  fontSize: 13.5,
+                  height: 1.4,
+                  color: colors.textSecondary,
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: required ? colors.errorBg : colors.surfaceAlt,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  required ? 'Required' : 'Optional',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: required ? colors.error : colors.textSecondary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _FieldLabel('Title'),
-          const SizedBox(height: 6),
-          TextField(
-            controller: part.titleController,
-            enabled: enabled,
-            style: TextStyle(fontSize: 14, color: colors.textPrimary),
-            decoration:
-                fieldDecoration(context, hint: 'e.g. Describe a memorable trip'),
-          ),
-          const SizedBox(height: 12),
-          _FieldLabel('Question'),
-          const SizedBox(height: 6),
-          TextField(
-            controller: part.questionController,
-            enabled: enabled,
-            minLines: 2,
-            maxLines: 4,
-            style: TextStyle(fontSize: 14, color: colors.textPrimary),
-            decoration:
-                fieldDecoration(context, hint: 'Enter the exact examiner question'),
-          ),
+            ),
+          ],
           const SizedBox(height: 12),
           _FieldLabel('Recording'),
           const SizedBox(height: 6),

@@ -1478,11 +1478,11 @@ class _SectionHeader extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF272942),
+              color: context.colors.textPrimary,
               height: 1.0,
               letterSpacing: 0,
             ),
@@ -1491,13 +1491,13 @@ class _SectionHeader extends StatelessWidget {
           if (onSeeAll != null)
             GestureDetector(
               onTap: onSeeAll,
-              child: const Text(
+              child: Text(
                 'See all',
                 style: TextStyle(
                   fontFamily: 'SF Pro',
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFFB9BCBE),
+                  color: context.colors.textTertiary,
                   height: 1.0,
                   letterSpacing: 0,
                 ),
@@ -2702,7 +2702,7 @@ class _PodcastCard extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 6),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         decoration: BoxDecoration(
-          color: const Color(0xFFF6F6F6),
+          color: context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
@@ -2710,8 +2710,8 @@ class _PodcastCard extends StatelessWidget {
             Container(
               width: 56,
               height: 56,
-              decoration: const BoxDecoration(
-                color: Color(0xFF272942),
+              decoration: BoxDecoration(
+                color: context.colors.brand,
                 shape: BoxShape.circle,
               ),
               child: Center(
@@ -2734,10 +2734,10 @@ class _PodcastCard extends StatelessWidget {
                   ],
                   Text(
                     podcast.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                       height: 1.3,
                     ),
                     maxLines: 2,
@@ -2747,10 +2747,10 @@ class _PodcastCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       podcast.formattedDuration,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w400,
-                        color: Color(0xFF6C6C6C),
+                        color: context.colors.textSecondary,
                       ),
                     ),
                   ],
@@ -2850,9 +2850,9 @@ class _ArticleCard extends StatelessWidget {
         width: 160,
         margin: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFEEEEEE)),
+          border: Border.all(color: context.colors.border),
           boxShadow: [
             BoxShadow(
               color: accent.withValues(alpha: 0.10),
@@ -2980,10 +2980,10 @@ class _ArticleCard extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                 child: Text(
                   article.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                     height: 1.35,
                   ),
                   maxLines: 3,
@@ -3016,9 +3016,9 @@ class _SideNav extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 82,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(right: BorderSide(color: Color(0xFFEEEEEE), width: 1)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        border: Border(right: BorderSide(color: context.colors.border, width: 1)),
       ),
       child: SafeArea(
         right: false,
@@ -3050,8 +3050,8 @@ class _SideNav extends StatelessWidget {
                               ? FontWeight.w600
                               : FontWeight.w400,
                           color: selected
-                              ? const Color(0xFF272942)
-                              : const Color(0xFFCCCCCC),
+                              ? context.colors.textPrimary
+                              : context.colors.textTertiary,
                         ),
                       ),
                     ],
@@ -3081,9 +3081,9 @@ class _BottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFEEEEEE), width: 1)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        border: Border(top: BorderSide(color: context.colors.border, width: 1)),
       ),
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: SafeArea(
@@ -3113,8 +3113,8 @@ class _BottomNav extends StatelessWidget {
                             ? FontWeight.w600
                             : FontWeight.w400,
                         color: selected
-                            ? const Color(0xFF272942)
-                            : const Color(0xFFCCCCCC),
+                            ? context.colors.textPrimary
+                            : context.colors.textTertiary,
                       ),
                     ),
                   ],
@@ -3367,7 +3367,7 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
           if (showPendingBanner) _PendingActivationBanner(status: status),
           Expanded(
             child: RefreshIndicator(
-              color: const Color(0xFF272942),
+              color: context.colors.textPrimary,
               onRefresh: _fetch,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -3396,12 +3396,12 @@ class _TutorHomeBodyState extends State<TutorHomeBody> {
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: Row(
                             children: [
-                              const Text(
+                              Text(
                                 'MY LESSONS',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF272942),
+                                  color: context.colors.textPrimary,
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -3516,18 +3516,18 @@ class _PendingActivationBanner extends StatelessWidget {
               children: [
                 Text(
                   _title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   _message,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF6C6C6C),
+                    color: context.colors.textSecondary,
                     height: 1.35,
                   ),
                 ),
@@ -3570,7 +3570,7 @@ class _TutorListMode extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: const Color(0xFFF2F2F4),
+              color: context.colors.surfaceAlt,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -3606,15 +3606,15 @@ class _TutorListMode extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 28),
               decoration: BoxDecoration(
-                color: const Color(0xFFF2F2F4),
+                color: context.colors.surfaceAlt,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Center(
                 child: Text(
                   tab == 'upcoming' ? 'No upcoming lessons' : 'No past lessons',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFFAAAAAA),
+                    color: context.colors.textTertiary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -3630,21 +3630,21 @@ class _TutorListMode extends StatelessWidget {
                   children: [
                     Text(
                       g.key.label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF272942),
+                        color: context.colors.textPrimary,
                         letterSpacing: 0.5,
                       ),
                     ),
                     const Spacer(),
                     if (g.key.isToday)
-                      const Text(
+                      Text(
                         'Today',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: Color(0xFF2B85DB),
+                          color: context.colors.accentBlue,
                         ),
                       ),
                   ],
@@ -3753,7 +3753,7 @@ class _SegBtn extends StatelessWidget {
         height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: active ? const Color(0xFF272942) : Colors.transparent,
+          color: active ? context.colors.brand : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
@@ -3761,7 +3761,7 @@ class _SegBtn extends StatelessWidget {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: active ? Colors.white : const Color(0xFF272942),
+            color: active ? Colors.white : context.colors.textPrimary,
           ),
         ),
       ),
@@ -3815,10 +3815,10 @@ class _TutorCalendarMode extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
           child: Text(
             _formatDateHeader(focusedMonth, selectedDay),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF272942),
+              color: context.colors.textPrimary,
               letterSpacing: 0.5,
             ),
           ),
@@ -3835,15 +3835,15 @@ class _TutorCalendarMode extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 28),
               decoration: BoxDecoration(
-                color: const Color(0xFFF2F2F4),
+                color: context.colors.surfaceAlt,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
                   'No lessons on this day',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFFAAAAAA),
+                    color: context.colors.textTertiary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -3940,9 +3940,9 @@ class _TutorCalendarCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEEEEEE)),
+        border: Border.all(color: context.colors.border),
       ),
       child: Column(
         children: [
@@ -3950,9 +3950,9 @@ class _TutorCalendarCard extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: onPrevMonth,
-                child: const Icon(
+                child: Icon(
                   Icons.chevron_left,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                   size: 24,
                 ),
               ),
@@ -3960,10 +3960,10 @@ class _TutorCalendarCard extends StatelessWidget {
                 child: Center(
                   child: Text(
                     '${_monthNames[month]} $year',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                       letterSpacing: 1,
                     ),
                   ),
@@ -3971,9 +3971,9 @@ class _TutorCalendarCard extends StatelessWidget {
               ),
               GestureDetector(
                 onTap: onNextMonth,
-                child: const Icon(
+                child: Icon(
                   Icons.chevron_right,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                   size: 24,
                 ),
               ),
@@ -3987,10 +3987,10 @@ class _TutorCalendarCard extends StatelessWidget {
                     child: Center(
                       child: Text(
                         d,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFFAAAAAA),
+                          color: context.colors.textTertiary,
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -4024,11 +4024,11 @@ class _TutorCalendarCard extends StatelessWidget {
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFF272942) : null,
+                            color: isSelected ? context.colors.brand : null,
                             borderRadius: BorderRadius.circular(8),
                             border: isToday && !isSelected
                                 ? Border.all(
-                                    color: const Color(0xFF272942),
+                                    color: context.colors.brand,
                                     width: 1.5,
                                   )
                                 : null,
@@ -4043,7 +4043,7 @@ class _TutorCalendarCard extends StatelessWidget {
                                   fontWeight: FontWeight.w500,
                                   color: isSelected
                                       ? Colors.white
-                                      : const Color(0xFF272942),
+                                      : context.colors.textPrimary,
                                 ),
                               ),
                               if (hasLesson)
@@ -4055,7 +4055,7 @@ class _TutorCalendarCard extends StatelessWidget {
                                     decoration: BoxDecoration(
                                       color: isSelected
                                           ? Colors.white
-                                          : const Color(0xFF4CAF50),
+                                          : context.colors.success,
                                       shape: BoxShape.circle,
                                     ),
                                   ),
@@ -4212,7 +4212,7 @@ class _SectionClosed extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -4224,12 +4224,12 @@ class _SectionClosed extends StatelessWidget {
                   width: 72,
                   height: 72,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF2F2F4),
+                    color: context.colors.surfaceAlt,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.lock_clock_rounded,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                     size: 32,
                   ),
                 ),
@@ -4237,19 +4237,19 @@ class _SectionClosed extends StatelessWidget {
                 Text(
                   title,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'This section is temporarily unavailable. Please check back soon.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF6C6C6C),
+                    color: context.colors.textSecondary,
                     height: 1.4,
                   ),
                 ),

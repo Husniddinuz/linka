@@ -1,13 +1,13 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 
-/// Form for a tutor to submit their own IELTS Writing sample (Task 1 or 2)
-/// for review. On success, pops with `true` so the caller can refresh its
-/// list.
+/// Form for a tutor to submit their own IELTS Writing sample essay for
+/// review, against an admin-curated topic. The tutor first picks a
+/// [_WritingTopic] (which supplies the task number, prompt, and optional
+/// chart/graph image) and then writes their sample essay for it. On
+/// success, pops with `true` so the caller can refresh its list.
 class WritingSampleUploadScreen extends StatefulWidget {
   const WritingSampleUploadScreen({super.key});
 
@@ -17,87 +17,69 @@ class WritingSampleUploadScreen extends StatefulWidget {
 }
 
 class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
-  int _taskNumber = 1;
-  final _titleController = TextEditingController();
-  final _promptController = TextEditingController();
   final _essayController = TextEditingController();
   final _bandController = TextEditingController();
   final _commentController = TextEditingController();
-  File? _chartImage;
+
+  List<_WritingTopic> _topics = [];
+  bool _loadingTopics = true;
+  bool _topicsFailed = false;
+  _WritingTopic? _selectedTopic;
   bool _submitting = false;
 
   @override
+  void initState() {
+    super.initState();
+    _loadTopics();
+  }
+
+  @override
   void dispose() {
-    _titleController.dispose();
-    _promptController.dispose();
     _essayController.dispose();
     _bandController.dispose();
     _commentController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickChartImage(ImageSource source) async {
-    final picker = ImagePicker();
-    final file = await picker.pickImage(source: source, imageQuality: 85);
-    if (file == null || !mounted) return;
-    setState(() => _chartImage = File(file.path));
+  Future<void> _loadTopics() async {
+    setState(() {
+      _loadingTopics = true;
+      _topicsFailed = false;
+    });
+    try {
+      final list = await ApiService.getList('/tutor/samples/writing/topics/');
+      if (!mounted) return;
+      setState(() {
+        _topics = list
+            .map((e) => _WritingTopic.fromJson(e as Map<String, dynamic>))
+            .toList();
+        _loadingTopics = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _topics = [];
+        _loadingTopics = false;
+        _topicsFailed = true;
+      });
+    }
   }
 
-  void _showImageSourceSheet() {
-    final colors = context.colors;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: colors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: colors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              leading: Icon(Icons.photo_library_outlined, color: colors.textPrimary),
-              title: Text('Choose from gallery',
-                  style: TextStyle(color: colors.textPrimary)),
-              onTap: () {
-                Navigator.pop(context);
-                _pickChartImage(ImageSource.gallery);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.camera_alt_outlined, color: colors.textPrimary),
-              title:
-                  Text('Take a photo', style: TextStyle(color: colors.textPrimary)),
-              onTap: () {
-                Navigator.pop(context);
-                _pickChartImage(ImageSource.camera);
-              },
-            ),
-            const SizedBox(height: 12),
-          ],
-        ),
-      ),
-    );
+  void _selectTopic(_WritingTopic topic) {
+    if (_selectedTopic?.id == topic.id) return;
+    setState(() => _selectedTopic = topic);
   }
 
   Future<void> _submit() async {
     if (_submitting) return;
-    final title = _titleController.text.trim();
-    final prompt = _promptController.text.trim();
+    final topic = _selectedTopic;
+    if (topic == null) {
+      AppNotify.show(context, message: 'Please select a topic first.');
+      return;
+    }
     final essay = _essayController.text.trim();
-    if (title.isEmpty || prompt.isEmpty || essay.isEmpty) {
-      AppNotify.show(context,
-          message: 'Please fill in the title, prompt, and sample essay.');
+    if (essay.isEmpty) {
+      AppNotify.show(context, message: 'Please write or paste your sample essay.');
       return;
     }
 
@@ -107,14 +89,8 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
       final comment = _commentController.text.trim();
       await ApiService.postMultipart(
         '/tutor/samples/writing/',
-        files: {
-          if (_taskNumber == 1 && _chartImage != null)
-            'chart_image': _chartImage!,
-        },
         fields: {
-          'task_number': _taskNumber.toString(),
-          'title': title,
-          'prompt_html': prompt,
+          'topic': topic.id.toString(),
           'sample_essay_html': essay,
           if (band.isNotEmpty) 'band_score': band,
           if (comment.isNotEmpty) 'examiner_comment': comment,
@@ -143,9 +119,66 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
     Navigator.of(context).pop();
   }
 
+  void _showTopicPicker() {
+    final colors = context.colors;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: colors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+          ),
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.only(bottom: 12),
+            children: [
+              const SizedBox(height: 12),
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final topic in _topics)
+                ListTile(
+                  title: Text(
+                    topic.title,
+                    style: TextStyle(
+                        color: colors.textPrimary, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    'Task ${topic.taskNumber}',
+                    style: TextStyle(color: colors.textSecondary, fontSize: 12.5),
+                  ),
+                  trailing: _selectedTopic?.id == topic.id
+                      ? Icon(Icons.check_rounded, color: colors.brand)
+                      : null,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _selectTopic(topic);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final topic = _selectedTopic;
     return PopScope(
       canPop: !_submitting,
       onPopInvokedWithResult: (didPop, _) {
@@ -179,79 +212,56 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             children: [
-              _FieldLabel('Task'),
-              const SizedBox(height: 8),
-              _buildTaskSelector(colors),
-              const SizedBox(height: 20),
-              _FieldLabel('Title'),
+              _FieldLabel('Topic'),
               const SizedBox(height: 6),
-              TextField(
-                controller: _titleController,
-                enabled: !_submitting,
-                style: TextStyle(fontSize: 14, color: colors.textPrimary),
-                decoration: fieldDecoration(context,
-                    hint: 'e.g. Line graph: internet usage by age group'),
-              ),
-              const SizedBox(height: 16),
-              _FieldLabel('Prompt'),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _promptController,
-                enabled: !_submitting,
-                minLines: 3,
-                maxLines: 6,
-                style: TextStyle(fontSize: 14, color: colors.textPrimary),
-                decoration:
-                    fieldDecoration(context, hint: 'Enter the exact task prompt'),
-              ),
-              const SizedBox(height: 16),
-              _FieldLabel('Sample essay'),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _essayController,
-                enabled: !_submitting,
-                minLines: 6,
-                maxLines: 14,
-                style: TextStyle(fontSize: 14, color: colors.textPrimary),
-                decoration:
-                    fieldDecoration(context, hint: 'Write or paste the full essay'),
-              ),
-              if (_taskNumber == 1) ...[
+              _buildTopicPicker(colors),
+              if (topic != null) ...[
                 const SizedBox(height: 16),
-                _FieldLabel('Chart image (optional)'),
+                _buildTopicPreview(colors, topic),
+                const SizedBox(height: 16),
+                _FieldLabel('Sample essay'),
                 const SizedBox(height: 6),
-                _buildChartPicker(colors),
+                TextField(
+                  controller: _essayController,
+                  enabled: !_submitting,
+                  minLines: 6,
+                  maxLines: 14,
+                  style: TextStyle(fontSize: 14, color: colors.textPrimary),
+                  decoration:
+                      fieldDecoration(context, hint: 'Write or paste the full essay'),
+                ),
+                const SizedBox(height: 16),
+                _FieldLabel('Band score (optional)'),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _bandController,
+                  enabled: !_submitting,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: TextStyle(fontSize: 14, color: colors.textPrimary),
+                  decoration: fieldDecoration(context, hint: 'e.g. 7.5'),
+                ),
+                const SizedBox(height: 16),
+                _FieldLabel('Examiner comment (optional)'),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _commentController,
+                  enabled: !_submitting,
+                  minLines: 2,
+                  maxLines: 4,
+                  style: TextStyle(fontSize: 14, color: colors.textPrimary),
+                  decoration: fieldDecoration(context,
+                      hint: 'Overall feedback for this essay'),
+                ),
               ],
-              const SizedBox(height: 16),
-              _FieldLabel('Band score (optional)'),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _bandController,
-                enabled: !_submitting,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                style: TextStyle(fontSize: 14, color: colors.textPrimary),
-                decoration: fieldDecoration(context, hint: 'e.g. 7.5'),
-              ),
-              const SizedBox(height: 16),
-              _FieldLabel('Examiner comment (optional)'),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _commentController,
-                enabled: !_submitting,
-                minLines: 2,
-                maxLines: 4,
-                style: TextStyle(fontSize: 14, color: colors.textPrimary),
-                decoration: fieldDecoration(context,
-                    hint: 'Overall feedback for this essay'),
-              ),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _submitting ? null : _submit,
+                  onPressed: (_submitting || topic == null) ? null : _submit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: colors.brand,
                     foregroundColor: colors.onBrand,
+                    disabledBackgroundColor: colors.surfaceAlt,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape:
                         RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -276,121 +286,166 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
     );
   }
 
-  Widget _buildTaskSelector(AppColors colors) {
-    return Row(
-      children: [
-        for (final task in [1, 2]) ...[
-          if (task > 1) const SizedBox(width: 8),
-          Expanded(
-            child: GestureDetector(
-              onTap: _submitting
-                  ? null
-                  : () => setState(() {
-                        _taskNumber = task;
-                        if (task != 1) _chartImage = null;
-                      }),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: _taskNumber == task ? colors.brand : colors.surfaceAlt,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  'Task $task',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: _taskNumber == task ? colors.onBrand : colors.textPrimary,
-                  ),
-                ),
+  Widget _buildTopicPicker(AppColors colors) {
+    if (_loadingTopics) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+            color: colors.surfaceAlt, borderRadius: BorderRadius.circular(12)),
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2, color: colors.textPrimary),
+        ),
+      );
+    }
+    if (_topicsFailed || _topics.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+            color: colors.errorBg, borderRadius: BorderRadius.circular(12)),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                _topicsFailed
+                    ? 'Failed to load topics.'
+                    : 'No writing topics are available yet.',
+                style: TextStyle(fontSize: 13, color: colors.error),
               ),
             ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildChartPicker(AppColors colors) {
-    final image = _chartImage;
-    if (image == null) {
-      return GestureDetector(
-        onTap: _submitting ? null : _showImageSourceSheet,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          decoration: BoxDecoration(
-            color: colors.surfaceAlt,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: colors.border),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.image_outlined, color: colors.textPrimary, size: 22),
-              const SizedBox(width: 10),
-              Text(
-                'Add chart image',
+            TextButton(onPressed: _loadTopics, child: const Text('Retry')),
+          ],
+        ),
+      );
+    }
+    return GestureDetector(
+      onTap: _submitting ? null : _showTopicPicker,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: colors.surfaceAlt,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colors.border),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                _selectedTopic?.title ?? 'Select a topic',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: colors.textPrimary,
+                  color:
+                      _selectedTopic != null ? colors.textPrimary : colors.textTertiary,
+                ),
+              ),
+            ),
+            Icon(Icons.expand_more_rounded, color: colors.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopicPreview(AppColors colors, _WritingTopic topic) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.surfaceAlt,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'Task ${topic.taskNumber}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary,
+                  ),
                 ),
               ),
             ],
           ),
-        ),
-      );
-    }
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: colors.surfaceAlt,
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: Stack(
-        children: [
-          Image.file(image, width: double.infinity, height: 160, fit: BoxFit.cover),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: GestureDetector(
-              onTap: _submitting ? null : _showImageSourceSheet,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 16),
-                    SizedBox(width: 4),
-                    Text('Change',
-                        style: TextStyle(color: Colors.white, fontSize: 12)),
-                  ],
+          if (topic.promptHtml.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              topic.promptHtml,
+              style: TextStyle(fontSize: 13.5, height: 1.4, color: colors.textSecondary),
+            ),
+          ],
+          if (topic.imageUrl != null && topic.imageUrl!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.network(
+                topic.imageUrl!,
+                width: double.infinity,
+                height: 160,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return SizedBox(
+                    height: 160,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: colors.textPrimary),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) => Container(
+                  height: 100,
+                  alignment: Alignment.center,
+                  color: colors.surface,
+                  child: Text(
+                    'Could not load image',
+                    style: TextStyle(fontSize: 12.5, color: colors.textTertiary),
+                  ),
                 ),
               ),
             ),
-          ),
-          Positioned(
-            top: 8,
-            left: 8,
-            child: GestureDetector(
-              onTap: _submitting ? null : () => setState(() => _chartImage = null),
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.close_rounded, color: Colors.white, size: 16),
-              ),
-            ),
-          ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+// ─── Topic model ────────────────────────────────────────────────────────────
+
+class _WritingTopic {
+  final int id;
+  final int taskNumber;
+  final String title;
+  final String promptHtml;
+  final String? imageUrl;
+
+  const _WritingTopic({
+    required this.id,
+    required this.taskNumber,
+    required this.title,
+    required this.promptHtml,
+    this.imageUrl,
+  });
+
+  factory _WritingTopic.fromJson(Map<String, dynamic> j) {
+    return _WritingTopic(
+      id: (j['id'] as num?)?.toInt() ?? 0,
+      taskNumber: (j['task_number'] as num?)?.toInt() ?? 1,
+      title: j['title']?.toString() ?? '',
+      promptHtml: j['prompt_html']?.toString() ?? '',
+      imageUrl: j['image_url']?.toString(),
     );
   }
 }

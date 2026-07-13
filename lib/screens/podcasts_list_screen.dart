@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
 import '../services/facebook_events_service.dart';
 import '../services/podcast_playback_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/new_badge.dart';
 import 'podcast_player_screen.dart';
 
@@ -81,18 +82,18 @@ class _PodcastsListScreenState extends State<PodcastsListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.chevron_left, color: Color(0xFF272942), size: 28),
+          icon: Icon(Icons.chevron_left, color: context.colors.textPrimary, size: 28),
         ),
-        title: const Text(
+        title: Text(
           'Podcasts',
           style: TextStyle(
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -100,18 +101,18 @@ class _PodcastsListScreenState extends State<PodcastsListScreen> {
         centerTitle: true,
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFF5C542)))
+          ? Center(child: CircularProgressIndicator(color: context.colors.accentYellow))
           : _podcasts.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
                     'No podcasts available',
-                    style: TextStyle(color: Color(0xFFAAAAAA), fontSize: 16),
+                    style: TextStyle(color: context.colors.textTertiary, fontSize: 16),
                   ),
                 )
               : ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   itemCount: _podcasts.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                  separatorBuilder: (_, _) => Divider(height: 1, color: context.colors.border),
                   itemBuilder: (context, i) {
                     final podcast = _podcasts[i];
                     final title = podcast['title'] as String? ?? '';
@@ -139,8 +140,8 @@ class _PodcastsListScreenState extends State<PodcastsListScreen> {
                       leading: Container(
                         width: 48,
                         height: 48,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF272942),
+                        decoration: BoxDecoration(
+                          color: context.colors.brand,
                           shape: BoxShape.circle,
                         ),
                         child: Center(
@@ -156,10 +157,10 @@ class _PodcastsListScreenState extends State<PodcastsListScreen> {
                           Flexible(
                             child: Text(
                               title,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF272942),
+                                color: context.colors.textPrimary,
                               ),
                             ),
                           ),
@@ -174,17 +175,17 @@ class _PodcastsListScreenState extends State<PodcastsListScreen> {
                               padding: const EdgeInsets.only(top: 4),
                               child: Text(
                                 durationText,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w400,
-                                  color: Color(0xFF6C6C6C),
+                                  color: context.colors.textSecondary,
                                 ),
                               ),
                             )
                           : null,
-                      trailing: const Icon(
+                      trailing: Icon(
                         Icons.play_circle_fill,
-                        color: Color(0xFF272942),
+                        color: context.colors.textPrimary,
                         size: 32,
                       ),
                       onTap: () {

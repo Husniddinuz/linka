@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../services/api_constants.dart';
+import '../theme/app_colors.dart';
 
 class PublicOfferScreen extends StatefulWidget {
   const PublicOfferScreen({super.key});
@@ -57,18 +58,18 @@ class _PublicOfferScreenState extends State<PublicOfferScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF272942), size: 20),
+          icon: Icon(Icons.arrow_back_ios, color: context.colors.textPrimary, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           'Public Offer',
           style: TextStyle(
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -76,9 +77,9 @@ class _PublicOfferScreenState extends State<PublicOfferScreen> {
         centerTitle: true,
       ),
       body: _loading
-          ? const Center(
+          ? Center(
               child: CircularProgressIndicator(
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
                 strokeWidth: 2,
               ),
             )
@@ -92,8 +93,8 @@ class _PublicOfferScreenState extends State<PublicOfferScreen> {
                         Text(
                           _error!,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Color(0xFF272942),
+                          style: TextStyle(
+                            color: context.colors.textPrimary,
                             fontSize: 15,
                           ),
                         ),
@@ -107,7 +108,7 @@ class _PublicOfferScreenState extends State<PublicOfferScreen> {
                             _fetch();
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF272942),
+                            backgroundColor: context.colors.brand,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
@@ -128,10 +129,10 @@ class _PublicOfferScreenState extends State<PublicOfferScreen> {
                       if (_title != null) ...[
                         Text(
                           _title!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF272942),
+                            color: context.colors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -139,9 +140,9 @@ class _PublicOfferScreenState extends State<PublicOfferScreen> {
                       if (_lastUpdated != null) ...[
                         Text(
                           'Last updated: $_lastUpdated',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFFAAAAAA),
+                            color: context.colors.textTertiary,
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -149,9 +150,9 @@ class _PublicOfferScreenState extends State<PublicOfferScreen> {
                       if (_content != null)
                         Text(
                           _content!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            color: Color(0xFF444444),
+                            color: context.colors.textSecondary,
                             height: 1.6,
                           ),
                         ),

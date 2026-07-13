@@ -327,7 +327,7 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -335,7 +335,7 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
             _buildTopBar(),
             _buildVideoSection(),
             _buildWebinarInfo(),
-            const Divider(height: 1, color: Color(0xFFEEEEEE)),
+            Divider(height: 1, color: context.colors.border),
             _buildChatToggle(),
             if (_chatExpanded) Expanded(child: _buildChat()),
           ],
@@ -347,21 +347,21 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
   Widget _buildTopBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: Colors.white,
+      color: context.colors.surface,
       child: Row(
         children: [
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
-            child: const Icon(Icons.chevron_left_rounded, size: 30, color: Color(0xFF272942)),
+            child: Icon(Icons.chevron_left_rounded, size: 30, color: context.colors.textPrimary),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               widget.webinar.title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -451,17 +451,17 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
               children: [
                 Text(
                   widget.webinar.tutorName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                   ),
                 ),
-                const Text(
+                Text(
                   'Tutor · Webinar host',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFFAAAAAA),
+                    color: context.colors.textTertiary,
                   ),
                 ),
               ],
@@ -497,18 +497,18 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: const Color(0xFF272942).withValues(alpha: 0.06),
+                color: context.colors.surfaceAlt,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.mic_off_rounded, size: 14, color: Color(0xFFAAAAAA)),
+                  Icon(Icons.mic_off_rounded, size: 14, color: context.colors.textTertiary),
                   const SizedBox(width: 4),
                   Text(
                     'View only',
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey[600],
+                      color: context.colors.textSecondary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -528,12 +528,12 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
-            const Text(
+            Text(
               'LIVE CHAT',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
                 letterSpacing: 0.5,
               ),
             ),
@@ -544,20 +544,20 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _wsConnected
-                    ? const Color(0xFF27AE60)
-                    : const Color(0xFFCCCCCC),
+                    ? context.colors.success
+                    : context.colors.border,
               ),
             ),
             if (!_wsConnected && widget.webinar.isLive) ...[
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: _connectChat,
-                child: const Text(
+                child: Text(
                   'Reconnect',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF2B85DB),
+                    color: context.colors.accentBlue,
                   ),
                 ),
               ),
@@ -567,7 +567,7 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
               _chatExpanded
                   ? Icons.keyboard_arrow_down_rounded
                   : Icons.keyboard_arrow_up_rounded,
-              color: const Color(0xFF272942),
+              color: context.colors.textPrimary,
               size: 20,
             ),
           ],
@@ -586,13 +586,13 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
             onTap: () => FocusScope.of(context).unfocus(),
             behavior: HitTestBehavior.translucent,
             child: _messages.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
                       'No messages yet.\nBe the first to say hi!',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
-                        color: Color(0xFFAAAAAA),
+                        color: context.colors.textTertiary,
                         height: 1.5,
                       ),
                     ),
@@ -621,9 +621,9 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
         : MediaQuery.of(context).viewPadding.bottom + 8.0;
     return Container(
       padding: EdgeInsets.fromLTRB(16, 8, 16, safeBottom),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        border: Border(top: BorderSide(color: context.colors.border)),
       ),
       child: Row(
         children: [
@@ -631,17 +631,17 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: const Color(0xFFF2F2F2),
+                color: context.colors.surfaceAlt,
                 borderRadius: BorderRadius.circular(22),
               ),
               child: TextField(
                 controller: _chatController,
-                style: const TextStyle(fontSize: 14, color: Color(0xFF272942)),
-                decoration: const InputDecoration(
+                style: TextStyle(fontSize: 14, color: context.colors.textPrimary),
+                decoration: InputDecoration(
                   hintText: 'Ask a question...',
-                  hintStyle: TextStyle(color: Color(0xFFAAAAAA), fontSize: 14),
+                  hintStyle: TextStyle(color: context.colors.textTertiary, fontSize: 14),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => _sendMessage(),
@@ -657,8 +657,8 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
               height: 40,
               decoration: BoxDecoration(
                 color: _sendingMessage
-                    ? const Color(0xFFCCCCCC)
-                    : const Color(0xFF272942),
+                    ? context.colors.border
+                    : context.colors.brand,
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
@@ -701,13 +701,13 @@ class _LiveBadge extends StatelessWidget {
           const SizedBox(width: 6),
           Row(
             children: [
-              const Icon(Icons.visibility_outlined, size: 13, color: Color(0xFFAAAAAA)),
+              Icon(Icons.visibility_outlined, size: 13, color: context.colors.textTertiary),
               const SizedBox(width: 3),
               Text(
                 '$viewerCount',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: Color(0xFFAAAAAA),
+                  color: context.colors.textTertiary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -926,10 +926,10 @@ class _ChatBubble extends StatelessWidget {
                     padding: const EdgeInsets.only(left: 4, bottom: 3),
                     child: Text(
                       message.sender,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF272942),
+                        color: context.colors.textPrimary,
                       ),
                     ),
                   ),
@@ -938,8 +938,8 @@ class _ChatBubble extends StatelessWidget {
                       horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: isOwn
-                        ? const Color(0xFF272942)
-                        : const Color(0xFFF2F2F2),
+                        ? context.colors.brand
+                        : context.colors.surfaceAlt,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(16),
                       topRight: const Radius.circular(16),
@@ -951,7 +951,7 @@ class _ChatBubble extends StatelessWidget {
                     message.text,
                     style: TextStyle(
                       fontSize: 13,
-                      color: isOwn ? Colors.white : const Color(0xFF272942),
+                      color: isOwn ? Colors.white : context.colors.textPrimary,
                       height: 1.4,
                     ),
                   ),

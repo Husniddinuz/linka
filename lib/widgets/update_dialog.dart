@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/update_service.dart';
+import '../theme/app_colors.dart';
 
 Future<void> showUpdateDialog(BuildContext context, UpdateInfo info) {
   return showDialog(
@@ -35,7 +36,7 @@ class _UpdateDialog extends StatelessWidget {
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 36),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.colors.surface,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
@@ -105,10 +106,10 @@ class _UpdateDialog extends StatelessWidget {
                       Text(
                         info.message,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w400,
-                          color: Color(0xFF6C6C6C),
+                          color: context.colors.textSecondary,
                           height: 1.45,
                         ),
                       ),
@@ -121,7 +122,7 @@ class _UpdateDialog extends StatelessWidget {
                         child: ElevatedButton(
                           onPressed: _openStore,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF272942),
+                            backgroundColor: context.colors.brand,
                             foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(

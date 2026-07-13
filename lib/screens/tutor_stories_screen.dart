@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:video_player/video_player.dart';
 import '../services/api_service.dart';
 import '../services/user_service.dart';
+import '../theme/app_colors.dart';
 import 'home_screen.dart' show StoryData;
 import 'story_upload_screen.dart';
 import 'story_viewer_screen.dart';
@@ -97,37 +98,37 @@ class _TutorStoriesScreenState extends State<TutorStoriesScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
+        title: Text(
           'Delete story?',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
           ),
         ),
-        content: const Text(
+        content: Text(
           'This story will be permanently removed. This action can\'t be undone.',
-          style: TextStyle(fontSize: 14, color: Color(0xFF6B6B7B)),
+          style: TextStyle(fontSize: 14, color: context.colors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text(
+            child: Text(
               'Cancel',
               style: TextStyle(
-                color: Color(0xFF6B6B7B),
+                color: context.colors.textSecondary,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(
+            child: Text(
               'Delete',
               style: TextStyle(
-                color: Color(0xFFE53935),
+                color: context.colors.error,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -158,19 +159,19 @@ class _TutorStoriesScreenState extends State<TutorStoriesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
               child: Text(
                 'My stories',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                 ),
               ),
             ),
@@ -180,7 +181,7 @@ class _TutorStoriesScreenState extends State<TutorStoriesScreen> {
             ),
             Expanded(
               child: RefreshIndicator(
-                color: const Color(0xFF272942),
+                color: context.colors.textPrimary,
                 onRefresh: _load,
                 child: _loading
                     ? const _GridSkeleton()
@@ -407,7 +408,7 @@ class _VideoThumbState extends State<_VideoThumb> {
     if (_failed) return const _TilePlaceholder();
     final c = _controller;
     if (c == null || !c.value.isInitialized) {
-      return Container(color: const Color(0xFFEFEFF2));
+      return Container(color: context.colors.surfaceAlt);
     }
     return FittedBox(
       fit: BoxFit.cover,
@@ -427,10 +428,10 @@ class _TilePlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFFEFEFF2),
-      child: const Icon(
+      color: context.colors.surfaceAlt,
+      child: Icon(
         Icons.image_outlined,
-        color: Color(0xFFAAAAAA),
+        color: context.colors.textTertiary,
         size: 28,
       ),
     );
@@ -454,7 +455,7 @@ class _GridSkeleton extends StatelessWidget {
       itemCount: 9,
       itemBuilder: (_, _) => Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFEEEEEE),
+          color: context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(12),
         ),
       ),
@@ -482,35 +483,35 @@ class _EmptyState extends StatelessWidget {
                 Container(
                   width: 96,
                   height: 96,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF3F1FB),
+                  decoration: BoxDecoration(
+                    color: context.colors.surfaceAlt,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.auto_stories_rounded,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                     size: 44,
                   ),
                 ),
                 const SizedBox(height: 24),
-                const Text(
+                Text(
                   'No stories yet',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Share a photo or video with your students. '
                   'Stories stay visible for 24 hours.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
                     height: 1.5,
-                    color: Color(0xFF6B6B7B),
+                    color: context.colors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 28),

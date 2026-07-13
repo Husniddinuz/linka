@@ -712,7 +712,7 @@ class _RateSheetState extends State<_RateSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEEEEEE),
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -728,16 +728,16 @@ class _RateSheetState extends State<_RateSheet> {
                           width: 44,
                           height: 44,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const SizedBox(
+                          errorBuilder: (_, _, _) => SizedBox(
                             width: 44,
                             height: 44,
-                            child: ColoredBox(color: Color(0xFFEEEEEE)),
+                            child: ColoredBox(color: context.colors.border),
                           ),
                         )
                       : Container(
                           width: 44,
                           height: 44,
-                          color: const Color(0xFFEEEEEE),
+                          color: context.colors.border,
                         ),
                 ),
                 const SizedBox(width: 12),
@@ -746,17 +746,17 @@ class _RateSheetState extends State<_RateSheet> {
                   children: [
                     Text(
                       widget.participantName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF272942),
+                        color: context.colors.textPrimary,
                       ),
                     ),
-                    const Text(
+                    Text(
                       'Rate this lesson',
                       style: TextStyle(
                         fontSize: 13,
-                        color: Color(0xFFAAAAAA),
+                        color: context.colors.textTertiary,
                       ),
                     ),
                   ],
@@ -767,7 +767,7 @@ class _RateSheetState extends State<_RateSheet> {
             Container(
               padding: const EdgeInsets.symmetric(vertical: 20),
               decoration: BoxDecoration(
-                color: const Color(0xFF272942).withValues(alpha: 0.06),
+                color: context.colors.surfaceAlt,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
@@ -786,8 +786,8 @@ class _RateSheetState extends State<_RateSheet> {
                                 : Icons.star_outline_rounded,
                             size: 40,
                             color: filled
-                                ? const Color(0xFFF5C542)
-                                : const Color(0xFFDDDDDD),
+                                ? context.colors.accentYellow
+                                : context.colors.border,
                           ),
                         ),
                       );
@@ -796,10 +796,10 @@ class _RateSheetState extends State<_RateSheet> {
                   const SizedBox(height: 8),
                   Text(
                     _labels[(_rating - 1).clamp(0, 4)],
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                     ),
                   ),
                 ],
@@ -810,19 +810,19 @@ class _RateSheetState extends State<_RateSheet> {
               controller: _commentController,
               minLines: 3,
               maxLines: 5,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
                 height: 1.5,
               ),
               decoration: InputDecoration(
                 hintText: 'Share your experience...',
-                hintStyle: const TextStyle(
+                hintStyle: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFFBBBBBB),
+                  color: context.colors.textTertiary,
                 ),
                 filled: true,
-                fillColor: const Color(0xFFF5F5F7),
+                fillColor: context.colors.surfaceAlt,
                 contentPadding: const EdgeInsets.all(16),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -834,9 +834,9 @@ class _RateSheetState extends State<_RateSheet> {
               const SizedBox(height: 8),
               Text(
                 _error!,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: Color(0xFFE74C3C),
+                  color: context.colors.error,
                 ),
               ),
             ],
@@ -849,8 +849,8 @@ class _RateSheetState extends State<_RateSheet> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: _saving
-                      ? const Color(0xFF272942).withValues(alpha: 0.5)
-                      : const Color(0xFF272942),
+                      ? context.colors.brand.withValues(alpha: 0.5)
+                      : context.colors.brand,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: _saving

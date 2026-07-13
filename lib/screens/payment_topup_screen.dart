@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../services/wallet_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 
 enum PaymentMethod { click, payme, uzum }
@@ -104,22 +105,22 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(
+          SizedBox(
             width: 56,
             height: 56,
             child: CircularProgressIndicator(
               strokeWidth: 3,
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF272942)),
+              valueColor: AlwaysStoppedAnimation<Color>(context.colors.textPrimary),
             ),
           ),
           const SizedBox(height: 24),
           Text(
             _finalizing ? 'Verifying payment.' : 'Waiting for payment.',
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF272942),
+              color: context.colors.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
@@ -128,9 +129,9 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen>
                 ? 'Checking the payment status with the bank.'
                 : 'Complete the payment in your bank app, then return here.',
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: Color(0xFF888888),
+              color: context.colors.textSecondary,
               height: 1.4,
             ),
           ),
@@ -141,8 +142,8 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen>
             child: ElevatedButton(
               onPressed: _finalizing ? null : _finalize,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF272942),
-                disabledBackgroundColor: const Color(0xFFCCCCCC),
+                backgroundColor: context.colors.brand,
+                disabledBackgroundColor: context.colors.border,
                 foregroundColor: Colors.white,
                 disabledForegroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
@@ -177,11 +178,11 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen>
                       _pendingOrderId = null;
                     });
                   },
-            child: const Text(
+            child: Text(
               'Cancel',
               style: TextStyle(
                 fontSize: 14,
-                color: Color(0xFF888888),
+                color: context.colors.textSecondary,
               ),
             ),
           ),
@@ -261,20 +262,20 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.chevron_left, color: Color(0xFF272942), size: 28),
+          icon: Icon(Icons.chevron_left, color: context.colors.textPrimary, size: 28),
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
-        title: const Text(
+        title: Text(
           'Payment',
           style: TextStyle(
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -289,12 +290,12 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'AMOUNT',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF888888),
+                      color: context.colors.textSecondary,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -305,9 +306,9 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen>
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: context.colors.surface,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE8E8E8)),
+                      border: Border.all(color: context.colors.border),
                     ),
                     child: Row(
                       children: [
@@ -316,42 +317,42 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen>
                             controller: _amountController,
                             keyboardType: TextInputType.number,
                             onChanged: (_) => setState(() {}),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF272942),
+                              color: context.colors.textPrimary,
                             ),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               hintText: '0',
                               hintStyle: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFFCCCCCC),
+                                color: context.colors.textTertiary,
                               ),
                               border: InputBorder.none,
                               isCollapsed: true,
-                              contentPadding: EdgeInsets.symmetric(vertical: 16),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 16),
                             ),
                           ),
                         ),
-                        const Text(
+                        Text(
                           'UZS',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF999999),
+                            color: context.colors.textSecondary,
                           ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Text(
+                  Text(
                     'PAYMENT METHOD',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF888888),
+                      color: context.colors.textSecondary,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -397,17 +398,17 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen>
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF6F6F6),
+                      color: context.colors.surfaceAlt,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.info_outline, size: 18, color: Color(0xFF6C9BD1)),
-                        SizedBox(width: 10),
+                        Icon(Icons.info_outline, size: 18, color: context.colors.accentBlue),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             'Select from the options to go to the bank app and top up your wallet.',
-                            style: TextStyle(fontSize: 13, color: Color(0xFF888888)),
+                            style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
                           ),
                         ),
                       ],
@@ -427,8 +428,8 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen>
               child: ElevatedButton(
                 onPressed: _canSubmit ? _onTopUp : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF272942),
-                  disabledBackgroundColor: const Color(0xFFCCCCCC),
+                  backgroundColor: context.colors.brand,
+                  disabledBackgroundColor: context.colors.border,
                   foregroundColor: Colors.white,
                   disabledForegroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
@@ -482,10 +483,10 @@ class _PaymentMethodCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? const Color(0xFFFF8C00) : const Color(0xFFE8E8E8),
+            color: isSelected ? const Color(0xFFFF8C00) : context.colors.border,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -499,7 +500,7 @@ class _PaymentMethodCard extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? const Color(0xFFFF8C00) : const Color(0xFFCCCCCC),
+                  color: isSelected ? const Color(0xFFFF8C00) : context.colors.border,
                   width: 2,
                 ),
               ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/skeleton.dart';
 import 'notifications_screen.dart';
 
@@ -90,7 +91,7 @@ class _NotificationsInboxScreenState extends State<NotificationsInboxScreen> {
     final hasUnread = _items.any((i) => !i.isRead);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -101,13 +102,13 @@ class _NotificationsInboxScreenState extends State<NotificationsInboxScreen> {
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
-                    child: const Icon(
+                    child: Icon(
                       Icons.chevron_left_rounded,
                       size: 30,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                     ),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
                         'Notifications',
@@ -115,7 +116,7 @@ class _NotificationsInboxScreenState extends State<NotificationsInboxScreen> {
                           fontFamily: 'SF Pro',
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF272942),
+                          color: context.colors.textPrimary,
                         ),
                       ),
                     ),
@@ -126,10 +127,10 @@ class _NotificationsInboxScreenState extends State<NotificationsInboxScreen> {
                         builder: (_) => const NotificationsScreen(),
                       ),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.settings_outlined,
                       size: 24,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                     ),
                   ),
                 ],
@@ -149,8 +150,8 @@ class _NotificationsInboxScreenState extends State<NotificationsInboxScreen> {
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                         color: _markingAll
-                            ? const Color(0xFFAAAAAA)
-                            : const Color(0xFF272942),
+                            ? context.colors.textTertiary
+                            : context.colors.textPrimary,
                       ),
                     ),
                   ),
@@ -159,7 +160,7 @@ class _NotificationsInboxScreenState extends State<NotificationsInboxScreen> {
             const SizedBox(height: 12),
             Expanded(
               child: RefreshIndicator(
-                color: const Color(0xFF272942),
+                color: context.colors.textPrimary,
                 onRefresh: _load,
                 child: _loading
                     ? ListView.builder(
@@ -292,12 +293,14 @@ class _InboxCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
         decoration: BoxDecoration(
-          color: unread ? const Color(0xFFFFF8E6) : const Color(0xFFF6F6F6),
+          color: unread
+              ? context.colors.accentYellow.withValues(alpha: 0.12)
+              : context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: unread
-                ? const Color(0xFFF5C542).withValues(alpha: 0.5)
-                : const Color(0xFFEEEEEE),
+                ? context.colors.accentYellow.withValues(alpha: 0.5)
+                : context.colors.border,
           ),
         ),
         child: Row(
@@ -306,13 +309,13 @@ class _InboxCard extends StatelessWidget {
             Container(
               width: 40,
               height: 40,
-              decoration: const BoxDecoration(
-                color: Color(0xFF272942),
+              decoration: BoxDecoration(
+                color: context.colors.brand,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 _iconForType(item.type),
-                color: const Color(0xFFF5C542),
+                color: context.colors.accentYellow,
                 size: 20,
               ),
             ),
@@ -326,11 +329,11 @@ class _InboxCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           item.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'SF Pro',
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF272942),
+                            color: context.colors.textPrimary,
                             height: 1.3,
                           ),
                           maxLines: 1,
@@ -340,11 +343,11 @@ class _InboxCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text(
                         _timeAgo(item.createdAt),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'SF Pro',
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
-                          color: Color(0xFFAAAAAA),
+                          color: context.colors.textTertiary,
                         ),
                       ),
                     ],
@@ -353,11 +356,11 @@ class _InboxCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       item.body,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'SF Pro',
                         fontSize: 13,
                         fontWeight: FontWeight.w400,
-                        color: Color(0xFF6C6C6C),
+                        color: context.colors.textSecondary,
                         height: 1.35,
                       ),
                       maxLines: 3,
@@ -395,9 +398,9 @@ class _NotificationDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.all(Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.all(Radius.circular(20)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -407,7 +410,7 @@ class _NotificationDetailSheet extends StatelessWidget {
             width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: const Color(0xFFDDDDDD),
+              color: context.colors.border,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -415,13 +418,13 @@ class _NotificationDetailSheet extends StatelessWidget {
           Container(
             width: 52,
             height: 52,
-            decoration: const BoxDecoration(
-              color: Color(0xFF272942),
+            decoration: BoxDecoration(
+              color: context.colors.brand,
               shape: BoxShape.circle,
             ),
             child: Icon(
               _iconForType(item.type),
-              color: const Color(0xFFF5C542),
+              color: context.colors.accentYellow,
               size: 26,
             ),
           ),
@@ -431,11 +434,11 @@ class _NotificationDetailSheet extends StatelessWidget {
             child: Text(
               item.title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
                 height: 1.3,
               ),
             ),
@@ -447,11 +450,11 @@ class _NotificationDetailSheet extends StatelessWidget {
               child: Text(
                 item.body,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'SF Pro',
                   fontSize: 14,
                   fontWeight: FontWeight.w400,
-                  color: Color(0xFF6C6C6C),
+                  color: context.colors.textSecondary,
                   height: 1.5,
                 ),
               ),
@@ -462,11 +465,11 @@ class _NotificationDetailSheet extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Text(
               _timeAgo(item.createdAt),
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 12,
                 fontWeight: FontWeight.w400,
-                color: Color(0xFFAAAAAA),
+                color: context.colors.textTertiary,
               ),
             ),
           ),
@@ -479,7 +482,7 @@ class _NotificationDetailSheet extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF272942),
+                  color: context.colors.brand,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Text(
@@ -516,13 +519,13 @@ class _EmptyState extends StatelessWidget {
           height: 40,
         ),
         const SizedBox(height: 12),
-        const Text(
+        Text(
           'No notifications yet',
           style: TextStyle(
             fontFamily: 'SF Pro',
             fontSize: 16,
             fontWeight: FontWeight.w500,
-            color: Color(0xFFAAAAAA),
+            color: context.colors.textTertiary,
           ),
         ),
       ],
