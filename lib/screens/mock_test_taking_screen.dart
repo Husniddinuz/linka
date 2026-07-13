@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import '../models/mock_test.dart';
 import '../services/mock_test_service.dart';
 import '../services/podcast_playback_service.dart';
 import '../services/prefs_service.dart';
@@ -35,7 +36,7 @@ class MockTestTakingScreen extends StatefulWidget {
 }
 
 class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
-  Map<String, dynamic>? _test;
+  MockTest? _test;
   bool _loading = true;
   String? _error;
 
@@ -84,18 +85,16 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
       setState(() {
         _test = data;
         _loading = false;
-        _remaining = Duration(
-          seconds: (data['duration_seconds'] as num?)?.toInt() ?? 3600,
-        );
+        _remaining = Duration(seconds: data.durationSeconds);
       });
       _startTimer();
       if (_isListening) {
-        final audioUrl = data['audio_url'] as String?;
-        if (audioUrl != null && audioUrl.isNotEmpty) {
+        final audioUrl = data.audioUrl;
+        if (audioUrl.isNotEmpty) {
           await PodcastPlaybackService.instance.loadAdHoc(
             'mock-listening-${widget.testId}',
             Uri.parse(audioUrl),
-            title: data['title']?.toString() ?? 'Listening test',
+            title: data.title.isNotEmpty ? data.title : 'Listening test',
           );
         }
       }
@@ -127,23 +126,18 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
     return h > 0 ? '$h:$m:$s' : '$m:$s';
   }
 
-  List<Map<String, dynamic>> get _sections =>
-      ((_test?['sections'] as List?) ?? const []).cast<Map<String, dynamic>>();
+  List<TestSection> get _sections => _test?.sections ?? const [];
 
-  /// question id -> {number, number_end}, flattened across every section so
+  /// question id -> Question, flattened across every section so
   /// answered-progress can be reported against the real IELTS question
   /// numbers (1-40) rather than UI rows — a "choose FOUR letters" question is
   /// one row in the answers map but spans 4 question numbers (37-40).
-  Map<String, Map<String, dynamic>> get _questionIndex {
-    final index = <String, Map<String, dynamic>>{};
+  Map<String, Question> get _questionIndex {
+    final index = <String, Question>{};
     for (final section in _sections) {
-      final groups = ((section['question_groups'] as List?) ?? const [])
-          .cast<Map<String, dynamic>>();
-      for (final g in groups) {
-        final questions = ((g['questions'] as List?) ?? const [])
-            .cast<Map<String, dynamic>>();
-        for (final q in questions) {
-          index[q['id'].toString()] = q;
+      for (final g in section.questionGroups) {
+        for (final q in g.questions) {
+          index[q.id.toString()] = q;
         }
       }
     }
@@ -155,10 +149,8 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
     var count = 0;
     _answers.forEach((id, value) {
       final q = index[id];
-      final end = q?['number_end'] as num?;
-      final span = end != null
-          ? (end.toInt() - (q!['number'] as num).toInt() + 1)
-          : 1;
+      final end = q?.numberEnd;
+      final span = end != null ? (end - q!.number + 1) : 1;
       if (value is String && value.trim().isNotEmpty) {
         count += 1;
       } else if (value is List && value.isNotEmpty) {
@@ -168,7 +160,7 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
     return count;
   }
 
-  int get _totalQuestions => (_test?['total_questions'] as num?)?.toInt() ?? 0;
+  int get _totalQuestions => _test?.totalQuestions ?? 0;
 
   Future<void> _confirmSubmit({bool auto = false}) async {
     if (_submitting) return;
@@ -401,7 +393,7 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
       backgroundColor: Colors.white,
       appBar: mtAppBar(
         context,
-        title: _test!['title']?.toString() ?? 'Mock test',
+        title: _test!.title.isNotEmpty ? _test!.title : 'Mock test',
         actions: [
           if (!_isListening)
             IconButton(
@@ -489,7 +481,7 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                   : _ReadingSplitView(
                       passage: _PassageView(
                         passageKey: '${widget.testId}_$_sectionIndex',
-                        bodyHtml: section['body_html']?.toString() ?? '',
+                        bodyHtml: section.bodyHtml,
                         background: _passageBackground,
                         fontScale: _passageFontScale,
                       ),
@@ -896,22 +888,20 @@ class _QuestionsView extends StatelessWidget {
     required this.onAnswer,
   });
 
-  final Map<String, dynamic> section;
+  final TestSection section;
   final Map<String, dynamic> answers;
   final void Function(String questionId, dynamic value) onAnswer;
 
   @override
   Widget build(BuildContext context) {
-    final groups = ((section['question_groups'] as List?) ?? const [])
-        .cast<Map<String, dynamic>>();
+    final groups = section.questionGroups;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: groups.map((group) {
-          final questions = ((group['questions'] as List?) ?? const [])
-              .cast<Map<String, dynamic>>();
-          final instruction = group['instruction_html']?.toString() ?? '';
+          final questions = group.questions;
+          final instruction = group.instructionHtml;
           return Padding(
             padding: const EdgeInsets.only(bottom: 22),
             child: Column(
@@ -937,20 +927,14 @@ class _QuestionsView extends StatelessWidget {
                       ),
                     ),
                   ),
-                if (group['type'] == 'text' &&
-                    questions.every(
-                      (q) =>
-                          (q['prompt_text'] as String?)?.contains('___') ??
-                          false,
-                    ))
-                  TextGroupInline(
-                    questions: questions,
-                    answers: answers,
-                    onChanged: onAnswer,
-                  )
+                if (questionTypeHandler(
+                      group.type,
+                    ).buildGroupBlock?.call(group, questions, answers, onAnswer)
+                    case final block?)
+                  block
                 else
                   ...questions.map((q) {
-                    final id = q['id'].toString();
+                    final id = q.id.toString();
                     return QuestionField(
                       question: q,
                       group: group,

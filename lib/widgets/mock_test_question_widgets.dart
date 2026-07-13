@@ -1,24 +1,6 @@
 import 'package:flutter/material.dart';
+import '../models/mock_test.dart';
 import 'mock_test_styles.dart';
-
-/// Returns this question's own options, falling back to the group's shared
-/// legend (matching/true-false/MCQ groups usually only store options once,
-/// on the group, since every question in the group shares the same choices).
-List<Map<String, dynamic>> questionOptions(
-  Map<String, dynamic> question,
-  Map<String, dynamic> group,
-) {
-  final own = (question['options'] as List?) ?? const [];
-  if (own.isNotEmpty) return own.cast<Map<String, dynamic>>();
-  final shared = (group['shared_options'] as List?) ?? const [];
-  return shared.cast<Map<String, dynamic>>();
-}
-
-String questionLabel(Map<String, dynamic> question) {
-  final end = question['number_end'];
-  final n = question['number'];
-  return end != null ? '$n–$end' : '$n';
-}
 
 const _promptStyle = TextStyle(
   fontFamily: 'SF Pro',
@@ -29,18 +11,18 @@ const _promptStyle = TextStyle(
 
 class _QuestionShell extends StatelessWidget {
   const _QuestionShell({required this.question, required this.child});
-  final Map<String, dynamic> question;
+  final Question question;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final prompt = (question['prompt_text'] as String?) ?? '';
+    final prompt = question.promptText;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _QuestionNumberBadge(label: questionLabel(question)),
+          _QuestionNumberBadge(label: question.label),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -100,7 +82,7 @@ class TextAnswerField extends StatelessWidget {
     required this.onChanged,
   });
 
-  final Map<String, dynamic> question;
+  final Question question;
   final String? value;
   final ValueChanged<String> onChanged;
 
@@ -144,7 +126,7 @@ class TextGroupInline extends StatelessWidget {
     required this.onChanged,
   });
 
-  final List<Map<String, dynamic>> questions;
+  final List<Question> questions;
   final Map<String, dynamic> answers;
   final void Function(String questionId, String value) onChanged;
 
@@ -159,7 +141,7 @@ class TextGroupInline extends StatelessWidget {
     // with its blanks assigned to the sibling questions in order, instead of
     // repeating the text once per question with every blank mislabeled the
     // same number.
-    final prompts = questions.map((q) => (q['prompt_text'] as String?) ?? '').toList();
+    final prompts = questions.map((q) => q.promptText).toList();
     final shared = prompts.isNotEmpty && prompts.toSet().length == 1 ? prompts.first : null;
     final sharedBlankCount = shared != null ? '___'.allMatches(shared).length : 0;
 
@@ -174,8 +156,7 @@ class TextGroupInline extends StatelessWidget {
       }
     } else {
       for (final q in questions) {
-        final prompt = (q['prompt_text'] as String?) ?? '';
-        final parts = prompt.split('___');
+        final parts = q.promptText.split('___');
         for (var i = 0; i < parts.length; i++) {
           final text = parts[i].trim();
           if (text.isNotEmpty) spans.add(TextSpan(text: '$text '));
@@ -186,14 +167,14 @@ class TextGroupInline extends StatelessWidget {
     return Text.rich(TextSpan(style: style, children: spans));
   }
 
-  WidgetSpan _blankSpan(Map<String, dynamic> question) {
-    final id = question['id'].toString();
+  WidgetSpan _blankSpan(Question question) {
+    final id = question.id.toString();
     return WidgetSpan(
       alignment: PlaceholderAlignment.middle,
       child: Padding(
         padding: const EdgeInsets.only(right: 6),
         child: _InlineBlank(
-          label: questionLabel(question),
+          label: question.label,
           value: answers[id] as String?,
           onChanged: (v) => onChanged(id, v),
         ),
@@ -258,19 +239,19 @@ class SingleChoiceField extends StatelessWidget {
     required this.onChanged,
   });
 
-  final Map<String, dynamic> question;
-  final Map<String, dynamic> group;
+  final Question question;
+  final QuestionGroup group;
   final String? value;
   final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final options = questionOptions(question, group);
+    final options = question.effectiveOptions(group);
     return _QuestionShell(
       question: question,
       child: Column(
         children: options.map((opt) {
-          final optValue = opt['value']?.toString() ?? '';
+          final optValue = opt.value;
           final selected = value == optValue;
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -294,7 +275,7 @@ class SingleChoiceField extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        opt['label']?.toString() ?? optValue,
+                        opt.label.isNotEmpty ? opt.label : optValue,
                         style: TextStyle(
                           fontFamily: 'SF Pro',
                           fontSize: 14,
@@ -323,8 +304,8 @@ class MultiSelectField extends StatelessWidget {
     required this.onChanged,
   });
 
-  final Map<String, dynamic> question;
-  final Map<String, dynamic> group;
+  final Question question;
+  final QuestionGroup group;
   final List<String> values;
   final ValueChanged<List<String>> onChanged;
 
@@ -336,15 +317,14 @@ class MultiSelectField extends StatelessWidget {
   /// hard-blocking selection at the span count can itself force a wrong
   /// answer. Selection stays unrestricted; grading is authoritative.
   int? get _expectedCount {
-    final start = (question['number'] as num?)?.toInt();
-    final end = (question['number_end'] as num?)?.toInt();
-    if (start == null || end == null) return null;
-    return end - start + 1;
+    final end = question.numberEnd;
+    if (end == null) return null;
+    return end - question.number + 1;
   }
 
   @override
   Widget build(BuildContext context) {
-    final options = questionOptions(question, group);
+    final options = question.effectiveOptions(group);
     final expected = _expectedCount;
     return _QuestionShell(
       question: question,
@@ -360,7 +340,7 @@ class MultiSelectField extends StatelessWidget {
               ),
             ),
           ...options.map((opt) {
-            final optValue = opt['value']?.toString() ?? '';
+            final optValue = opt.value;
             final selected = values.contains(optValue);
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -392,7 +372,7 @@ class MultiSelectField extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          opt['label']?.toString() ?? optValue,
+                          opt.label.isNotEmpty ? opt.label : optValue,
                           style: TextStyle(
                             fontFamily: 'SF Pro',
                             fontSize: 14,
@@ -413,7 +393,77 @@ class MultiSelectField extends StatelessWidget {
   }
 }
 
-/// Renders one question of any type, dispatching on the group's `type`.
+/// Everything a question type needs to describe how it renders, in one
+/// place: [buildField] renders a single question's answer input (used by
+/// [QuestionField]); the optional [buildGroupBlock] lets a type render its
+/// whole group as one block instead of stacking per-question fields (e.g.
+/// [TextGroupInline]'s flowing fill-in-the-blank paragraph) — return null to
+/// fall back to per-question [buildField] cards.
+///
+/// Adding a new question type means adding one [QuestionTypeHandler] entry
+/// to [kQuestionTypeRegistry] — nothing else in this file branches on
+/// `group.type`.
+class QuestionTypeHandler {
+  const QuestionTypeHandler({required this.buildField, this.buildGroupBlock});
+
+  final Widget Function(
+    BuildContext context, {
+    required Question question,
+    required QuestionGroup group,
+    required dynamic answer,
+    required ValueChanged<dynamic> onChanged,
+  })
+  buildField;
+
+  final Widget? Function(
+    QuestionGroup group,
+    List<Question> questions,
+    Map<String, dynamic> answers,
+    void Function(String questionId, dynamic value) onAnswer,
+  )?
+  buildGroupBlock;
+}
+
+final Map<String, QuestionTypeHandler> kQuestionTypeRegistry = {
+  'text': QuestionTypeHandler(
+    buildField: (context, {required question, required group, required answer, required onChanged}) =>
+        TextAnswerField(question: question, value: answer as String?, onChanged: onChanged),
+    buildGroupBlock: (group, questions, answers, onAnswer) {
+      // Renders the whole group as one flowing paragraph only when every
+      // question's prompt actually has a blank to fill; otherwise falls
+      // back to per-question TextAnswerField cards (same fallback as every
+      // other type).
+      final everyPromptHasBlank = questions.every((q) => q.promptText.contains('___'));
+      if (!everyPromptHasBlank) return null;
+      return TextGroupInline(questions: questions, answers: answers, onChanged: onAnswer);
+    },
+  ),
+  'single_choice': QuestionTypeHandler(
+    buildField: (context, {required question, required group, required answer, required onChanged}) =>
+        SingleChoiceField(question: question, group: group, value: answer as String?, onChanged: onChanged),
+  ),
+  'true_false_ng': QuestionTypeHandler(
+    buildField: (context, {required question, required group, required answer, required onChanged}) =>
+        SingleChoiceField(question: question, group: group, value: answer as String?, onChanged: onChanged),
+  ),
+  'multi_select': QuestionTypeHandler(
+    buildField: (context, {required question, required group, required answer, required onChanged}) =>
+        MultiSelectField(
+          question: question,
+          group: group,
+          values: (answer as List?)?.cast<String>() ?? const [],
+          onChanged: onChanged,
+        ),
+  ),
+};
+
+/// Looks up the handler for [type], falling back to the 'text' handler for
+/// any unrecognized type — mirrors the previous switch statement's implicit
+/// `default:` fallthrough.
+QuestionTypeHandler questionTypeHandler(String type) =>
+    kQuestionTypeRegistry[type] ?? kQuestionTypeRegistry['text']!;
+
+/// Renders one question of any type, dispatching via [kQuestionTypeRegistry].
 class QuestionField extends StatelessWidget {
   const QuestionField({
     super.key,
@@ -423,36 +473,13 @@ class QuestionField extends StatelessWidget {
     required this.onChanged,
   });
 
-  final Map<String, dynamic> question;
-  final Map<String, dynamic> group;
+  final Question question;
+  final QuestionGroup group;
   final dynamic answer;
   final ValueChanged<dynamic> onChanged;
 
   @override
-  Widget build(BuildContext context) {
-    switch (group['type']) {
-      case 'multi_select':
-        return MultiSelectField(
-          question: question,
-          group: group,
-          values: (answer as List?)?.cast<String>() ?? const [],
-          onChanged: onChanged,
-        );
-      case 'single_choice':
-      case 'true_false_ng':
-        return SingleChoiceField(
-          question: question,
-          group: group,
-          value: answer as String?,
-          onChanged: onChanged,
-        );
-      case 'text':
-      default:
-        return TextAnswerField(
-          question: question,
-          value: answer as String?,
-          onChanged: onChanged,
-        );
-    }
-  }
+  Widget build(BuildContext context) => questionTypeHandler(
+    group.type,
+  ).buildField(context, question: question, group: group, answer: answer, onChanged: onChanged);
 }

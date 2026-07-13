@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/mock_test.dart';
 import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
 import 'mock_test_taking_screen.dart';
@@ -17,7 +18,7 @@ class MockTestListScreen extends StatefulWidget {
 }
 
 class _MockTestListScreenState extends State<MockTestListScreen> {
-  late Future<List<Map<String, dynamic>>> _future = MockTestService.fetchTests(widget.testType);
+  late Future<List<MockTest>> _future = MockTestService.fetchTests(widget.testType);
   bool _isLocked = false;
 
   @override
@@ -38,7 +39,7 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: mtAppBar(context, title: isListening ? 'Listening' : 'Reading'),
-      body: FutureBuilder<List<Map<String, dynamic>>>(
+      body: FutureBuilder<List<MockTest>>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -68,7 +69,7 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
 
           final locked = _isLocked && tests.length > _freeTestLimit;
           final visible = locked ? tests.sublist(0, _freeTestLimit) : tests;
-          final hidden = locked ? tests.sublist(_freeTestLimit) : const <Map<String, dynamic>>[];
+          final hidden = locked ? tests.sublist(_freeTestLimit) : const <MockTest>[];
 
           return RefreshIndicator(
             color: MockTestColors.navy,
@@ -107,13 +108,13 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
 
 class _TestCard extends StatelessWidget {
   const _TestCard({required this.test, required this.testType, required this.locked});
-  final Map<String, dynamic> test;
+  final MockTest test;
   final String testType;
   final bool locked;
 
   @override
   Widget build(BuildContext context) {
-    final minutes = ((test['duration_seconds'] as num?)?.toInt() ?? 0) ~/ 60;
+    final minutes = test.durationSeconds ~/ 60;
     final icon = testType == 'listening' ? Icons.headphones_rounded : Icons.menu_book_rounded;
     return GestureDetector(
       onTap: locked
@@ -121,7 +122,7 @@ class _TestCard extends StatelessWidget {
           : () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => MockTestTakingScreen(testId: test['id'] as int, testType: testType),
+                  builder: (_) => MockTestTakingScreen(testId: test.id, testType: testType),
                 ),
               ),
       child: Container(
@@ -136,7 +137,7 @@ class _TestCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    test['title']?.toString() ?? '',
+                    test.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -148,7 +149,7 @@ class _TestCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${test['total_questions'] ?? 40} questions · $minutes min',
+                    '${test.totalQuestions} questions · $minutes min',
                     style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: MockTestColors.grey),
                   ),
                 ],

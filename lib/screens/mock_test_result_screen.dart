@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
+import '../models/mock_test.dart';
 import '../widgets/mock_test_styles.dart';
 
 class MockTestResultScreen extends StatelessWidget {
   const MockTestResultScreen({super.key, required this.attempt});
 
-  final Map<String, dynamic> attempt;
+  final MockTestAttempt attempt;
 
   @override
   Widget build(BuildContext context) {
-    final rawScore = (attempt['raw_score'] as num?)?.toInt() ?? 0;
-    final maxScore = (attempt['max_score'] as num?)?.toInt() ?? 0;
-    final band = attempt['band_score']?.toString() ?? '-';
-    final details = ((attempt['result_detail'] as List?) ?? const []).cast<Map<String, dynamic>>();
+    final rawScore = attempt.rawScore ?? 0;
+    final maxScore = attempt.maxScore ?? 0;
+    final band = attempt.bandScore ?? '-';
+    final details = attempt.resultDetail;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -68,12 +69,10 @@ class MockTestResultScreen extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           ...details.map((d) {
-            final correct = d['is_correct'] == true;
-            final number = d['number'];
-            final endNumber = d['number_end'];
-            final label = endNumber != null ? '$number–$endNumber' : '$number';
-            final submitted = _formatAnswer(d['submitted']);
-            final correctAnswer = _formatAnswer(d['correct_answer']);
+            final correct = d.isCorrect;
+            final label = d.label;
+            final submitted = _formatAnswer(d.submitted);
+            final correctAnswer = _formatAnswer(d.correctAnswer);
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),

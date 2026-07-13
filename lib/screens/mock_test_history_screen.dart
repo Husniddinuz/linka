@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/mock_test.dart';
 import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
 import 'mock_test_result_screen.dart';
@@ -14,7 +15,7 @@ class MockTestHistoryScreen extends StatefulWidget {
 class _MockTestHistoryScreenState extends State<MockTestHistoryScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController = TabController(length: 2, vsync: this);
-  final Future<List<Map<String, dynamic>>> _testAttempts = MockTestService.fetchAttempts();
+  final Future<List<MockTestAttempt>> _testAttempts = MockTestService.fetchAttempts();
   final Future<List<Map<String, dynamic>>> _writingAttempts = MockTestService.fetchWritingAttempts();
 
   @override
@@ -50,7 +51,7 @@ class _MockTestHistoryScreenState extends State<MockTestHistoryScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          FutureBuilder<List<Map<String, dynamic>>>(
+          FutureBuilder<List<MockTestAttempt>>(
             future: _testAttempts,
             builder: (context, snapshot) {
               if (snapshot.connectionState != ConnectionState.done) {
@@ -64,13 +65,12 @@ class _MockTestHistoryScreenState extends State<MockTestHistoryScreen>
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, i) {
                   final a = attempts[i];
-                  final test = (a['test'] as Map?) ?? const {};
-                  final icon = test['test_type'] == 'listening' ? Icons.headphones_rounded : Icons.menu_book_rounded;
+                  final icon = a.testType == 'listening' ? Icons.headphones_rounded : Icons.menu_book_rounded;
                   return _HistoryRow(
                     icon: icon,
-                    title: test['title']?.toString() ?? '',
-                    subtitle: '${a['raw_score']}/${a['max_score']} correct',
-                    band: '${a['band_score'] ?? '-'}',
+                    title: a.testTitle,
+                    subtitle: '${a.rawScore}/${a.maxScore} correct',
+                    band: a.bandScore ?? '-',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => MockTestResultScreen(attempt: a)),
