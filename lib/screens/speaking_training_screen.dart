@@ -13,6 +13,7 @@ import '../services/api_service.dart';
 import '../services/plus_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/free_minutes_dialog.dart';
 import 'plus_subscription_screen.dart';
 
@@ -797,7 +798,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
   void _showGenderFilter() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1832,10 +1833,10 @@ class _GenderOption extends StatelessWidget {
       leading: Icon(icon, color: iconColor, size: 26),
       title: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w500,
-          color: Color(0xFF272942),
+          color: context.colors.textPrimary,
         ),
       ),
       trailing: Container(
@@ -1846,7 +1847,7 @@ class _GenderOption extends StatelessWidget {
           border: Border.all(
             color: isSelected
                 ? const Color(0xFF6C6CFF)
-                : const Color(0xFFCCCCCC),
+                : context.colors.border,
             width: 2,
           ),
         ),

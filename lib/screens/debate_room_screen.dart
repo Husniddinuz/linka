@@ -11,6 +11,7 @@ import '../services/api_constants.dart';
 import '../services/api_service.dart';
 import '../services/debate_service.dart';
 import '../services/token_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/cached_avatar.dart';
 
 // ─── Chat message model ────────────────────────────────────────────────────────
@@ -1204,7 +1205,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
   void _openAdminPanel() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -1236,7 +1237,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE0E0E0),
+                      color: context.colors.border,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1244,27 +1245,27 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
                     child: Row(
                       children: [
-                        const Text(
+                        Text(
                           'Manage debate',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF272942),
+                            color: context.colors.textPrimary,
                           ),
                         ),
                         const Spacer(),
                         Text(
                           '$speakerCount/$_capacity speakers',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFFAAAAAA),
+                            color: context.colors.textTertiary,
                           ),
                         ),
                         const SizedBox(width: 10),
                         GestureDetector(
                           onTap: _seedRosterFromState,
-                          child: const Icon(Icons.refresh_rounded,
-                              size: 20, color: Color(0xFF272942)),
+                          child: Icon(Icons.refresh_rounded,
+                              size: 20, color: context.colors.textPrimary),
                         ),
                       ],
                     ),
@@ -1540,7 +1541,7 @@ class _AdminRosterRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final roleColor = entry.isSpeaker
         ? const Color(0xFF27AE60)
-        : const Color(0xFFAAAAAA);
+        : context.colors.textTertiary;
     final roleLabel = entry.isSpeaker
         ? 'Speaker ${entry.team ?? ''}'.trim()
         : 'Watcher';
@@ -1559,10 +1560,10 @@ class _AdminRosterRow extends StatelessWidget {
                   isSelf ? '${entry.name} (you)' : entry.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -1578,14 +1579,14 @@ class _AdminRosterRow extends StatelessWidget {
             ),
           ),
           if (busy)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
               child: SizedBox(
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Color(0xFFAAAAAA),
+                  color: context.colors.textTertiary,
                 ),
               ),
             )

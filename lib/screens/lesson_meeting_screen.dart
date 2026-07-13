@@ -247,7 +247,7 @@ class _LessonMeetingScreenState extends State<LessonMeetingScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -262,7 +262,7 @@ class _LessonMeetingScreenState extends State<LessonMeetingScreen> {
     if (_leaving) return;
     final leave = await showModalBottomSheet<bool>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -859,18 +859,18 @@ class _ChatSheetState extends State<_ChatSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFFDDDDDD),
+                color: context.colors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Chat',
               style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
@@ -880,10 +880,10 @@ class _ChatSheetState extends State<_ChatSheet> {
                 valueListenable: widget.messagesListenable,
                 builder: (_, msgs, _) {
                   if (msgs.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Text(
                         'No messages yet',
-                        style: TextStyle(color: Color(0xFFAAAAAA)),
+                        style: TextStyle(color: context.colors.textTertiary),
                       ),
                     );
                   }
@@ -910,7 +910,7 @@ class _ChatSheetState extends State<_ChatSheet> {
                         decoration: InputDecoration(
                           hintText: 'Message…',
                           filled: true,
-                          fillColor: const Color(0xFFF2F2F2),
+                          fillColor: context.colors.surfaceAlt,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 14,
                             vertical: 12,
@@ -928,8 +928,8 @@ class _ChatSheetState extends State<_ChatSheet> {
                       child: Container(
                         width: 44,
                         height: 44,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF272942),
+                        decoration: BoxDecoration(
+                          color: context.colors.brand,
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.send, color: Colors.white, size: 20),
@@ -963,8 +963,8 @@ class _ChatBubble extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: mine
-                    ? const Color(0xFF272942)
-                    : const Color(0xFFF2F2F2),
+                    ? context.colors.brand
+                    : context.colors.surfaceAlt,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(14),
                   topRight: const Radius.circular(14),
@@ -979,17 +979,17 @@ class _ChatBubble extends StatelessWidget {
                   if (!mine)
                     Text(
                       entry.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF6C6C6C),
+                        color: context.colors.textSecondary,
                       ),
                     ),
                   if (!mine) const SizedBox(height: 2),
                   Text(
                     entry.text,
                     style: TextStyle(
-                      color: mine ? Colors.white : const Color(0xFF272942),
+                      color: mine ? Colors.white : context.colors.textPrimary,
                       fontSize: 14,
                     ),
                   ),
@@ -1015,23 +1015,23 @@ class _LeaveSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'Leave the lesson?',
               style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'You can rejoin while the lesson is still active.',
               style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 14,
-                color: Color(0xFF6C6C6C),
+                color: context.colors.textSecondary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -1041,7 +1041,7 @@ class _LeaveSheet extends StatelessWidget {
               child: Container(
                 height: 48,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE53935),
+                  color: context.colors.error,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Center(
@@ -1062,14 +1062,14 @@ class _LeaveSheet extends StatelessWidget {
               child: Container(
                 height: 48,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF2F2F2),
+                  color: context.colors.surfaceAlt,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
                     'Stay',
                     style: TextStyle(
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),

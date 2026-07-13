@@ -76,7 +76,9 @@ class _TutorCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = tutor['tutor_name']?.toString() ?? '';
     final imageUrl = tutor['tutor_image_url'] as String?;
-    final band = tutor['band_score']?.toString();
+    // The tutor's own IELTS Speaking score (their credential) — distinct
+    // from this specific sample's band_score.
+    final speakingScore = tutor['tutor_speaking_score']?.toString();
     final parts = (tutor['parts'] as List?) ?? const [];
 
     return GestureDetector(
@@ -107,7 +109,7 @@ class _TutorCard extends StatelessWidget {
                 ),
               ),
             ),
-            if (band != null)
+            if (speakingScore != null)
               Positioned(
                 top: 10,
                 right: 10,
@@ -115,7 +117,7 @@ class _TutorCard extends StatelessWidget {
                   background: MockTestColors.yellow,
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   child: Text(
-                    'IELTS $band',
+                    'IELTS $speakingScore',
                     style: const TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 11.5,
