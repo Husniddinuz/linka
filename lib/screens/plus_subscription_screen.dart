@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../services/app_feature_service.dart';
 import '../services/plus_service.dart';
 import '../services/wallet_service.dart';
+import '../theme/app_colors.dart';
 import 'payment_topup_screen.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/skeleton.dart';
@@ -167,17 +168,18 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
     final plusEnabled = AppFeatureService.isEnabled('plus');
     final canConnect =
         plusEnabled && !_submitting && !_balanceLoading && !isAlreadyActive;
+    final colors = context.colors;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: colors.background,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios_rounded,
-            color: Color(0xFF272942),
+            color: colors.textPrimary,
             size: 20,
           ),
           onPressed: () => Navigator.of(context).pop(),
@@ -208,12 +210,12 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF5F5F7),
+                      color: colors.surfaceAlt,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: colors.surface,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Column(
@@ -236,12 +238,12 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                                     children: [
                                       Row(
                                         children: [
-                                          const Text(
+                                          Text(
                                             'Per year',
                                             style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.w600,
-                                              color: Color(0xFF272942),
+                                              color: colors.textPrimary,
                                             ),
                                           ),
                                           if (_yearlyDiscountPercent != null) ...[
@@ -250,7 +252,7 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                                               padding: const EdgeInsets.symmetric(
                                                   horizontal: 8, vertical: 3),
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFFE53935),
+                                                color: colors.error,
                                                 borderRadius:
                                                     BorderRadius.circular(12),
                                               ),
@@ -269,9 +271,9 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                                       const SizedBox(height: 2),
                                       Text(
                                         _yearlySubtitle,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 13,
-                                          color: Color(0xFF999999),
+                                          color: colors.textSecondary,
                                         ),
                                       ),
                                     ],
@@ -282,18 +284,18 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                                     children: [
                                       TextSpan(
                                         text: '${_formatPrice(_yearlyPrice)} ',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w700,
-                                          color: Color(0xFF272942),
+                                          color: colors.textPrimary,
                                         ),
                                       ),
-                                      const TextSpan(
+                                      TextSpan(
                                         text: 'UZS',
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w400,
-                                          color: Color(0xFF999999),
+                                          color: colors.textSecondary,
                                         ),
                                       ),
                                     ],
@@ -304,9 +306,9 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                           ),
                         ),
 
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16),
-                          child: Divider(height: 1, thickness: 1, color: Color(0xDEDDDDDD)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Divider(height: 1, thickness: 1, color: colors.border),
                         ),
 
                         // Monthly option
@@ -320,13 +322,13 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                               children: [
                                 _RadioDot(selected: !_isYearly),
                                 const SizedBox(width: 12),
-                                const Expanded(
+                                Expanded(
                                   child: Text(
                                     'Monthly',
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
-                                      color: Color(0xFF272942),
+                                      color: colors.textPrimary,
                                     ),
                                   ),
                                 ),
@@ -335,18 +337,18 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                                     children: [
                                       TextSpan(
                                         text: '${_formatPrice(_monthlyPrice)} ',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w700,
-                                          color: Color(0xFF272942),
+                                          color: colors.textPrimary,
                                         ),
                                       ),
-                                      const TextSpan(
+                                      TextSpan(
                                         text: 'UZS',
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w400,
-                                          color: Color(0xFF999999),
+                                          color: colors.textSecondary,
                                         ),
                                       ),
                                     ],
@@ -374,7 +376,7 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF5F5F7),
+                    color: colors.surfaceAlt,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
@@ -384,17 +386,17 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 16),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: colors.surface,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           children: [
-                            const Text(
+                            Text(
                               'Balance',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
-                                color: Color(0xFF272942),
+                                color: colors.textPrimary,
                               ),
                             ),
                             const Spacer(),
@@ -414,16 +416,16 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                                         fontSize: 16,
                                         fontWeight: FontWeight.w700,
                                         color: hasEnoughBalance
-                                            ? const Color(0xFF27AE60)
-                                            : const Color(0xFFE74C3C),
+                                            ? colors.success
+                                            : colors.error,
                                       ),
                                     ),
-                                    const TextSpan(
+                                    TextSpan(
                                       text: 'UZS',
                                       style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w500,
-                                        color: Color(0xFF999999),
+                                        color: colors.textSecondary,
                                       ),
                                     ),
                                   ],
@@ -450,17 +452,17 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 16),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: colors.surface,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           children: [
-                            const Text(
+                            Text(
                               'Price',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
-                                color: Color(0xFF272942),
+                                color: colors.textPrimary,
                               ),
                             ),
                             const Spacer(),
@@ -469,18 +471,18 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                                 children: [
                                   TextSpan(
                                     text: _formatPrice(_price),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700,
-                                      color: Color(0xFF272942),
+                                      color: colors.textPrimary,
                                     ),
                                   ),
-                                  const TextSpan(
+                                  TextSpan(
                                     text: ' UZS',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w500,
-                                      color: Color(0xFF999999),
+                                      color: colors.textSecondary,
                                     ),
                                   ),
                                 ],
@@ -501,10 +503,10 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                   child: ElevatedButton(
                     onPressed: canConnect ? _onConnect : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF272942),
+                      backgroundColor: colors.brand,
                       foregroundColor: Colors.white,
                       disabledBackgroundColor:
-                          const Color(0xFF272942).withValues(alpha: 0.4),
+                          colors.brand.withValues(alpha: 0.4),
                       disabledForegroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
@@ -559,13 +561,14 @@ class _RadioDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Container(
       width: 22,
       height: 22,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: selected ? const Color(0xFFF5C542) : const Color(0xFFDDDDDD),
+          color: selected ? colors.accentYellow : colors.border,
           width: 2,
         ),
       ),
@@ -574,9 +577,9 @@ class _RadioDot extends StatelessWidget {
               child: Container(
                 width: 12,
                 height: 12,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Color(0xFFF5C542),
+                  color: colors.accentYellow,
                 ),
               ),
             )

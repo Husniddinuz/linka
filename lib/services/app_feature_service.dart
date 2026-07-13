@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_constants.dart';
+import 'user_service.dart';
 
 /// Remote feature flags for temporarily closing sections of the app without
 /// shipping a new build. Backed by GET /app-features/, which is reachable
@@ -27,8 +28,11 @@ class AppFeatureService {
   static bool _refreshing = false;
 
   /// Returns `true` if [key] is unknown — safer than hiding sections on a
-  /// schema mismatch or empty cache.
+  /// schema mismatch or empty cache. Always `true` for static test accounts
+  /// (see [UserService.isTestUser]) so QA/reviewers see every section
+  /// regardless of what's currently toggled off in production.
   static bool isEnabled(String key) {
+    if (UserService.isTestUser) return true;
     return _map[key] ?? true;
   }
 

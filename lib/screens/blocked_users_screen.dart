@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/chat_service.dart';
+import '../theme/app_colors.dart';
 
 class BlockedUsersScreen extends StatefulWidget {
   const BlockedUsersScreen({super.key});
@@ -74,29 +75,29 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
         leadingWidth: 48,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-          color: const Color(0xFF272942),
+          color: context.colors.textPrimary,
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Blocked users',
           style: TextStyle(
             fontFamily: 'SF Pro',
             fontSize: 17,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
           ),
         ),
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: Color(0xFFEEEEEE)),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, color: context.colors.border),
         ),
       ),
       body: _buildBody(),
@@ -105,8 +106,8 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF5B7FD4)),
+      return Center(
+        child: CircularProgressIndicator(color: context.colors.accentBlue),
       );
     }
 
@@ -115,22 +116,22 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'Failed to load blocked users.',
               style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 15,
-                color: Color(0xFF888888),
+                color: context.colors.textSecondary,
               ),
             ),
             const SizedBox(height: 16),
             TextButton(
               onPressed: _load,
-              child: const Text(
+              child: Text(
                 'Try again',
                 style: TextStyle(
                   fontFamily: 'SF Pro',
-                  color: Color(0xFF5B7FD4),
+                  color: context.colors.accentBlue,
                 ),
               ),
             ),
@@ -140,13 +141,13 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
     }
 
     if (_users.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           "You haven't blocked anyone.",
           style: TextStyle(
             fontFamily: 'SF Pro',
             fontSize: 15,
-            color: Color(0xFF888888),
+            color: context.colors.textSecondary,
           ),
         ),
       );
@@ -168,48 +169,48 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
               const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           leading: CircleAvatar(
             radius: 22,
-            backgroundColor: const Color(0xFF5B7FD4).withValues(alpha: 0.12),
+            backgroundColor: context.colors.accentBlue.withValues(alpha: 0.12),
             child: Text(
               name.isNotEmpty ? name[0].toUpperCase() : '?',
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF5B7FD4),
+                color: context.colors.accentBlue,
               ),
             ),
           ),
           title: Text(
             name,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 15,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF272942),
+              color: context.colors.textPrimary,
             ),
           ),
           subtitle: blockedAt.isNotEmpty
               ? Text(
                   blockedAt,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 12,
-                    color: Color(0xFFAAAAAA),
+                    color: context.colors.textTertiary,
                   ),
                 )
               : null,
           trailing: isUnblocking
-              ? const SizedBox(
+              ? SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Color(0xFF5B7FD4),
+                    color: context.colors.accentBlue,
                   ),
                 )
               : TextButton(
                   onPressed: () => _unblock(userId),
                   style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF5B7FD4),
+                    foregroundColor: context.colors.accentBlue,
                     textStyle: const TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 14,

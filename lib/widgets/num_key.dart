@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 
 class NumKey extends StatelessWidget {
   final String label;
@@ -16,21 +17,21 @@ class NumKey extends StatelessWidget {
         height: 56,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F7),
+          color: context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(12),
         ),
         child: label == '⌫'
-            ? const Icon(
+            ? Icon(
                 Icons.backspace_outlined,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
                 size: 22,
               )
             : Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                 ),
               ),
       ),

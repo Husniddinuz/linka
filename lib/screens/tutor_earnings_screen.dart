@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/app_feature_service.dart';
 import '../services/earnings_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/skeleton.dart';
 
@@ -81,14 +82,14 @@ class _TutorEarningsScreenState extends State<TutorEarningsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           children: [
             _TopBar(onBack: () => Navigator.of(context).maybePop()),
             Expanded(
               child: RefreshIndicator(
-                color: const Color(0xFF272942),
+                color: context.colors.textPrimary,
                 onRefresh: _load,
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -96,14 +97,14 @@ class _TutorEarningsScreenState extends State<TutorEarningsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 8),
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                         child: Text(
                           'MY WALLET',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF272942),
+                            color: context.colors.textPrimary,
                             letterSpacing: 0.5,
                           ),
                         ),
@@ -247,22 +248,22 @@ class _TopBar extends StatelessWidget {
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onBack,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Icon(
                   Icons.arrow_back_ios_new_rounded,
                   size: 20,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                 ),
               ),
             ),
           ),
-          const Text(
+          Text(
             'Income',
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF272942),
+              color: context.colors.textPrimary,
             ),
           ),
         ],
@@ -290,7 +291,7 @@ class _BalanceCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF272942),
+        color: context.colors.brand,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
@@ -399,7 +400,7 @@ class _TopTabs extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFF2F2F4),
+        color: context.colors.surfaceAlt,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -444,7 +445,7 @@ class _SegButton extends StatelessWidget {
         height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: active ? const Color(0xFF272942) : Colors.transparent,
+          color: active ? context.colors.brand : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
@@ -452,7 +453,7 @@ class _SegButton extends StatelessWidget {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: active ? Colors.white : const Color(0xFF272942),
+            color: active ? Colors.white : context.colors.textPrimary,
           ),
         ),
       ),
@@ -479,7 +480,7 @@ class _EarningsSection extends StatelessWidget {
             label: 'Total earned',
             totalUzs: page?.totalCompletedUzs ?? 0,
             loading: loading,
-            color: const Color(0xFF27AE60),
+            color: context.colors.success,
           ),
         ),
         const SizedBox(height: 16),
@@ -497,14 +498,14 @@ class _EarningsSection extends StatelessWidget {
             ),
           )
         else if (entries.isEmpty)
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 32, 20, 32),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 32, 20, 32),
             child: Center(
               child: Text(
                 'No earnings yet',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFFAAAAAA),
+                  color: context.colors.textTertiary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -576,14 +577,14 @@ class _WithdrawalsSection extends StatelessWidget {
             ),
           )
         else if (entries.isEmpty)
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 32, 20, 32),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 32, 20, 32),
             child: Center(
               child: Text(
                 'No withdrawals yet',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFFAAAAAA),
+                  color: context.colors.textTertiary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -613,17 +614,17 @@ class _WithdrawSummaryCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF6F6F8),
+        color: context.colors.surfaceAlt,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Total withdrawn',
             style: TextStyle(
               fontSize: 12,
-              color: Color(0xFF999999),
+              color: context.colors.textSecondary,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -636,10 +637,10 @@ class _WithdrawSummaryCard extends StatelessWidget {
                 children: [
                   TextSpan(
                     text: '${_formatAmount(payout)} ',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                     ),
                   ),
                   TextSpan(
@@ -647,14 +648,14 @@ class _WithdrawSummaryCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: Colors.black.withValues(alpha: 0.5),
+                      color: context.colors.textSecondary,
                     ),
                   ),
                   TextSpan(
                     text: '($completedCount payouts)',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF999999),
+                      color: context.colors.textSecondary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -665,9 +666,9 @@ class _WithdrawSummaryCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               'Commission: ${_formatAmount(commission)} UZS',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: Color(0xFF999999),
+                color: context.colors.textSecondary,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -706,15 +707,15 @@ class _FilterBar extends StatelessWidget {
               height: 40,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF2F2F4),
+                color: context.colors.surfaceAlt,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.filter_list_rounded,
                     size: 18,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -722,17 +723,17 @@ class _FilterBar extends StatelessWidget {
                       label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF272942),
+                        color: context.colors.textPrimary,
                       ),
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     Icons.keyboard_arrow_down_rounded,
                     size: 18,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                   ),
                 ],
               ),
@@ -748,16 +749,16 @@ class _FilterBar extends StatelessWidget {
               height: 40,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF2F2F4),
+                color: context.colors.surfaceAlt,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
                   'Clear',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                   ),
                 ),
               ),
@@ -799,7 +800,7 @@ class _WithdrawalRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _statusColor(entry.status);
+    final color = _statusColor(entry.status, context);
     final icon = _statusIcon(entry.status);
     return GestureDetector(
       onTap: () => _showDetails(context),
@@ -807,7 +808,7 @@ class _WithdrawalRow extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
         decoration: BoxDecoration(
-          color: const Color(0xFFF6F6F8),
+          color: context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -828,10 +829,10 @@ class _WithdrawalRow extends StatelessWidget {
                 children: [
                   Text(
                     _formatDateTime(entry.createdAt),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -851,10 +852,10 @@ class _WithdrawalRow extends StatelessWidget {
             ),
             Text(
               '${_formatAmount(entry.requestedAmountUzs)} UZS',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
               ),
             ),
           ],
@@ -871,17 +872,17 @@ class _WithdrawalRow extends StatelessWidget {
     );
   }
 
-  static Color _statusColor(String s) {
+  static Color _statusColor(String s, BuildContext context) {
     switch (s) {
       case 'completed':
-        return const Color(0xFF27AE60);
+        return context.colors.success;
       case 'rejected':
-        return const Color(0xFFE74C3C);
+        return context.colors.error;
       case 'failed':
         return const Color(0xFFE67E22);
       case 'pending':
       default:
-        return const Color(0xFFF5C542);
+        return context.colors.accentYellow;
     }
   }
 
@@ -935,7 +936,7 @@ class _TotalRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF6F6F8),
+        color: context.colors.surfaceAlt,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -946,10 +947,10 @@ class _TotalRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF999999),
+                    color: context.colors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -967,12 +968,12 @@ class _TotalRow extends StatelessWidget {
                             color: color,
                           ),
                         ),
-                        const TextSpan(
+                        TextSpan(
                           text: 'UZS',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF999999),
+                            color: context.colors.textSecondary,
                           ),
                         ),
                       ],
@@ -985,14 +986,14 @@ class _TotalRow extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.colors.surface,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE5E5E7)),
+              border: Border.all(color: context.colors.border),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.arrow_downward_rounded,
               size: 18,
-              color: Color(0xFF999999),
+              color: context.colors.textSecondary,
             ),
           ),
         ],
@@ -1018,10 +1019,10 @@ class _GroupedEarnings extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
             child: Text(
               _formatDateHeader(g.date),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
                 letterSpacing: 0.5,
               ),
             ),
@@ -1074,7 +1075,7 @@ class _EarningRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const accent = Color(0xFF27AE60);
+    final accent = context.colors.success;
     return Row(
       children: [
         ClipRRect(
@@ -1097,10 +1098,10 @@ class _EarningRow extends StatelessWidget {
             children: [
               Text(
                 entry.studentName.isEmpty ? 'Student' : entry.studentName,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -1108,9 +1109,9 @@ class _EarningRow extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 entry.timeRange ?? '',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: Color(0xFF999999),
+                  color: context.colors.textSecondary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -1119,7 +1120,7 @@ class _EarningRow extends StatelessWidget {
         ),
         Text(
           '+${_formatAmount(entry.amountUzs)} UZS',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
             color: accent,
@@ -1138,8 +1139,8 @@ class _AvatarFallback extends StatelessWidget {
     return Container(
       width: 44,
       height: 44,
-      color: const Color(0xFFE0E0E0),
-      child: const Icon(Icons.person, color: Color(0xFFAAAAAA), size: 22),
+      color: context.colors.surfaceAlt,
+      child: Icon(Icons.person, color: context.colors.textTertiary, size: 22),
     );
   }
 }
@@ -1237,9 +1238,9 @@ class _WithdrawSheetState extends State<_WithdrawSheet> {
       padding: EdgeInsets.only(bottom: bottomInset),
       child: Container(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: SafeArea(
           top: false,
@@ -1253,30 +1254,30 @@ class _WithdrawSheetState extends State<_WithdrawSheet> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE5E5E7),
+                    color: context.colors.border,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-              const Text(
+              Text(
                 'Withdraw',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                 ),
               ),
               const SizedBox(height: 14),
               if (_loading)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Center(
                     child: SizedBox(
                       width: 22,
                       height: 22,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.4,
-                        color: Color(0xFF272942),
+                        color: context.colors.textPrimary,
                       ),
                     ),
                   ),
@@ -1367,6 +1368,8 @@ class _WithdrawSheetState extends State<_WithdrawSheet> {
                 ],
               ),
             ),
+          // (payout schedule note intentionally keeps its warm amber accent
+          // in both themes — a self-contained notice chip, not a page surface)
         ],
         const SizedBox(height: 18),
         Row(
@@ -1402,16 +1405,16 @@ class _BalanceRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF6F6F8),
+        color: context.colors.surfaceAlt,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
-          const Text(
+          Text(
             'Available',
             style: TextStyle(
               fontSize: 12,
-              color: Color(0xFF999999),
+              color: context.colors.textSecondary,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -1421,17 +1424,17 @@ class _BalanceRow extends StatelessWidget {
               children: [
                 TextSpan(
                   text: '${_formatAmount(balanceUzs)} ',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                   ),
                 ),
-                const TextSpan(
+                TextSpan(
                   text: 'UZS',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF999999),
+                    color: context.colors.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -1452,10 +1455,10 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w700,
-        color: Color(0xFF999999),
+        color: context.colors.textSecondary,
         letterSpacing: 0.6,
       ),
     );
@@ -1476,12 +1479,10 @@ class _PresetChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color bg = selected
-        ? const Color(0xFF272942)
-        : (enabled ? const Color(0xFFF2F2F4) : const Color(0xFFF6F6F8));
+    final Color bg = selected ? context.colors.brand : context.colors.surfaceAlt;
     final Color fg = selected
         ? Colors.white
-        : (enabled ? const Color(0xFF272942) : const Color(0xFFBDBDBD));
+        : (enabled ? context.colors.textPrimary : context.colors.textTertiary);
     return GestureDetector(
       onTap: enabled ? onTap : null,
       behavior: HitTestBehavior.opaque,
@@ -1526,28 +1527,28 @@ class _AmountInput extends StatelessWidget {
           height: 48,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFFF6F6F8),
+            color: context.colors.surfaceAlt,
             borderRadius: BorderRadius.circular(10),
             border: error == null
                 ? null
-                : Border.all(color: const Color(0xFFE74C3C)),
+                : Border.all(color: context.colors.error),
           ),
           alignment: Alignment.center,
           child: TextField(
             controller: controller,
             keyboardType: TextInputType.number,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF272942),
+              color: context.colors.textPrimary,
             ),
             decoration: InputDecoration(
               border: InputBorder.none,
               isCollapsed: true,
               hintText: hint,
-              hintStyle: const TextStyle(
+              hintStyle: TextStyle(
                 fontSize: 14,
-                color: Color(0xFF999999),
+                color: context.colors.textSecondary,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -1557,9 +1558,9 @@ class _AmountInput extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             error!,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: Color(0xFFE74C3C),
+              color: context.colors.error,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -1580,7 +1581,7 @@ class _ErrorBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFDECEC),
+        color: context.colors.errorBg,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -1588,10 +1589,10 @@ class _ErrorBox extends StatelessWidget {
         children: [
           Text(
             message,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: Color(0xFFC0392B),
+              color: context.colors.error,
               height: 1.35,
             ),
           ),
@@ -1600,12 +1601,12 @@ class _ErrorBox extends StatelessWidget {
             GestureDetector(
               onTap: onRetry,
               behavior: HitTestBehavior.opaque,
-              child: const Text(
+              child: Text(
                 'Retry',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                   decoration: TextDecoration.underline,
                 ),
               ),
@@ -1635,7 +1636,7 @@ class _SheetButton extends StatelessWidget {
       child: Container(
         height: 48,
         decoration: BoxDecoration(
-          color: filled ? const Color(0xFF272942) : const Color(0xFFF2F2F4),
+          color: filled ? context.colors.brand : context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(
@@ -1644,7 +1645,7 @@ class _SheetButton extends StatelessWidget {
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: filled ? Colors.white : const Color(0xFF272942),
+              color: filled ? Colors.white : context.colors.textPrimary,
             ),
           ),
         ),
@@ -1663,9 +1664,9 @@ class _WithdrawalDetailsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
         top: false,
@@ -1679,38 +1680,38 @@ class _WithdrawalDetailsSheet extends StatelessWidget {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE5E5E7),
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             Text(
               'Withdrawal #${entry.id}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: 12),
-            _kv('Status',
+            _kv(context, 'Status',
                 _WithdrawalRow._statusLabel(entry.status),
-                color: _WithdrawalRow._statusColor(entry.status)),
-            _kv('Requested',
+                color: _WithdrawalRow._statusColor(entry.status, context)),
+            _kv(context, 'Requested',
                 '${_formatAmount(entry.requestedAmountUzs)} UZS'),
             if (entry.commissionAmountUzs > 0)
-              _kv('Commission',
+              _kv(context, 'Commission',
                   '${_formatAmount(entry.commissionAmountUzs)} UZS'),
-            _kv('Payout', '${_formatAmount(entry.payoutAmountUzs)} UZS'),
+            _kv(context, 'Payout', '${_formatAmount(entry.payoutAmountUzs)} UZS'),
             if (entry.paylovPaymentId != null)
-              _kv('Paylov payment', '#${entry.paylovPaymentId}'),
+              _kv(context, 'Paylov payment', '#${entry.paylovPaymentId}'),
             if (entry.linkaOrderId != null)
-              _kv('Order', '#${entry.linkaOrderId}'),
+              _kv(context, 'Order', '#${entry.linkaOrderId}'),
             if (entry.paylovSplitRef.isNotEmpty)
-              _kv('Split ref', entry.paylovSplitRef),
-            _kv('Created', _formatDateTime(entry.createdAt)),
+              _kv(context, 'Split ref', entry.paylovSplitRef),
+            _kv(context, 'Created', _formatDateTime(entry.createdAt)),
             if (entry.processedAt != null)
-              _kv('Processed', _formatDateTime(entry.processedAt)),
+              _kv(context, 'Processed', _formatDateTime(entry.processedAt)),
             if (entry.accountantNote.isNotEmpty ||
                 entry.failReason.isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -1718,17 +1719,17 @@ class _WithdrawalDetailsSheet extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFDECEC),
+                  color: context.colors.errorBg,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   entry.accountantNote.isNotEmpty
                       ? entry.accountantNote
                       : entry.failReason,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFFC0392B),
+                    color: context.colors.error,
                   ),
                 ),
               ),
@@ -1739,7 +1740,7 @@ class _WithdrawalDetailsSheet extends StatelessWidget {
     );
   }
 
-  Widget _kv(String k, String v, {Color? color}) {
+  Widget _kv(BuildContext context, String k, String v, {Color? color}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -1748,9 +1749,9 @@ class _WithdrawalDetailsSheet extends StatelessWidget {
             width: 110,
             child: Text(
               k,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: Color(0xFF999999),
+                color: context.colors.textSecondary,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -1761,7 +1762,7 @@ class _WithdrawalDetailsSheet extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: color ?? const Color(0xFF272942),
+                color: color ?? context.colors.textPrimary,
               ),
             ),
           ),
@@ -1809,7 +1810,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
       lastDate: DateTime(now.year + 1),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(primary: Color(0xFF272942)),
+          colorScheme: ColorScheme.light(primary: ctx.colors.brand),
         ),
         child: child ?? const SizedBox.shrink(),
       ),
@@ -1828,9 +1829,9 @@ class _FiltersSheetState extends State<_FiltersSheet> {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
         top: false,
@@ -1844,26 +1845,26 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE5E5E7),
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            const Text(
+            Text(
               'Filter withdrawals',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'DATE RANGE',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF999999),
+                color: context.colors.textSecondary,
                 letterSpacing: 0.6,
               ),
             ),
@@ -1893,12 +1894,12 @@ class _FiltersSheetState extends State<_FiltersSheet> {
               ],
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'STATUS',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF999999),
+                color: context.colors.textSecondary,
                 letterSpacing: 0.6,
               ),
             ),
@@ -1990,7 +1991,7 @@ class _DateField extends StatelessWidget {
         height: 48,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFFF6F6F8),
+          color: context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
@@ -1998,7 +1999,7 @@ class _DateField extends StatelessWidget {
             Icon(
               Icons.calendar_today_rounded,
               size: 16,
-              color: Colors.black.withValues(alpha: 0.55),
+              color: context.colors.textSecondary,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -2010,8 +2011,8 @@ class _DateField extends StatelessWidget {
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: value == null
-                      ? const Color(0xFF999999)
-                      : const Color(0xFF272942),
+                      ? context.colors.textSecondary
+                      : context.colors.textPrimary,
                 ),
               ),
             ),
@@ -2019,10 +2020,10 @@ class _DateField extends StatelessWidget {
               GestureDetector(
                 onTap: onClear,
                 behavior: HitTestBehavior.opaque,
-                child: const Icon(
+                child: Icon(
                   Icons.close_rounded,
                   size: 16,
-                  color: Color(0xFF999999),
+                  color: context.colors.textSecondary,
                 ),
               ),
           ],
@@ -2051,7 +2052,7 @@ class _StatusChip extends StatelessWidget {
         height: 36,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFF272942) : const Color(0xFFF2F2F4),
+          color: active ? context.colors.brand : context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Center(
@@ -2060,7 +2061,7 @@ class _StatusChip extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: active ? Colors.white : const Color(0xFF272942),
+              color: active ? Colors.white : context.colors.textPrimary,
             ),
           ),
         ),

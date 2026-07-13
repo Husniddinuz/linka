@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'otp_screen.dart';
 import 'public_offer_screen.dart';
 import '../services/auth_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/num_key.dart';
 
@@ -101,7 +102,7 @@ class _AuthScreenState extends State<AuthScreen> {
         statusBarColor: Colors.transparent,
       ),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.background,
         body: SafeArea(
           child: Column(
             children: [
@@ -120,13 +121,13 @@ class _AuthScreenState extends State<AuthScreen> {
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF2F2F2),
+                            color: context.colors.surfaceAlt,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.arrow_back_ios_new_rounded,
                             size: 18,
-                            color: Color(0xFF272942),
+                            color: context.colors.textPrimary,
                           ),
                         ),
                       ),
@@ -134,17 +135,17 @@ class _AuthScreenState extends State<AuthScreen> {
                       const SizedBox(height: 24),
 
                       RichText(
-                        text: const TextSpan(
+                        text: TextSpan(
                           style: TextStyle(
                             fontSize: 42,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF272942),
+                            color: context.colors.textPrimary,
                           ),
                           children: [
-                            TextSpan(text: 'Welcome'),
+                            const TextSpan(text: 'Welcome'),
                             TextSpan(
                               text: '!',
-                              style: TextStyle(color: Color(0xFFF5C542)),
+                              style: TextStyle(color: context.colors.accentYellow),
                             ),
                           ],
                         ),
@@ -160,7 +161,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           vertical: 16,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF2F2F2),
+                          color: context.colors.surfaceAlt,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -171,8 +172,8 @@ class _AuthScreenState extends State<AuthScreen> {
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
                                 color: _digits.isEmpty
-                                    ? const Color(0xFFBBBBBB)
-                                    : const Color(0xFF272942),
+                                    ? context.colors.textTertiary
+                                    : context.colors.textPrimary,
                               ),
                             ),
                             Text(
@@ -183,8 +184,8 @@ class _AuthScreenState extends State<AuthScreen> {
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
                                 color: _digits.isEmpty
-                                    ? const Color(0xFFBBBBBB)
-                                    : const Color(0xFF272942),
+                                    ? context.colors.textTertiary
+                                    : context.colors.textPrimary,
                               ),
                             ),
                           ],
@@ -199,10 +200,10 @@ class _AuthScreenState extends State<AuthScreen> {
                         child: ElevatedButton(
                           onPressed: canSubmit && !_loading ? _onGetCode : null,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF272942),
-                            disabledBackgroundColor: const Color(0xFFCCCCCC),
+                            backgroundColor: context.colors.brand,
+                            disabledBackgroundColor: context.colors.textTertiary,
                             foregroundColor: Colors.white,
-                            disabledForegroundColor: const Color(0xFF999999),
+                            disabledForegroundColor: context.colors.textSecondary,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -242,12 +243,12 @@ class _AuthScreenState extends State<AuthScreen> {
                               height: 22,
                               decoration: BoxDecoration(
                                 color: _accepted
-                                    ? const Color(0xFFF5C542)
-                                    : Colors.white,
+                                    ? context.colors.accentYellow
+                                    : context.colors.surface,
                                 border: Border.all(
                                   color: _accepted
-                                      ? const Color(0xFFF5C542)
-                                      : const Color(0xFFCCCCCC),
+                                      ? context.colors.accentYellow
+                                      : context.colors.textTertiary,
                                   width: 1.5,
                                 ),
                                 borderRadius: BorderRadius.circular(5),
@@ -265,9 +266,9 @@ class _AuthScreenState extends State<AuthScreen> {
                           Expanded(
                             child: Text.rich(
                               TextSpan(
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
-                                  color: Color(0xFF9E9E9E),
+                                  color: context.colors.textSecondary,
                                 ),
                                 children: [
                                   const TextSpan(
@@ -275,8 +276,8 @@ class _AuthScreenState extends State<AuthScreen> {
                                   ),
                                   TextSpan(
                                     text: 'Public Offer',
-                                    style: const TextStyle(
-                                      color: Color(0xFF272942),
+                                    style: TextStyle(
+                                      color: context.colors.textPrimary,
                                       decoration: TextDecoration.underline,
                                     ),
                                     recognizer: _publicOfferRecognizer

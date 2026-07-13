@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 import '../widgets/lesson_card.dart';
 import '../widgets/lesson_goals.dart';
 
@@ -40,15 +41,17 @@ class LessonDetailScreen extends StatelessWidget {
     return '${_weekdays[d.weekday]}, ${d.day} ${_months[d.month]} ${d.year}';
   }
 
-  ({String label, Color color}) get _statusBadge {
+  ({String label, Color color}) _statusBadge(BuildContext context) {
     switch (lesson.status) {
       case 'finished':
-        return (label: 'Completed', color: const Color(0xFF27AE60));
+        return (label: 'Completed', color: context.colors.success);
       case 'cancelled':
-        return (label: 'Cancelled', color: const Color(0xFFE74C3C));
+        return (label: 'Cancelled', color: context.colors.error);
       case 'confirmed':
-        return (label: 'Confirmed', color: const Color(0xFF2B85DB));
+        return (label: 'Confirmed', color: context.colors.accentBlue);
       case 'pending':
+        // Pending is a one-off amber status accent with no direct token
+        // match — left as a literal.
         return (label: 'Pending', color: const Color(0xFFE67E22));
       default:
         final s = lesson.status;
@@ -56,7 +59,7 @@ class LessonDetailScreen extends StatelessWidget {
           label: s.isEmpty
               ? 'Scheduled'
               : '${s[0].toUpperCase()}${s.substring(1)}',
-          color: const Color(0xFF6C6C6C),
+          color: context.colors.textSecondary,
         );
     }
   }
@@ -65,23 +68,23 @@ class LessonDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasGoals = lesson.lessonGoals.isNotEmpty ||
         (lesson.studentNote?.trim().isNotEmpty ?? false);
-    final status = _statusBadge;
+    final status = _statusBadge(context);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.background,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.chevron_left, color: Color(0xFF272942), size: 28),
+          icon: Icon(Icons.chevron_left, color: context.colors.textPrimary, size: 28),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Lesson details',
           style: TextStyle(
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
             fontSize: 17,
             fontWeight: FontWeight.w600,
           ),
@@ -157,14 +160,14 @@ class LessonDetailScreen extends StatelessWidget {
                       goals: lesson.lessonGoals,
                       note: lesson.studentNote,
                     )
-                  : const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 4),
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Text(
                         'No goals were specified for this lesson.',
                         style: TextStyle(
                           fontFamily: 'SF Pro',
                           fontSize: 13,
-                          color: Color(0xFFAAAAAA),
+                          color: context.colors.textTertiary,
                         ),
                       ),
                     ),
@@ -188,11 +191,11 @@ class _Section extends StatelessWidget {
       children: [
         Text(
           title.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'SF Pro',
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: Color(0xFFAAAAAA),
+            color: context.colors.textTertiary,
             letterSpacing: 0.5,
           ),
         ),
@@ -201,7 +204,7 @@ class _Section extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color(0xFFF6F6F6),
+            color: context.colors.surfaceAlt,
             borderRadius: BorderRadius.circular(16),
           ),
           child: child,
@@ -225,21 +228,21 @@ class _InfoRow extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 13,
-              color: Color(0xFF999999),
+              color: context.colors.textSecondary,
             ),
           ),
           const Spacer(),
           valueWidget ??
               Text(
                 value ?? '—',
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'SF Pro',
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                 ),
               ),
         ],
@@ -253,9 +256,9 @@ class _RowDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 6),
-      child: Divider(height: 1, color: Color(0xFFEAEAEA)),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Divider(height: 1, color: context.colors.border),
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
 import '../screens/lesson_detail_screen.dart';
+import '../theme/app_colors.dart';
 
 class Lesson {
   final int id;
@@ -252,7 +253,7 @@ class _LessonCardState extends State<LessonCard> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.cancel_outlined, color: Colors.red),
+              leading: Icon(Icons.cancel_outlined, color: context.colors.error),
               title: const Text('Cancel lesson'),
               onTap: () {
                 Navigator.pop(ctx);
@@ -269,7 +270,7 @@ class _LessonCardState extends State<LessonCard> {
     final submitted = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -298,7 +299,7 @@ class _LessonCardState extends State<LessonCard> {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: const Color(0xFFF6F6F6),
+          color: context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -318,7 +319,7 @@ class _LessonCardState extends State<LessonCard> {
                     height: 82,
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: context.colors.surface,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
@@ -331,11 +332,11 @@ class _LessonCardState extends State<LessonCard> {
                             children: [
                               Text(
                                 widget.lesson.participantName,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: 'SF Pro',
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF272942),
+                                  color: context.colors.textPrimary,
                                   height: 1.0,
                                   letterSpacing: 0,
                                 ),
@@ -351,11 +352,11 @@ class _LessonCardState extends State<LessonCard> {
                                   const SizedBox(width: 5),
                                   Text(
                                     widget.lesson.timeRange,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontFamily: 'SF Pro',
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
-                                      color: Color(0xFF6C6C6C),
+                                      color: context.colors.textSecondary,
                                       height: 1.0,
                                       letterSpacing: 0,
                                     ),
@@ -373,11 +374,11 @@ class _LessonCardState extends State<LessonCard> {
                                   const SizedBox(width: 5),
                                   Text(
                                     widget.lesson.duration,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontFamily: 'SF Pro',
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
-                                      color: Color(0xFF6C6C6C),
+                                      color: context.colors.textSecondary,
                                       height: 1.0,
                                       letterSpacing: 0,
                                     ),
@@ -403,8 +404,8 @@ class _LessonCardState extends State<LessonCard> {
                                     child: Container(
                                       width: 4,
                                       height: 4,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF272942),
+                                      decoration: BoxDecoration(
+                                        color: context.colors.textPrimary,
                                         shape: BoxShape.circle,
                                       ),
                                     ),
@@ -430,7 +431,7 @@ class _LessonCardState extends State<LessonCard> {
                         child: Container(
                           height: 46,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF272942),
+                            color: context.colors.brand,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Row(
@@ -472,13 +473,13 @@ class _LessonCardState extends State<LessonCard> {
                           width: 46,
                           height: 46,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF2F2F4),
+                            color: context.colors.surfaceAlt,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.link_rounded,
                             size: 22,
-                            color: Color(0xFF272942),
+                            color: context.colors.textPrimary,
                           ),
                         ),
                       ),
@@ -491,7 +492,7 @@ class _LessonCardState extends State<LessonCard> {
                   height: 46,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF2F2F4),
+                    color: context.colors.surfaceAlt,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -502,16 +503,16 @@ class _LessonCardState extends State<LessonCard> {
                             ? Icons.check_circle_outline_rounded
                             : Icons.access_time_rounded,
                         size: 16,
-                        color: const Color(0xFF6C6C6C),
+                        color: context.colors.textSecondary,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         _hasEnded ? 'Lesson ended' : 'Starts in $_countdownLabel',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'SF Pro',
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF6C6C6C),
+                          color: context.colors.textSecondary,
                           height: 1.0,
                           leadingDistribution: TextLeadingDistribution.even,
                         ),
@@ -526,17 +527,17 @@ class _LessonCardState extends State<LessonCard> {
                 width: double.infinity,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEEEEEE),
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
                     'Cancelled',
                     style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: Color(0xFFAAAAAA),
+                      color: context.colors.textTertiary,
                       height: 1.0,
                     ),
                   ),
@@ -552,7 +553,7 @@ class _LessonCardState extends State<LessonCard> {
                     width: double.infinity,
                     height: 46,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF5C542),
+                      color: context.colors.accentYellow,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Center(
@@ -574,26 +575,26 @@ class _LessonCardState extends State<LessonCard> {
                   width: double.infinity,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEEF7EE),
+                    color: context.colors.successBg,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           Icons.check_circle_outline_rounded,
                           size: 15,
-                          color: Color(0xFF27AE60),
+                          color: context.colors.success,
                         ),
-                        SizedBox(width: 6),
+                        const SizedBox(width: 6),
                         Text(
                           'Review submitted',
                           style: TextStyle(
                             fontFamily: 'SF Pro',
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF27AE60),
+                            color: context.colors.success,
                             height: 1.0,
                           ),
                         ),

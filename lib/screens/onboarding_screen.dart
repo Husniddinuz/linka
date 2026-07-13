@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/prefs_service.dart';
+import '../theme/app_colors.dart';
 import 'role_selection_screen.dart';
 
 class _Slide {
@@ -71,9 +72,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final isLast = _currentPage == _slides.length - 1;
+    final colors = context.colors;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -84,10 +86,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 padding: const EdgeInsets.only(top: 8, right: 16),
                 child: TextButton(
                   onPressed: _finish,
-                  child: const Text(
+                  child: Text(
                     'Skip',
                     style: TextStyle(
-                      color: Color(0xFFAAAAAA),
+                      color: colors.textTertiary,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),
@@ -122,9 +124,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         width: active ? 22 : 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: active
-                              ? const Color(0xFFF5C542)
-                              : const Color(0xFFDDDDDD),
+                          color: active ? colors.accentYellow : colors.border,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       );
@@ -141,7 +141,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         vertical: 14,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF272942),
+                        color: colors.brand,
                         borderRadius: BorderRadius.circular(30),
                       ),
                       child: Text(
@@ -175,6 +175,7 @@ class _SlidePage extends StatelessWidget {
         ? slide.title.substring(0, slide.title.length - 1)
         : slide.title;
     final hasDot = slide.title.endsWith('.');
+    final colors = context.colors;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,7 +192,7 @@ class _SlidePage extends StatelessWidget {
                   fit: BoxFit.fitHeight,
                   alignment: Alignment.centerRight,
                 )
-              : Container(color: const Color(0xFFF2F2F2)),
+              : Container(color: colors.surfaceAlt),
         ),
 
         const SizedBox(height: 28),
@@ -201,18 +202,18 @@ class _SlidePage extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: RichText(
             text: TextSpan(
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 38,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF272942),
+                color: colors.textPrimary,
                 height: 1.2,
               ),
               children: [
                 TextSpan(text: titleWithoutDot),
                 if (hasDot)
-                  const TextSpan(
+                  TextSpan(
                     text: '.',
-                    style: TextStyle(color: Color(0xFFF5C542)),
+                    style: TextStyle(color: colors.accentYellow),
                   ),
               ],
             ),
@@ -226,8 +227,8 @@ class _SlidePage extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Text(
             slide.subtitle,
-            style: const TextStyle(
-              color: Color(0xFFAAAAAA),
+            style: TextStyle(
+              color: colors.textTertiary,
               fontSize: 15,
               height: 1.55,
             ),

@@ -17,6 +17,7 @@ import '../services/api_service.dart';
 import '../services/chat_service.dart';
 import '../services/podcast_playback_service.dart';
 import '../services/user_service.dart';
+import '../theme/app_colors.dart';
 import 'chats_screen.dart';
 import 'tutor_profile_screen.dart';
 
@@ -446,7 +447,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -510,16 +511,16 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: Color(0xFFAAAAAA)),
+              style: TextStyle(color: context.colors.textTertiary),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
+            child: Text(
               'Block',
-              style: TextStyle(color: Color(0xFFEB3349)),
+              style: TextStyle(color: context.colors.error),
             ),
           ),
         ],
@@ -616,7 +617,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content:
             Text(e is ApiException ? e.message : 'Failed to submit answer'),
-        backgroundColor: const Color(0xFFEB3349),
+        backgroundColor: context.colors.error,
         behavior: SnackBarBehavior.floating,
       ));
     }
@@ -1000,7 +1001,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(detail),
-                    backgroundColor: const Color(0xFFEB3349),
+                    backgroundColor: context.colors.error,
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
@@ -1182,7 +1183,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         final detail = e is ApiException ? e.message : 'Failed to send image';
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(detail),
-          backgroundColor: const Color(0xFFEB3349),
+          backgroundColor: context.colors.error,
           behavior: SnackBarBehavior.floating,
         ));
       }
@@ -1206,16 +1207,16 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: Color(0xFFAAAAAA)),
+              style: TextStyle(color: context.colors.textTertiary),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
+            child: Text(
               'Delete',
-              style: TextStyle(color: Color(0xFFEB3349)),
+              style: TextStyle(color: context.colors.error),
             ),
           ),
         ],
@@ -1248,7 +1249,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
       setState(() => _pinnedMessage = previous);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(e is ApiException ? e.message : 'Failed to pin message'),
-        backgroundColor: const Color(0xFFEB3349),
+        backgroundColor: context.colors.error,
         behavior: SnackBarBehavior.floating,
       ));
     }
@@ -1264,7 +1265,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
       setState(() => _pinnedMessage = previous);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(e is ApiException ? e.message : 'Failed to unpin message'),
-        backgroundColor: const Color(0xFFEB3349),
+        backgroundColor: context.colors.error,
         behavior: SnackBarBehavior.floating,
       ));
     }
@@ -1649,8 +1650,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
 
   Widget _buildMessageList() {
     if (_loadingInitial) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF5B7FD4)),
+      return Center(
+        child: CircularProgressIndicator(color: context.colors.accentBlue),
       );
     }
 
@@ -1662,15 +1663,15 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
       itemBuilder: (_, i) {
         if (i == 0) {
           return _loadingMore
-              ? const Center(
+              ? Center(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     child: SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Color(0xFF5B7FD4),
+                        color: context.colors.accentBlue,
                       ),
                     ),
                   ),
@@ -1757,11 +1758,11 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         children: [
           Text(
             '${widget.channel.emoji}  ${widget.channel.name}',
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF272942),
+              color: context.colors.textPrimary,
             ),
           ),
           Text(
@@ -1770,18 +1771,18 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
                 : widget.channel.type == ChannelType.announcement
                     ? 'Announcements'
                     : 'Community channel',
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 12,
               fontWeight: FontWeight.w400,
-              color: Color(0xFFAAAAAA),
+              color: context.colors.textTertiary,
             ),
           ),
         ],
       ),
-      bottom: const PreferredSize(
-        preferredSize: Size.fromHeight(1),
-        child: Divider(height: 1, color: Color(0xFFEEEEEE)),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Divider(height: 1, color: context.colors.border),
       ),
     );
   }
@@ -1813,19 +1814,19 @@ class _DateDivider extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
         children: [
-          const Expanded(child: Divider(color: Color(0xFFEEEEEE))),
+          Expanded(child: Divider(color: context.colors.border)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
               _label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFFAAAAAA),
+                color: context.colors.textTertiary,
               ),
             ),
           ),
-          const Expanded(child: Divider(color: Color(0xFFEEEEEE))),
+          Expanded(child: Divider(color: context.colors.border)),
         ],
       ),
     );
@@ -1895,7 +1896,7 @@ class _MessageBubble extends StatelessWidget {
 
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -1905,10 +1906,10 @@ class _MessageBubble extends StatelessWidget {
           children: [
             if (canPin)
               ListTile(
-                leading: const Icon(Icons.push_pin_outlined, color: Color(0xFF272942)),
-                title: const Text(
+                leading: Icon(Icons.push_pin_outlined, color: context.colors.textPrimary),
+                title: Text(
                   'Pin message',
-                  style: TextStyle(fontFamily: 'SF Pro', color: Color(0xFF272942)),
+                  style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textPrimary),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -1917,10 +1918,10 @@ class _MessageBubble extends StatelessWidget {
               ),
             if (canUnpin)
               ListTile(
-                leading: const Icon(Icons.push_pin, color: Color(0xFF272942)),
-                title: const Text(
+                leading: Icon(Icons.push_pin, color: context.colors.textPrimary),
+                title: Text(
                   'Unpin message',
-                  style: TextStyle(fontFamily: 'SF Pro', color: Color(0xFF272942)),
+                  style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textPrimary),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -1929,10 +1930,10 @@ class _MessageBubble extends StatelessWidget {
               ),
             if (canReply)
               ListTile(
-                leading: const Icon(Icons.reply_rounded, color: Color(0xFF272942)),
-                title: const Text(
+                leading: Icon(Icons.reply_rounded, color: context.colors.textPrimary),
+                title: Text(
                   'Reply',
-                  style: TextStyle(fontFamily: 'SF Pro', color: Color(0xFF272942)),
+                  style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textPrimary),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -1941,10 +1942,10 @@ class _MessageBubble extends StatelessWidget {
               ),
             if (canDelete)
               ListTile(
-                leading: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEB3349)),
-                title: const Text(
+                leading: Icon(Icons.delete_outline_rounded, color: context.colors.error),
+                title: Text(
                   'Delete',
-                  style: TextStyle(fontFamily: 'SF Pro', color: Color(0xFFEB3349)),
+                  style: TextStyle(fontFamily: 'SF Pro', color: context.colors.error),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -1953,10 +1954,10 @@ class _MessageBubble extends StatelessWidget {
               ),
             if (canReport)
               ListTile(
-                leading: const Icon(Icons.flag_outlined, color: Color(0xFF272942)),
-                title: const Text(
+                leading: Icon(Icons.flag_outlined, color: context.colors.textPrimary),
+                title: Text(
                   'Report',
-                  style: TextStyle(fontFamily: 'SF Pro', color: Color(0xFF272942)),
+                  style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textPrimary),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -1965,10 +1966,10 @@ class _MessageBubble extends StatelessWidget {
               ),
             if (canBlock)
               ListTile(
-                leading: const Icon(Icons.block, color: Color(0xFFEB3349)),
-                title: const Text(
+                leading: Icon(Icons.block, color: context.colors.error),
+                title: Text(
                   'Block sender',
-                  style: TextStyle(fontFamily: 'SF Pro', color: Color(0xFFEB3349)),
+                  style: TextStyle(fontFamily: 'SF Pro', color: context.colors.error),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -2045,9 +2046,9 @@ class _MessageBubble extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Text(
                       _timeLabel(message.sentAt),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: Color(0xFFCCCCCC),
+                        color: context.colors.textTertiary,
                       ),
                     ),
                   ),
@@ -2186,9 +2187,9 @@ class _MessageBubble extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Text(
                       _timeLabel(message.sentAt),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: Color(0xFFCCCCCC),
+                        color: context.colors.textTertiary,
                       ),
                     ),
                   ),
@@ -2214,13 +2215,13 @@ class _ReplyBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accentColor =
-        isMine ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF5B7FD4);
+        isMine ? Colors.white.withValues(alpha: 0.55) : context.colors.accentBlue;
     final textColor = isMine
         ? Colors.white.withValues(alpha: 0.75)
         : const Color(0xFF555577);
     final bgColor = isMine
         ? Colors.white.withValues(alpha: 0.12)
-        : const Color(0xFF5B7FD4).withValues(alpha: 0.08);
+        : context.colors.accentBlue.withValues(alpha: 0.08);
 
     Widget content;
     if (replyTo.isDeleted) {
@@ -2333,19 +2334,19 @@ class _ReplyBar extends StatelessWidget {
       onTap: onTap,
       child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF8F8FF),
-        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceAlt,
+        border: Border(top: BorderSide(color: context.colors.border)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.reply_rounded, size: 18, color: Color(0xFF5B7FD4)),
+          Icon(Icons.reply_rounded, size: 18, color: context.colors.accentBlue),
           const SizedBox(width: 10),
           Container(
             width: 3,
             height: 36,
             decoration: BoxDecoration(
-              color: const Color(0xFF5B7FD4),
+              color: context.colors.accentBlue,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -2357,11 +2358,11 @@ class _ReplyBar extends StatelessWidget {
               children: [
                 Text(
                   message.senderName.isEmpty ? 'You' : message.senderName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF5B7FD4),
+                    color: context.colors.accentBlue,
                   ),
                 ),
                 const SizedBox(height: 1),
@@ -2369,10 +2370,10 @@ class _ReplyBar extends StatelessWidget {
                   preview,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 13,
-                    color: Color(0xFF888888),
+                    color: context.colors.textSecondary,
                   ),
                 ),
               ],
@@ -2380,9 +2381,9 @@ class _ReplyBar extends StatelessWidget {
           ),
           GestureDetector(
             onTap: onDismiss,
-            child: const Padding(
-              padding: EdgeInsets.all(4),
-              child: Icon(Icons.close_rounded, size: 18, color: Color(0xFFAAAAAA)),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(Icons.close_rounded, size: 18, color: context.colors.textTertiary),
             ),
           ),
         ],
@@ -2419,26 +2420,26 @@ class _PinnedBanner extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: const BoxDecoration(
-          color: Color(0xFFF8F8FF),
-          border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
+        decoration: BoxDecoration(
+          color: context.colors.surfaceAlt,
+          border: Border(bottom: BorderSide(color: context.colors.border)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.push_pin_rounded, size: 16, color: Color(0xFF5B7FD4)),
+            Icon(Icons.push_pin_rounded, size: 16, color: context.colors.accentBlue),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  Text(
                     'Pinned message',
                     style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF5B7FD4),
+                      color: context.colors.accentBlue,
                     ),
                   ),
                   const SizedBox(height: 1),
@@ -2446,10 +2447,10 @@ class _PinnedBanner extends StatelessWidget {
                     preview,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 13,
-                      color: Color(0xFF888888),
+                      color: context.colors.textSecondary,
                     ),
                   ),
                 ],
@@ -2458,9 +2459,9 @@ class _PinnedBanner extends StatelessWidget {
             if (onUnpin != null)
               GestureDetector(
                 onTap: onUnpin,
-                child: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Icon(Icons.close_rounded, size: 18, color: Color(0xFFAAAAAA)),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(Icons.close_rounded, size: 18, color: context.colors.textTertiary),
                 ),
               ),
           ],
@@ -2605,13 +2606,13 @@ class _ImageBubble extends StatelessWidget {
                       color: isMine
                           ? Colors.white.withValues(alpha: 0.08)
                           : Colors.black.withValues(alpha: 0.06),
-                      child: const Center(
+                      child: Center(
                         child: SizedBox(
                           width: 24,
                           height: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Color(0xFF5B7FD4),
+                            color: context.colors.accentBlue,
                           ),
                         ),
                       ),
@@ -2632,17 +2633,17 @@ class _ImageBubble extends StatelessWidget {
                                         progress.expectedTotalBytes!
                                     : null,
                                 strokeWidth: 2,
-                                color: const Color(0xFF5B7FD4),
+                                color: context.colors.accentBlue,
                               ),
                             ),
                       errorBuilder: (ctx, err, st) => Container(
                         width: 220,
                         height: 100,
                         alignment: Alignment.center,
-                        color: const Color(0xFFF0F0F0),
-                        child: const Icon(
+                        color: context.colors.surfaceAlt,
+                        child: Icon(
                           Icons.broken_image_outlined,
-                          color: Color(0xFFCCCCCC),
+                          color: context.colors.textTertiary,
                           size: 32,
                         ),
                       ),
@@ -2909,46 +2910,46 @@ class _TextInputBar extends StatelessWidget {
         16,
         8 + MediaQuery.of(context).padding.bottom,
       ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        border: Border(top: BorderSide(color: context.colors.border)),
       ),
       child: Row(
         children: [
           if (onCreateQuiz != null)
             IconButton(
-              icon: const Icon(Icons.poll, color: Color(0xFFAAAAAA)),
+              icon: Icon(Icons.poll, color: context.colors.textTertiary),
               onPressed: onCreateQuiz,
               tooltip: 'Create Quiz',
             ),
           if (onAudioLibrary != null)
             IconButton(
-              icon: const Icon(Icons.headphones, color: Color(0xFFAAAAAA)),
+              icon: Icon(Icons.headphones, color: context.colors.textTertiary),
               onPressed: onAudioLibrary,
               tooltip: 'Send MP3 file',
             ),
           IconButton(
-            icon: const Icon(Icons.image_outlined, color: Color(0xFFAAAAAA)),
+            icon: Icon(Icons.image_outlined, color: context.colors.textTertiary),
             onPressed: onImagePick,
             tooltip: 'Send image',
           ),
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
+                color: context.colors.surfaceAlt,
                 borderRadius: BorderRadius.circular(24),
               ),
               child: TextField(
                 controller: controller,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Message...',
                   hintStyle: TextStyle(
                     fontFamily: 'SF Pro',
-                    color: Color(0xFFBBBBBB),
+                    color: context.colors.textTertiary,
                     fontSize: 15,
                   ),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(
+                  contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 10,
                   ),
@@ -3030,16 +3031,16 @@ class _VoiceInputBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottomPad = MediaQuery.of(context).padding.bottom;
-    if (recordedPath != null) return _buildPreview(bottomPad);
-    return _buildRecorder(bottomPad);
+    if (recordedPath != null) return _buildPreview(context, bottomPad);
+    return _buildRecorder(context, bottomPad);
   }
 
-  Widget _buildRecorder(double bottomPad) {
+  Widget _buildRecorder(BuildContext context, double bottomPad) {
     return Container(
       padding: EdgeInsets.fromLTRB(16, 14, 16, 14 + bottomPad),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        border: Border(top: BorderSide(color: context.colors.border)),
       ),
       child: Column(
         children: [
@@ -3054,7 +3055,7 @@ class _VoiceInputBar extends StatelessWidget {
                     icon: const Icon(Icons.poll, size: 16),
                     label: const Text('Quiz'),
                     style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF888888),
+                      foregroundColor: context.colors.textSecondary,
                       textStyle: const TextStyle(
                           fontFamily: 'SF Pro', fontSize: 13),
                     ),
@@ -3067,7 +3068,7 @@ class _VoiceInputBar extends StatelessWidget {
                     icon: const Icon(Icons.headphones, size: 16),
                     label: const Text('MP3 file'),
                     style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF888888),
+                      foregroundColor: context.colors.textSecondary,
                       textStyle: const TextStyle(
                           fontFamily: 'SF Pro', fontSize: 13),
                     ),
@@ -3082,20 +3083,20 @@ class _VoiceInputBar extends StatelessWidget {
                 ? Text(
                     'Recording ${_fmt(recordSeconds)} / 01:30',
                     key: const ValueKey('rec'),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFFEB3349),
+                      color: context.colors.error,
                     ),
                   )
-                : const Text(
+                : Text(
                     '🎤  Voice messages only · max 90 seconds',
-                    key: ValueKey('idle'),
+                    key: const ValueKey('idle'),
                     style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 12,
-                      color: Color(0xFFAAAAAA),
+                      color: context.colors.textTertiary,
                     ),
                   ),
           ),
@@ -3108,13 +3109,13 @@ class _VoiceInputBar extends StatelessWidget {
               height: isRecording ? 70 : 58,
               decoration: BoxDecoration(
                 color: isRecording
-                    ? const Color(0xFFEB3349)
+                    ? context.colors.error
                     : const Color(0xFF272942),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
                     color: (isRecording
-                            ? const Color(0xFFEB3349)
+                            ? context.colors.error
                             : const Color(0xFF272942))
                         .withValues(alpha: 0.28),
                     blurRadius: isRecording ? 20 : 8,
@@ -3132,10 +3133,10 @@ class _VoiceInputBar extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             isRecording ? 'Tap to stop' : 'Tap to record',
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 11,
-              color: Color(0xFFCCCCCC),
+              color: context.colors.textTertiary,
             ),
           ),
         ],
@@ -3143,12 +3144,12 @@ class _VoiceInputBar extends StatelessWidget {
     );
   }
 
-  Widget _buildPreview(double bottomPad) {
+  Widget _buildPreview(BuildContext context, double bottomPad) {
     return Container(
       padding: EdgeInsets.fromLTRB(16, 14, 16, 14 + bottomPad),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        border: Border(top: BorderSide(color: context.colors.border)),
       ),
       child: Column(
         children: [
@@ -3156,11 +3157,11 @@ class _VoiceInputBar extends StatelessWidget {
             previewPlaying
                 ? 'Playing...'
                 : 'Voice recorded · ${_fmt(recordedDuration)}',
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 13,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF888888),
+              color: context.colors.textSecondary,
             ),
           ),
           const SizedBox(height: 16),
@@ -3169,8 +3170,8 @@ class _VoiceInputBar extends StatelessWidget {
             children: [
               _PreviewBtn(
                 icon: Icons.delete_outline_rounded,
-                iconColor: const Color(0xFFEB3349),
-                bg: const Color(0xFFEB3349),
+                iconColor: context.colors.error,
+                bg: context.colors.error,
                 bgAlpha: 0.1,
                 size: 50,
                 label: 'delete',
@@ -3183,7 +3184,7 @@ class _VoiceInputBar extends StatelessWidget {
                     : Icons.play_arrow_rounded,
                 iconColor: Colors.white,
                 bg: previewPlaying
-                    ? const Color(0xFF5B7FD4)
+                    ? context.colors.accentBlue
                     : const Color(0xFF272942),
                 size: 64,
                 label: previewPlaying ? 'pause' : 'listen',
@@ -3257,10 +3258,10 @@ class _PreviewBtn extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 10,
-              color: Color(0xFFCCCCCC),
+              color: context.colors.textTertiary,
             ),
           ),
         ],
@@ -3335,25 +3336,25 @@ class _AnnouncementBar extends StatelessWidget {
         20,
         12 + MediaQuery.of(context).padding.bottom,
       ),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF8F8F8),
-        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceAlt,
+        border: Border(top: BorderSide(color: context.colors.border)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
+          Icon(
             Icons.lock_outline_rounded,
             size: 14,
-            color: Color(0xFFAAAAAA),
+            color: context.colors.textTertiary,
           ),
           const SizedBox(width: 6),
-          const Text(
+          Text(
             'Announcements only — only admins can post here',
             style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 12,
-              color: Color(0xFFAAAAAA),
+              color: context.colors.textTertiary,
             ),
           ),
         ],
@@ -3376,21 +3377,21 @@ class _ReadOnlyBanner extends StatelessWidget {
         20,
         12 + MediaQuery.of(context).padding.bottom,
       ),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF8F8F8),
-        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceAlt,
+        border: Border(top: BorderSide(color: context.colors.border)),
       ),
-      child: const Row(
+      child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.lock_outline_rounded, size: 14, color: Color(0xFFAAAAAA)),
-          SizedBox(width: 6),
+          Icon(Icons.lock_outline_rounded, size: 14, color: context.colors.textTertiary),
+          const SizedBox(width: 6),
           Text(
             'Only tutors can post in this channel',
             style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 12,
-              color: Color(0xFFAAAAAA),
+              color: context.colors.textTertiary,
             ),
           ),
         ],
@@ -3415,10 +3416,10 @@ class _TypingIndicator extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: 'SF Pro',
           fontSize: 12,
-          color: Color(0xFFAAAAAA),
+          color: context.colors.textTertiary,
           fontStyle: FontStyle.italic,
         ),
       ),
@@ -3448,9 +3449,9 @@ class _QuizBubble extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE8E8F0)),
+        border: Border.all(color: context.colors.border),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -3472,11 +3473,11 @@ class _QuizBubble extends StatelessWidget {
                 Expanded(
                   child: Text(
                     quiz.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                       height: 1.35,
                     ),
                   ),
@@ -3484,7 +3485,7 @@ class _QuizBubble extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
+          Divider(height: 1, thickness: 1, color: context.colors.border),
           ...quiz.options.map((opt) {
             final fraction = total > 0 ? opt.answerCount / total : 0.0;
             final pct = (fraction * 100).round();
@@ -3495,12 +3496,12 @@ class _QuizBubble extends StatelessWidget {
             final Color barColor;
             if (quiz.hasAnswered) {
               barColor = isCorrect == true
-                  ? const Color(0xFF4CAF50)
-                  : const Color(0xFFEEEEEE);
+                  ? context.colors.success
+                  : context.colors.border;
             } else if (isPending) {
-              barColor = const Color(0xFF5B7FD4);
+              barColor = context.colors.accentBlue;
             } else {
-              barColor = const Color(0xFFEEEEEE);
+              barColor = context.colors.border;
             }
 
             final Widget leadIcon;
@@ -3511,16 +3512,16 @@ class _QuizBubble extends StatelessWidget {
                     : Icons.cancel_rounded,
                 size: 18,
                 color: isCorrect == true
-                    ? const Color(0xFF4CAF50)
-                    : const Color(0xFFEB3349),
+                    ? context.colors.success
+                    : context.colors.error,
               );
             } else {
               leadIcon = Icon(
                 Icons.radio_button_unchecked_rounded,
                 size: 18,
                 color: isPending
-                    ? const Color(0xFF5B7FD4)
-                    : const Color(0xFFCCCCCC),
+                    ? context.colors.accentBlue
+                    : context.colors.textTertiary,
               );
             }
 
@@ -3542,10 +3543,10 @@ class _QuizBubble extends StatelessWidget {
                               Flexible(
                                 child: Text(
                                   opt.text,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontFamily: 'SF Pro',
                                     fontSize: 14,
-                                    color: Color(0xFF272942),
+                                    color: context.colors.textPrimary,
                                     height: 1.3,
                                   ),
                                 ),
@@ -3555,8 +3556,8 @@ class _QuizBubble extends StatelessWidget {
                                 Container(
                                   width: 7,
                                   height: 7,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF5B7FD4),
+                                  decoration: BoxDecoration(
+                                    color: context.colors.accentBlue,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
@@ -3567,11 +3568,11 @@ class _QuizBubble extends StatelessWidget {
                         const SizedBox(width: 8),
                         Text(
                           '$pct%',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'SF Pro',
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF888888),
+                            color: context.colors.textSecondary,
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -3580,10 +3581,10 @@ class _QuizBubble extends StatelessWidget {
                           child: Text(
                             '${opt.answerCount}',
                             textAlign: TextAlign.right,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'SF Pro',
                               fontSize: 12,
-                              color: Color(0xFFAAAAAA),
+                              color: context.colors.textTertiary,
                             ),
                           ),
                         ),
@@ -3594,7 +3595,7 @@ class _QuizBubble extends StatelessWidget {
                       borderRadius: BorderRadius.circular(3),
                       child: LinearProgressIndicator(
                         value: fraction,
-                        backgroundColor: const Color(0xFFF0F0F0),
+                        backgroundColor: context.colors.border,
                         valueColor: AlwaysStoppedAnimation<Color>(barColor),
                         minHeight: 4,
                       ),
@@ -3610,10 +3611,10 @@ class _QuizBubble extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: Text(
                 '$total vote${total == 1 ? '' : 's'} total',
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'SF Pro',
                   fontSize: 12,
-                  color: Color(0xFFAAAAAA),
+                  color: context.colors.textTertiary,
                 ),
               ),
             ),
@@ -3717,7 +3718,7 @@ class _CreateQuizSheetState extends State<_CreateQuizSheet> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content:
             Text(e is ApiException ? e.message : 'Failed to create quiz'),
-        backgroundColor: const Color(0xFFEB3349),
+        backgroundColor: context.colors.error,
         behavior: SnackBarBehavior.floating,
       ));
     }
@@ -3737,19 +3738,19 @@ class _CreateQuizSheetState extends State<_CreateQuizSheet> {
             padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
             child: Row(
               children: [
-                const Text(
+                Text(
                   'New Quiz',
                   style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded,
-                      color: Color(0xFFAAAAAA)),
+                  icon: Icon(Icons.close_rounded,
+                      color: context.colors.textTertiary),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -3763,13 +3764,13 @@ class _CreateQuizSheetState extends State<_CreateQuizSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Question',
                     style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF888888),
+                      color: context.colors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -3777,41 +3778,41 @@ class _CreateQuizSheetState extends State<_CreateQuizSheet> {
                     controller: _questionController,
                     decoration: InputDecoration(
                       hintText: 'Type your question...',
-                      hintStyle: const TextStyle(
+                      hintStyle: TextStyle(
                         fontFamily: 'SF Pro',
-                        color: Color(0xFFBBBBBB),
+                        color: context.colors.textTertiary,
                         fontSize: 15,
                       ),
                       filled: true,
-                      fillColor: const Color(0xFFF8F8F8),
+                      fillColor: context.colors.surfaceAlt,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide:
-                            const BorderSide(color: Color(0xFFEEEEEE)),
+                            BorderSide(color: context.colors.border),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide:
-                            const BorderSide(color: Color(0xFFEEEEEE)),
+                            BorderSide(color: context.colors.border),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide:
-                            const BorderSide(color: Color(0xFF5B7FD4)),
+                            BorderSide(color: context.colors.accentBlue),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 12),
                     ),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 15,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                     ),
                     maxLines: 3,
                     minLines: 1,
                   ),
                   const SizedBox(height: 20),
-                  const Row(
+                  Row(
                     children: [
                       Text(
                         'Options',
@@ -3819,16 +3820,16 @@ class _CreateQuizSheetState extends State<_CreateQuizSheet> {
                           fontFamily: 'SF Pro',
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF888888),
+                          color: context.colors.textSecondary,
                         ),
                       ),
-                      SizedBox(width: 6),
+                      const SizedBox(width: 6),
                       Text(
                         '(tap ○ to mark correct)',
                         style: TextStyle(
                           fontFamily: 'SF Pro',
                           fontSize: 12,
-                          color: Color(0xFFBBBBBB),
+                          color: context.colors.textTertiary,
                         ),
                       ),
                     ],
@@ -3850,12 +3851,12 @@ class _CreateQuizSheetState extends State<_CreateQuizSheet> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: isCorrect
-                                    ? const Color(0xFF4CAF50)
+                                    ? context.colors.success
                                     : Colors.transparent,
                                 border: Border.all(
                                   color: isCorrect
-                                      ? const Color(0xFF4CAF50)
-                                      : const Color(0xFFCCCCCC),
+                                      ? context.colors.success
+                                      : context.colors.textTertiary,
                                   width: 2,
                                 ),
                               ),
@@ -3870,48 +3871,48 @@ class _CreateQuizSheetState extends State<_CreateQuizSheet> {
                               controller: _optionControllers[i],
                               decoration: InputDecoration(
                                 hintText: 'Option ${i + 1}...',
-                                hintStyle: const TextStyle(
+                                hintStyle: TextStyle(
                                   fontFamily: 'SF Pro',
-                                  color: Color(0xFFBBBBBB),
+                                  color: context.colors.textTertiary,
                                   fontSize: 14,
                                 ),
                                 filled: true,
-                                fillColor: const Color(0xFFF8F8F8),
+                                fillColor: context.colors.surfaceAlt,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(
-                                      color: Color(0xFFEEEEEE)),
+                                  borderSide: BorderSide(
+                                      color: context.colors.border),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                   borderSide: BorderSide(
                                     color: isCorrect
-                                        ? const Color(0xFF4CAF50)
+                                        ? context.colors.success
                                             .withValues(alpha: 0.5)
-                                        : const Color(0xFFEEEEEE),
+                                        : context.colors.border,
                                   ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(
-                                      color: Color(0xFF5B7FD4)),
+                                  borderSide: BorderSide(
+                                      color: context.colors.accentBlue),
                                 ),
                                 contentPadding:
                                     const EdgeInsets.symmetric(
                                         horizontal: 12, vertical: 10),
                               ),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: 'SF Pro',
                                 fontSize: 14,
-                                color: Color(0xFF272942),
+                                color: context.colors.textPrimary,
                               ),
                             ),
                           ),
                           if (_optionControllers.length > 2)
                             IconButton(
-                              icon: const Icon(
+                              icon: Icon(
                                   Icons.remove_circle_outline_rounded,
-                                  color: Color(0xFFEB3349),
+                                  color: context.colors.error,
                                   size: 20),
                               onPressed: () => _removeOption(i),
                             ),
@@ -3925,7 +3926,7 @@ class _CreateQuizSheetState extends State<_CreateQuizSheet> {
                       icon: const Icon(Icons.add_rounded, size: 18),
                       label: const Text('Add option'),
                       style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF5B7FD4),
+                        foregroundColor: context.colors.accentBlue,
                         textStyle: const TextStyle(
                           fontFamily: 'SF Pro',
                           fontSize: 14,
@@ -3948,7 +3949,7 @@ class _CreateQuizSheetState extends State<_CreateQuizSheet> {
                 onPressed: _canSubmit ? _submit : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF272942),
-                  disabledBackgroundColor: const Color(0xFFDDDDDD),
+                  disabledBackgroundColor: context.colors.border,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -4064,12 +4065,12 @@ class _SwipeToReplyState extends State<_SwipeToReply>
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF5B7FD4).withValues(alpha: 0.15),
+                        color: context.colors.accentBlue.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.reply_rounded,
-                        color: Color(0xFF5B7FD4),
+                        color: context.colors.accentBlue,
                         size: 17,
                       ),
                     ),
@@ -4139,18 +4140,18 @@ class _ReportSheetState extends State<_ReportSheet> {
             padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
             child: Row(
               children: [
-                const Text(
+                Text(
                   'Report message',
                   style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, color: Color(0xFFAAAAAA)),
+                  icon: Icon(Icons.close_rounded, color: context.colors.textTertiary),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -4173,8 +4174,8 @@ class _ReportSheetState extends State<_ReportSheet> {
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: selected
-                              ? const Color(0xFF5B7FD4)
-                              : const Color(0xFFCCCCCC),
+                              ? context.colors.accentBlue
+                              : context.colors.textTertiary,
                           width: 2,
                         ),
                       ),
@@ -4183,9 +4184,9 @@ class _ReportSheetState extends State<_ReportSheet> {
                               child: Container(
                                 width: 10,
                                 height: 10,
-                                decoration: const BoxDecoration(
+                                decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: Color(0xFF5B7FD4),
+                                  color: context.colors.accentBlue,
                                 ),
                               ),
                             )
@@ -4194,10 +4195,10 @@ class _ReportSheetState extends State<_ReportSheet> {
                     const SizedBox(width: 14),
                     Text(
                       label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'SF Pro',
                         fontSize: 15,
-                        color: Color(0xFF272942),
+                        color: context.colors.textPrimary,
                       ),
                     ),
                   ],
@@ -4210,11 +4211,11 @@ class _ReportSheetState extends State<_ReportSheet> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Text(
               'Additional comment (optional)',
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF888888),
+                color: context.colors.textSecondary,
               ),
             ),
           ),
@@ -4226,24 +4227,24 @@ class _ReportSheetState extends State<_ReportSheet> {
               minLines: 2,
               decoration: InputDecoration(
                 hintText: 'Tell us more...',
-                hintStyle: const TextStyle(
+                hintStyle: TextStyle(
                   fontFamily: 'SF Pro',
-                  color: Color(0xFFBBBBBB),
+                  color: context.colors.textTertiary,
                   fontSize: 14,
                 ),
                 filled: true,
-                fillColor: const Color(0xFFF8F8F8),
+                fillColor: context.colors.surfaceAlt,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFEEEEEE)),
+                  borderSide: BorderSide(color: context.colors.border),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFEEEEEE)),
+                  borderSide: BorderSide(color: context.colors.border),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF5B7FD4)),
+                  borderSide: BorderSide(color: context.colors.accentBlue),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14, vertical: 10),
@@ -4266,7 +4267,7 @@ class _ReportSheetState extends State<_ReportSheet> {
                     : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF272942),
-                  disabledBackgroundColor: const Color(0xFFDDDDDD),
+                  disabledBackgroundColor: context.colors.border,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -4325,10 +4326,10 @@ class _ReplyBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               '@',
               style: TextStyle(
-                color: Color(0xFF5B7FD4),
+                color: context.colors.accentBlue,
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
                 fontFamily: 'SF Pro',

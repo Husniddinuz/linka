@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../theme/app_colors.dart';
 
 /// Shows the "free minutes are over" dialog.
 ///
@@ -28,7 +29,7 @@ class _FreeMinutesDialog extends StatelessWidget {
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 36),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: context.colors.surface,
             borderRadius: BorderRadius.circular(20),
           ),
           child: Column(
@@ -38,9 +39,9 @@ class _FreeMinutesDialog extends StatelessWidget {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF272942),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                decoration: BoxDecoration(
+                  color: context.colors.brand,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 ),
                 child: Column(
                   children: [
@@ -48,7 +49,7 @@ class _FreeMinutesDialog extends StatelessWidget {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF5C542).withValues(alpha: 0.15),
+                        color: context.colors.accentYellow.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
                       child: Center(
@@ -56,8 +57,8 @@ class _FreeMinutesDialog extends StatelessWidget {
                           'assets/images/icons/notification_empty.svg',
                           width: 24,
                           height: 24,
-                          colorFilter: const ColorFilter.mode(
-                            Color(0xFFF5C542),
+                          colorFilter: ColorFilter.mode(
+                            context.colors.accentYellow,
                             BlendMode.srcIn,
                           ),
                         ),

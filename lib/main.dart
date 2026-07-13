@@ -10,9 +10,11 @@ import 'screens/tutor_profile_screen.dart';
 import 'services/api_service.dart';
 import 'services/app_feature_service.dart';
 import 'services/facebook_events_service.dart';
+import 'services/theme_service.dart';
 import 'services/token_service.dart';
 import 'services/update_service.dart';
 import 'services/user_service.dart';
+import 'theme/app_theme.dart';
 import 'widgets/app_notify.dart';
 import 'widgets/connectivity_wrapper.dart';
 import 'widgets/update_dialog.dart';
@@ -26,6 +28,7 @@ void main() async {
   );
   await Firebase.initializeApp();
   await FacebookEventsService.init();
+  await ThemeService.init();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   // Global session-expired handler: any 401 that can't be recovered by
@@ -142,19 +145,23 @@ class _LinkaAppState extends State<LinkaApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Linka',
-      navigatorKey: navigatorKey,
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF272942)),
-        fontFamily: 'Inter',
-      ),
-      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle.dark,
-        child: ConnectivityWrapper(child: child ?? const SizedBox.shrink()),
-      ),
-      home: const SplashScreen(),
+    return ValueListenableBuilder<bool>(
+      valueListenable: ThemeService.isDarkNotifier,
+      builder: (context, isDark, _) {
+        return MaterialApp(
+          title: 'Linka',
+          navigatorKey: navigatorKey,
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+          builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+            value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+            child: ConnectivityWrapper(child: child ?? const SizedBox.shrink()),
+          ),
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }

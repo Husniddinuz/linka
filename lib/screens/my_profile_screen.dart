@@ -8,7 +8,9 @@ import '../services/app_feature_service.dart';
 import '../services/auth_service.dart';
 import '../services/plus_service.dart';
 import '../services/share_service.dart';
+import '../services/theme_service.dart';
 import '../services/token_service.dart';
+import '../theme/app_colors.dart';
 import '../services/user_service.dart';
 import '../services/wallet_service.dart';
 import '../widgets/app_notify.dart';
@@ -25,6 +27,8 @@ import 'payment_topup_screen.dart';
 import 'public_offer_screen.dart';
 import 'blocked_users_screen.dart';
 import 'tutor_schedule_screen.dart';
+import 'tutor_speaking_samples_screen.dart';
+import 'tutor_writing_samples_screen.dart';
 
 class MyProfileScreen extends StatefulWidget {
   final VoidCallback? onNavigateToLessons;
@@ -173,7 +177,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: Column(
         children: [
           // White safe area for status bar
@@ -181,9 +185,9 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
           // Scrollable content on gray background
           Expanded(
             child: Container(
-              color: const Color(0xFFF5F5F7),
+              color: context.colors.surfaceAlt,
               child: RefreshIndicator(
-                color: const Color(0xFF272942),
+                color: context.colors.textPrimary,
                 onRefresh: _loadProfile,
                 child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -191,9 +195,9 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                   children: [
                     // White section: header + profile card
                     Container(
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.only(
+                      decoration: BoxDecoration(
+                        color: context.colors.surface,
+                        borderRadius: const BorderRadius.only(
                           bottomLeft: Radius.circular(24),
                           bottomRight: Radius.circular(24),
                         ),
@@ -207,14 +211,14 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                             ),
                             child: Row(
                               children: [
-                                const Expanded(
+                                Expanded(
                                   child: Center(
                                     child: Text(
                                       'My profile',
                                       style: TextStyle(
                                         fontSize: 17,
                                         fontWeight: FontWeight.w600,
-                                        color: Color(0xFF272942),
+                                        color: context.colors.textPrimary,
                                       ),
                                     ),
                                   ),
@@ -291,13 +295,41 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                           ),
                           const _Divider(),
                           _MenuRow(
-                            iconWidget: const Icon(
+                            iconWidget: Icon(
                               Icons.ios_share_rounded,
                               size: 22,
-                              color: Color(0xFF272942),
+                              color: context.colors.textPrimary,
                             ),
                             label: 'Share profile',
                             onTap: _shareMyProfile,
+                          ),
+                          const _Divider(),
+                          _MenuRow(
+                            iconWidget: Icon(
+                              Icons.mic_rounded,
+                              size: 22,
+                              color: context.colors.textPrimary,
+                            ),
+                            label: 'My speaking samples',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const TutorSpeakingSamplesScreen()),
+                            ),
+                          ),
+                          const _Divider(),
+                          _MenuRow(
+                            iconWidget: Icon(
+                              Icons.article_outlined,
+                              size: 22,
+                              color: context.colors.textPrimary,
+                            ),
+                            label: 'My writing samples',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const TutorWritingSamplesScreen()),
+                            ),
                           ),
                           const _Divider(),
                         ],
@@ -338,6 +370,8 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                     const SizedBox(height: 16),
                     _CardGroup(
                       children: [
+                        const _ThemeToggleRow(),
+                        const _Divider(),
                         _MenuRow(
                           icon: 'assets/images/buttons/notifications.svg',
                           label: 'Notifications',
@@ -427,19 +461,19 @@ class _ProfileCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F7),
+          color: context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
           children: [
-            // Avatar with white ring
+            // Avatar with ring matching the surrounding card
             Container(
               width: 84,
               height: 84,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white,
-                border: Border.all(color: Colors.white, width: 2),
+                color: context.colors.surface,
+                border: Border.all(color: context.colors.surface, width: 2),
               ),
               padding: const EdgeInsets.all(6),
               child: loading
@@ -447,7 +481,7 @@ class _ProfileCard extends StatelessWidget {
                   : avatarImage,
             ),
             const SizedBox(width: 12),
-            // Name & phone on white background
+            // Name & phone on card surface
             Expanded(
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -455,7 +489,7 @@ class _ProfileCard extends StatelessWidget {
                   vertical: 14,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: context.colors.surface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: loading
@@ -474,20 +508,20 @@ class _ProfileCard extends StatelessWidget {
                         children: [
                           Text(
                             displayName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF272942),
+                              color: context.colors.textPrimary,
                               height: 1.25,
                             ),
                           ),
                           const SizedBox(height: 6),
                           Text(
                             profile?['phone_number'] as String? ?? '',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w400,
-                              color: Color(0xFF999999),
+                              color: context.colors.textSecondary,
                             ),
                           ),
                         ],
@@ -536,7 +570,7 @@ class _CardGroup extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(children: children),
@@ -554,7 +588,7 @@ class _Divider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(left: 52),
-      child: Container(height: 0.5, color: const Color(0xFFEEEEEE)),
+      child: Container(height: 0.5, color: context.colors.border),
     );
   }
 }
@@ -588,21 +622,65 @@ class _MenuRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                 ),
               ),
             ),
-            const Icon(
+            Icon(
               Icons.chevron_right_rounded,
-              color: Color(0xFFCCCCCC),
+              color: context.colors.textTertiary,
               size: 22,
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─── Dark mode toggle ───────────────────────────────────────────────────────
+
+class _ThemeToggleRow extends StatelessWidget {
+  const _ThemeToggleRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return ValueListenableBuilder<bool>(
+      valueListenable: ThemeService.isDarkNotifier,
+      builder: (context, isDark, _) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              Icon(
+                isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                size: 22,
+                color: colors.textPrimary,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  'Dark mode',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: colors.textPrimary,
+                  ),
+                ),
+              ),
+              Switch.adaptive(
+                value: isDark,
+                activeThumbColor: colors.brand,
+                onChanged: (value) => ThemeService.setDark(value),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -662,12 +740,12 @@ class _BalanceRowState extends State<_BalanceRow> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Balance',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w400,
-                  color: Color(0xFF999999),
+                  color: context.colors.textSecondary,
                 ),
               ),
               const SizedBox(height: 4),
@@ -679,18 +757,18 @@ class _BalanceRowState extends State<_BalanceRow> {
                     children: [
                       TextSpan(
                         text: '${_formatAmount(_balance ?? 0)} ',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF27AE60),
+                          color: context.colors.success,
                         ),
                       ),
-                      const TextSpan(
+                      TextSpan(
                         text: 'UZS',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: Color(0xFF999999),
+                          color: context.colors.textSecondary,
                         ),
                       ),
                     ],
@@ -736,7 +814,7 @@ class _LogoutCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(16),
         ),
         child: GestureDetector(
@@ -752,19 +830,19 @@ class _LogoutCard extends StatelessWidget {
                   height: 22,
                 ),
                 const SizedBox(width: 14),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Log out',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
-                      color: Color(0xFFE74C3C),
+                      color: context.colors.error,
                     ),
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
-                  color: Color(0xFFCCCCCC),
+                  color: context.colors.textTertiary,
                   size: 22,
                 ),
               ],
@@ -778,7 +856,7 @@ class _LogoutCard extends StatelessWidget {
   Future<void> _handleLogout(BuildContext context) async {
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -831,7 +909,7 @@ class _LogoutConfirmSheet extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEEEEEE),
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -843,23 +921,23 @@ class _LogoutConfirmSheet extends StatelessWidget {
               height: 40,
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Log out',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Are you sure you want to log out of your account?',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
-                color: Color(0xFF999999),
+                color: context.colors.textSecondary,
                 height: 1.4,
               ),
             ),
@@ -869,8 +947,8 @@ class _LogoutConfirmSheet extends StatelessWidget {
                 Expanded(
                   child: _SheetButton(
                     label: 'Cancel',
-                    background: const Color(0xFFF2F2F2),
-                    textColor: const Color(0xFF272942),
+                    background: context.colors.surfaceAlt,
+                    textColor: context.colors.textPrimary,
                     onTap: () => Navigator.pop(context, false),
                   ),
                 ),
@@ -878,7 +956,7 @@ class _LogoutConfirmSheet extends StatelessWidget {
                 Expanded(
                   child: _SheetButton(
                     label: 'Log out',
-                    background: const Color(0xFFE74C3C),
+                    background: context.colors.error,
                     textColor: Colors.white,
                     onTap: () => Navigator.pop(context, true),
                   ),
@@ -955,7 +1033,7 @@ class _DeleteAccountCardState extends State<_DeleteAccountCard> {
 
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -1004,29 +1082,29 @@ class _DeleteAccountCardState extends State<_DeleteAccountCard> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (_deleting)
-              const SizedBox(
+              SizedBox(
                 width: 14,
                 height: 14,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Color(0xFFE74C3C),
+                  color: context.colors.error,
                 ),
               )
             else
-              const Icon(
+              Icon(
                 Icons.delete_outline_rounded,
-                color: Color(0xFFE74C3C),
+                color: context.colors.error,
                 size: 16,
               ),
             const SizedBox(width: 6),
-            const Text(
+            Text(
               'Delete account',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFFE74C3C),
+                color: context.colors.error,
                 decoration: TextDecoration.underline,
-                decorationColor: Color(0xFFE74C3C),
+                decorationColor: context.colors.error,
               ),
             ),
           ],
@@ -1077,7 +1155,7 @@ class _DeleteAccountConfirmSheetState
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEEEEEE),
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -1089,28 +1167,28 @@ class _DeleteAccountConfirmSheetState
                 height: 64,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE74C3C).withValues(alpha: 0.12),
+                  color: context.colors.error.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.warning_amber_rounded,
-                  color: Color(0xFFE74C3C),
+                  color: context.colors.error,
                   size: 34,
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Permanently delete account?',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 19,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFFE74C3C),
+                color: context.colors.error,
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'This action is IRREVERSIBLE.\n'
               'Your profile, lessons, messages, reviews, wallet balance, and '
               'all related data will be permanently deleted and cannot be '
@@ -1119,7 +1197,7 @@ class _DeleteAccountConfirmSheetState
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w400,
-                color: Color(0xFF555555),
+                color: context.colors.textSecondary,
                 height: 1.5,
               ),
             ),
@@ -1127,30 +1205,30 @@ class _DeleteAccountConfirmSheetState
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF3F2),
+                color: context.colors.errorBg,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: const Color(0xFFE74C3C).withValues(alpha: 0.25),
+                  color: context.colors.error.withValues(alpha: 0.25),
                 ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'To confirm, type your phone number:',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     widget.phoneNumber,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                       letterSpacing: 0.3,
                     ),
                   ),
@@ -1160,40 +1238,39 @@ class _DeleteAccountConfirmSheetState
                     keyboardType: TextInputType.phone,
                     autofocus: true,
                     onChanged: (_) => setState(() {}),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF272942),
+                      color: context.colors.textPrimary,
                     ),
                     decoration: InputDecoration(
                       hintText: 'Enter phone number',
-                      hintStyle: const TextStyle(
+                      hintStyle: TextStyle(
                         fontSize: 14,
-                        color: Color(0xFFBBBBBB),
+                        color: context.colors.textTertiary,
                         fontWeight: FontWeight.w400,
                       ),
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: context.colors.surface,
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 14),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(
-                          color: Color(0xFFE74C3C),
+                        borderSide: BorderSide(
+                          color: context.colors.error,
                           width: 1,
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide(
-                          color: const Color(0xFFE74C3C)
-                              .withValues(alpha: 0.3),
+                          color: context.colors.error.withValues(alpha: 0.3),
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(
-                          color: Color(0xFFE74C3C),
+                        borderSide: BorderSide(
+                          color: context.colors.error,
                           width: 1.5,
                         ),
                       ),
@@ -1208,8 +1285,8 @@ class _DeleteAccountConfirmSheetState
                 Expanded(
                   child: _SheetButton(
                     label: 'Cancel',
-                    background: const Color(0xFFF2F2F2),
-                    textColor: const Color(0xFF272942),
+                    background: context.colors.surfaceAlt,
+                    textColor: context.colors.textPrimary,
                     onTap: () => Navigator.pop(context, false),
                   ),
                 ),
@@ -1225,8 +1302,8 @@ class _DeleteAccountConfirmSheetState
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: _matches
-                            ? const Color(0xFFE74C3C)
-                            : const Color(0xFFE74C3C).withValues(alpha: 0.35),
+                            ? context.colors.error
+                            : context.colors.error.withValues(alpha: 0.35),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: const Text(

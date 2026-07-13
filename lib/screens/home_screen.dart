@@ -10,6 +10,7 @@ import '../services/notification_service.dart';
 import '../services/prefs_service.dart';
 import '../services/update_service.dart';
 import '../services/user_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/update_dialog.dart';
 import 'speaking_training_screen.dart';
 import 'lesson_meeting_screen.dart';
@@ -32,7 +33,10 @@ import 'profile_setup_screen.dart';
 import 'webinar_viewer_screen.dart';
 import 'debate_room_screen.dart';
 import '../services/debate_service.dart';
-import 'mock_tests_home_screen.dart';
+import 'ielts_booking_screen.dart';
+import 'mock_exams_screen.dart';
+import 'speaking_samples_list_screen.dart';
+import 'writing_samples_list_screen.dart';
 
 // ─── Data models ───────────────────────────────────────────────────────────────
 
@@ -595,7 +599,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   )
                 : RefreshIndicator(
-                    color: const Color(0xFF272942),
+                    color: context.colors.textPrimary,
                     onRefresh: _refreshStudentHome,
                     child: SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -721,65 +725,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                 onToggleBookmark: _toggleArticleBookmark,
                               ),
 
-                              if (AppFeatureService.isEnabled('mock_tests')) ...[
-                                const SizedBox(height: 28),
-                                _SectionHeader(
-                                  title: 'MOCK TESTS',
-                                  onSeeAll: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => const MockTestsHomeScreen(),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 21),
-                                  child: GestureDetector(
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => const MockTestsHomeScreen(),
-                                      ),
-                                    ),
-                                    child: Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(16),
-                                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
-                                        border: Border.all(
-                                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.quiz_outlined, color: Theme.of(context).colorScheme.primary),
-                                          const SizedBox(width: 14),
-                                          const Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  'Take a full IELTS mock test',
-                                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                                                ),
-                                                SizedBox(height: 2),
-                                                Text(
-                                                  'Reading, Listening & AI-graded Writing',
-                                                  style: TextStyle(fontSize: 12.5, color: Colors.grey),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const Icon(Icons.chevron_right),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-
                               if (AppFeatureService.isEnabled('ielts')) ...[
                                 const SizedBox(height: 28),
                                 const _IeltsSection(),
@@ -867,7 +812,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (isTablet) {
       return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.background,
         body: Row(
           children: [
             _SideNav(
@@ -894,7 +839,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: IndexedStack(index: _selectedTab, children: children),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1019,7 +964,7 @@ class _HeaderState extends State<_Header> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
+      color: context.colors.surface,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
         children: [
@@ -1048,11 +993,11 @@ class _HeaderState extends State<_Header> {
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const StoryUploadScreen()),
               ),
-              child: const Padding(
-                padding: EdgeInsets.only(right: 12),
+              child: Padding(
+                padding: const EdgeInsets.only(right: 12),
                 child: Icon(
                   Icons.add_circle_outline_rounded,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                   size: 28,
                 ),
               ),
@@ -1127,7 +1072,7 @@ class _StudentHomeSkeleton extends StatelessWidget {
             child: Container(
               height: 96,
               decoration: BoxDecoration(
-                color: const Color(0xFF272942),
+                color: context.colors.brand,
                 borderRadius: BorderRadius.circular(16),
               ),
               padding: const EdgeInsets.all(16),
@@ -1353,8 +1298,8 @@ class _TutorItem extends StatelessWidget {
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: showYellowRing
-                      ? const Color(0xFFF5C542)
-                      : const Color(0xFFDDDDDD),
+                      ? context.colors.accentYellow
+                      : context.colors.border,
                   width: showYellowRing ? 3.5 : 2,
                 ),
               ),
@@ -1365,7 +1310,7 @@ class _TutorItem extends StatelessWidget {
                         child: Container(
                           width: 80,
                           height: 80,
-                          color: Colors.white,
+                          color: context.colors.surface,
                           padding: const EdgeInsets.all(12),
                           child: Image.asset(
                             'assets/images/branding/new-logo.png',
@@ -1380,9 +1325,9 @@ class _TutorItem extends StatelessWidget {
             Text(
               tutor.name,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
                 height: 1.3,
               ),
             ),
@@ -1420,13 +1365,13 @@ class _LessonsSection extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             children: [
-              const Text(
+              Text(
                 "TODAY'S LESSONS",
                 style: TextStyle(
                   fontFamily: 'SF Pro',
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                   height: 1.0,
                   letterSpacing: 0,
                 ),
@@ -1434,13 +1379,13 @@ class _LessonsSection extends StatelessWidget {
               const Spacer(),
               GestureDetector(
                 onTap: onSeeAll,
-                child: const Text(
+                child: Text(
                   'See all',
                   style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFFB9BCBE),
+                    color: context.colors.textTertiary,
                     height: 1.0,
                     letterSpacing: 0,
                   ),
@@ -1471,14 +1416,14 @@ class _LessonsSection extends StatelessWidget {
               );
             }
             if (lessons.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
                   'No lessons scheduled for today',
                   style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 13,
-                    color: Color(0xFFAAAAAA),
+                    color: context.colors.textTertiary,
                   ),
                 ),
               );
@@ -1778,7 +1723,10 @@ class _IeltsSection extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: GestureDetector(
-            onTap: () {},
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const IeltsBookingScreen()),
+            ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Stack(
@@ -1960,18 +1908,28 @@ class _IeltsSection extends StatelessWidget {
                     SizedBox(
                       height: 96,
                       child: _IeltsActionButton(
-                        label: 'Speaking\nModal Answers',
+                        label: 'Speaking Samples',
                         icon: Icons.record_voice_over_rounded,
-                        onTap: () {},
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SpeakingSamplesListScreen(),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 10),
                     SizedBox(
                       height: 96,
                       child: _IeltsActionButton(
-                        label: 'Writing\nModal Answers',
+                        label: 'Writing Samples',
                         icon: Icons.edit_rounded,
-                        onTap: () {},
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const WritingSamplesListScreen(),
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -1982,9 +1940,13 @@ class _IeltsSection extends StatelessWidget {
                 child: SizedBox(
                   height: 202,
                   child: _IeltsActionButton(
-                    label: 'Mock\nExams',
+                    label: 'Mock Exams',
+                    subtitle: 'Reading · Listening\nWriting · Speaking',
                     icon: Icons.assignment_rounded,
-                    onTap: () {},
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MockExamsScreen()),
+                    ),
                     large: true,
                   ),
                 ),
@@ -1999,12 +1961,14 @@ class _IeltsSection extends StatelessWidget {
 
 class _IeltsActionButton extends StatelessWidget {
   final String label;
+  final String? subtitle;
   final IconData icon;
   final VoidCallback onTap;
   final bool large;
 
   const _IeltsActionButton({
     required this.label,
+    this.subtitle,
     required this.icon,
     required this.onTap,
     this.large = false,
@@ -2019,66 +1983,106 @@ class _IeltsActionButton extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFE4002B), Color(0xFFA30021)],
+            colors: [Color(0xFFE4002B), Color(0xFFC8102E), Color(0xFFA30021)],
           ),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF8A001C).withValues(alpha: 0.28),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
         clipBehavior: Clip.hardEdge,
         child: Stack(
           fit: StackFit.expand,
           children: [
             Positioned(
-              right: -20,
-              top: -20,
+              right: -26,
+              top: -26,
               child: Container(
-                width: 90,
-                height: 90,
+                width: large ? 120 : 84,
+                height: large ? 120 : 84,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.08),
+                  color: Colors.white.withValues(alpha: 0.10),
                 ),
               ),
             ),
             Positioned(
-              left: -16,
-              bottom: -16,
+              left: -18,
+              bottom: -18,
               child: Container(
-                width: 64,
-                height: 64,
+                width: large ? 84 : 56,
+                height: large ? 84 : 56,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.06),
+                  color: Colors.white.withValues(alpha: 0.07),
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(large ? 16 : 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    width: large ? 46 : 36,
-                    height: large ? 46 : 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.20),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      icon,
-                      color: Colors.white,
-                      size: large ? 24 : 18,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        width: large ? 48 : 36,
+                        height: large ? 48 : 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.22),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          icon,
+                          color: Colors.white,
+                          size: large ? 24 : 18,
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_outward_rounded,
+                        color: Colors.white.withValues(alpha: 0.55),
+                        size: large ? 18 : 14,
+                      ),
+                    ],
                   ),
-                  const Spacer(),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontFamily: 'SF Pro',
-                      fontSize: large ? 16 : 13,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      height: 1.25,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: large ? 17 : 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          height: 1.2,
+                        ),
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 5),
+                        Text(
+                          subtitle!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withValues(alpha: 0.78),
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),

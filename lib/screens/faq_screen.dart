@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/skeleton.dart';
 
 class FaqScreen extends StatefulWidget {
@@ -37,7 +38,7 @@ class _FaqScreenState extends State<FaqScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -49,23 +50,23 @@ class _FaqScreenState extends State<FaqScreen> {
                   GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
                     behavior: HitTestBehavior.opaque,
-                    child: const Padding(
-                      padding: EdgeInsets.all(8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
                       child: Icon(
                         Icons.chevron_left_rounded,
                         size: 28,
-                        color: Color(0xFF272942),
+                        color: context.colors.textPrimary,
                       ),
                     ),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
                         'FAQs',
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF272942),
+                          color: context.colors.textPrimary,
                         ),
                       ),
                     ),
@@ -107,12 +108,12 @@ class _FaqScreenState extends State<FaqScreen> {
 
   Widget _buildFaqList() {
     if (_faqs.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No FAQs available',
           style: TextStyle(
             fontSize: 15,
-            color: Color(0xFF999999),
+            color: context.colors.textSecondary,
           ),
         ),
       );
@@ -143,10 +144,10 @@ class _FaqScreenState extends State<FaqScreen> {
                     Expanded(
                       child: Text(
                         question,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
-                          color: Color(0xFF272942),
+                          color: context.colors.textPrimary,
                         ),
                       ),
                     ),
@@ -154,9 +155,9 @@ class _FaqScreenState extends State<FaqScreen> {
                     AnimatedRotation(
                       turns: isExpanded ? 0.5 : 0,
                       duration: const Duration(milliseconds: 200),
-                      child: const Icon(
+                      child: Icon(
                         Icons.keyboard_arrow_down_rounded,
-                        color: Color(0xFF272942),
+                        color: context.colors.textPrimary,
                         size: 24,
                       ),
                     ),
@@ -171,15 +172,15 @@ class _FaqScreenState extends State<FaqScreen> {
                 margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F7),
+                  color: context.colors.surfaceAlt,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   answer,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                     height: 1.5,
                   ),
                 ),
@@ -191,7 +192,7 @@ class _FaqScreenState extends State<FaqScreen> {
             ),
             Container(
               height: 0.5,
-              color: const Color(0xFFEEEEEE),
+              color: context.colors.border,
             ),
           ],
         );

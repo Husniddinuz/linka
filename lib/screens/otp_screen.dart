@@ -6,6 +6,7 @@ import 'profile_setup_screen.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import '../services/token_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 
 class OtpScreen extends StatefulWidget {
@@ -151,24 +152,24 @@ class _OtpScreenState extends State<OtpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.background,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios_rounded,
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
             size: 20,
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           'Login',
           style: TextStyle(
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
             fontSize: 17,
             fontWeight: FontWeight.w600,
           ),
@@ -183,18 +184,18 @@ class _OtpScreenState extends State<OtpScreen> {
               const SizedBox(height: 32),
 
               RichText(
-                text: const TextSpan(
+                text: TextSpan(
                   style: TextStyle(
                     fontSize: 38,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                     height: 1.2,
                   ),
                   children: [
-                    TextSpan(text: 'Enter\nthe code'),
+                    const TextSpan(text: 'Enter\nthe code'),
                     TextSpan(
                       text: '-',
-                      style: TextStyle(color: Color(0xFFF5C542)),
+                      style: TextStyle(color: context.colors.accentYellow),
                     ),
                   ],
                 ),
@@ -204,8 +205,8 @@ class _OtpScreenState extends State<OtpScreen> {
 
               Text(
                 'To confirm your phone number, send a 5-digit code to ${widget.phone}',
-                style: const TextStyle(
-                  color: Color(0xFFAAAAAA),
+                style: TextStyle(
+                  color: context.colors.textTertiary,
                   fontSize: 14,
                   height: 1.5,
                 ),
@@ -261,18 +262,18 @@ class _OtpScreenState extends State<OtpScreen> {
                                   ? Text(
                                       _code[i],
                                       key: ValueKey('d_${i}_${_code[i]}'),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 40,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF272942),
+                                        color: context.colors.textPrimary,
                                       ),
                                     )
                                   : Container(
                                       key: ValueKey('dot_$i'),
                                       width: 14,
                                       height: 14,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFFDDDDDD),
+                                      decoration: BoxDecoration(
+                                        color: context.colors.border,
                                         shape: BoxShape.circle,
                                       ),
                                     ),
@@ -298,8 +299,8 @@ class _OtpScreenState extends State<OtpScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: _secondsLeft > 0
-                          ? const Color(0xFFAAAAAA)
-                          : const Color(0xFF272942),
+                          ? context.colors.textTertiary
+                          : context.colors.textPrimary,
                       fontSize: 13,
                       height: 1.55,
                       decoration: _secondsLeft == 0

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/new_badge.dart';
 import 'article_detail_screen.dart';
 import 'saved_articles_screen.dart';
@@ -93,19 +94,20 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: colors.background,
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.chevron_left, color: Color(0xFF272942), size: 28),
+          icon: Icon(Icons.chevron_left, color: colors.textPrimary, size: 28),
         ),
-        title: const Text(
+        title: Text(
           'Articles',
           style: TextStyle(
-            color: Color(0xFF272942),
+            color: colors.textPrimary,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -121,13 +123,13 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
               'assets/images/icons/bookmark_outline_16.svg',
               width: 20,
               height: 20,
-              colorFilter: const ColorFilter.mode(Color(0xFF272942), BlendMode.srcIn),
+              colorFilter: ColorFilter.mode(colors.textPrimary, BlendMode.srcIn),
             ),
           ),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFF5C542)))
+          ? Center(child: CircularProgressIndicator(color: colors.accentYellow))
           : Column(
               children: [
                 // Search bar
@@ -136,30 +138,30 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
                   child: Container(
                     height: 40,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF2F2F2),
+                      color: colors.surfaceAlt,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: TextField(
                       controller: _searchController,
                       onChanged: _onSearch,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Keyword search',
-                        hintStyle: TextStyle(color: Color(0xFFAAAAAA), fontSize: 14),
-                        prefixIcon: Icon(Icons.search, color: Color(0xFFAAAAAA), size: 20),
+                        hintStyle: TextStyle(color: colors.textTertiary, fontSize: 14),
+                        prefixIcon: Icon(Icons.search, color: colors.textTertiary, size: 20),
                         border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
                       ),
-                      style: const TextStyle(fontSize: 14, color: Color(0xFF272942)),
+                      style: TextStyle(fontSize: 14, color: colors.textPrimary),
                     ),
                   ),
                 ),
                 // Grid
                 Expanded(
                   child: _filtered.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text(
                             'No articles found',
-                            style: TextStyle(color: Color(0xFFAAAAAA), fontSize: 16),
+                            style: TextStyle(color: colors.textTertiary, fontSize: 16),
                           ),
                         )
                       : LayoutBuilder(
@@ -199,9 +201,9 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
                                   ),
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
+                                      color: colors.surface,
                                       borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: const Color(0xFFEEEEEE)),
+                                      border: Border.all(color: colors.border),
                                       boxShadow: [
                                         BoxShadow(
                                           color: accent.withValues(alpha: 0.10),
@@ -318,10 +320,10 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
                                             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                                             child: Text(
                                               title,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.w700,
-                                                color: Color(0xFF272942),
+                                                color: colors.textPrimary,
                                                 height: 1.35,
                                               ),
                                               maxLines: 3,

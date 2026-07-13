@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../theme/app_colors.dart';
 import 'auth_screen.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
@@ -24,7 +25,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -32,20 +33,20 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 48),
-              const Text(
+              Text(
                 'You are\nregistering as ...',
                 style: TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                   height: 1.25,
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'Please select one of the options so we can continue.',
                 style: TextStyle(
-                  color: Color(0xFFAAAAAA),
+                  color: context.colors.textTertiary,
                   fontSize: 14,
                   height: 1.5,
                 ),
@@ -87,10 +88,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 child: ElevatedButton(
                   onPressed: _selectedRole != null ? _continue : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF272942),
-                    disabledBackgroundColor: const Color(0xFFE0E0E0),
+                    backgroundColor: context.colors.brand,
+                    disabledBackgroundColor: context.colors.border,
                     foregroundColor: Colors.white,
-                    disabledForegroundColor: const Color(0xFFAAAAAA),
+                    disabledForegroundColor: context.colors.textTertiary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
@@ -130,23 +131,22 @@ class _RoleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F7),
+          color: colors.surfaceAlt,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected
-                ? const Color(0xFFF5C542)
-                : const Color(0xFFE5E5E5),
+            color: isSelected ? colors.accentYellow : colors.border,
             width: isSelected ? 2 : 1.5,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: const Color(0xFFF5C542).withAlpha(51),
+                    color: colors.accentYellow.withAlpha(51),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -165,10 +165,10 @@ class _RoleCard extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF272942),
+                color: colors.textPrimary,
               ),
             ),
           ],

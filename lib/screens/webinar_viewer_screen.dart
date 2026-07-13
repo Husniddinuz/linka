@@ -7,6 +7,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../services/api_constants.dart';
 import '../services/api_service.dart';
 import '../services/token_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/cached_avatar.dart';
 import 'tutor_profile_screen.dart';
 

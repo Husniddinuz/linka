@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/booking_service.dart';
 import '../services/wallet_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/skeleton.dart';
 import 'payment_topup_screen.dart';
@@ -131,20 +132,20 @@ class _PaymentScreenState extends State<PaymentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.background,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.chevron_left, color: Color(0xFF272942), size: 28),
+          icon: Icon(Icons.chevron_left, color: context.colors.textPrimary, size: 28),
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
-        title: const Text(
+        title: Text(
           'Payment',
           style: TextStyle(
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
             fontSize: 17,
             fontWeight: FontWeight.w600,
           ),
@@ -164,28 +165,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF6F6F6),
+                      color: context.colors.surfaceAlt,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Tutor row (white background)
+                        // Tutor row (card surface background)
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: context.colors.surface,
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Row(
                             children: [
-                              // Avatar with white ring
+                              // Avatar with ring matching the card surface
                               Container(
                                 padding: const EdgeInsets.all(3),
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
+                                decoration: BoxDecoration(
+                                  color: context.colors.surface,
                                   shape: BoxShape.circle,
-                                  boxShadow: [
+                                  boxShadow: const [
                                     BoxShadow(
                                       color: Color(0x1A000000),
                                       blurRadius: 4,
@@ -203,8 +204,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                           errorBuilder: (_, _, _) => Container(
                                             width: 66,
                                             height: 66,
-                                            color: const Color(0xFFE0E0E0),
-                                            child: const Icon(Icons.person, size: 30, color: Color(0xFFAAAAAA)),
+                                            color: context.colors.surfaceAlt,
+                                            child: Icon(Icons.person, size: 30, color: context.colors.textTertiary),
                                           ),
                                         )
                                       : Image.asset(
@@ -221,18 +222,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                 children: [
                                   Text(
                                     widget.tutorName,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
-                                      color: Color(0xFF272942),
+                                      color: context.colors.textPrimary,
                                     ),
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
                                     'Experience: ${widget.experience}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 13,
-                                      color: Color(0xFF999999),
+                                      color: context.colors.textSecondary,
                                     ),
                                   ),
                                   const SizedBox(height: 6),
@@ -242,15 +243,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFEEEEEE),
+                                      color: context.colors.surfaceAlt,
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
                                       'IELTS ${widget.ieltsScore}',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w600,
-                                        color: Color(0xFFD32F2F),
+                                        color: context.colors.error,
                                       ),
                                     ),
                                   ),
@@ -263,26 +264,26 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         const SizedBox(height: 20),
 
                         // DETAILS header
-                        const Text(
+                        Text(
                           'DETAILS',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFFAAAAAA),
+                            color: context.colors.textTertiary,
                             letterSpacing: 0.5,
                           ),
                         ),
 
                         const SizedBox(height: 10),
 
-                        // Details table (white bg)
+                        // Details table (card surface bg)
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
                             vertical: 12,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: context.colors.surface,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Column(
@@ -291,17 +292,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                 label: 'Lesson Date',
                                 value: widget.lessonDate,
                               ),
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 10),
-                                child: Divider(height: 1, color: Color(0xFFEEEEEE)),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                child: Divider(height: 1, color: context.colors.border),
                               ),
                               _DetailRow(
                                 label: 'Time',
                                 value: widget.timeRange,
                               ),
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 10),
-                                child: Divider(height: 1, color: Color(0xFFEEEEEE)),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                child: Divider(height: 1, color: context.colors.border),
                               ),
                               _DetailRow(
                                 label: 'Duration',
@@ -316,9 +317,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         // Goal text
                         Text(
                           widget.goal,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            color: Color(0xFF272942),
+                            color: context.colors.textPrimary,
                             height: 1.6,
                           ),
                         ),
@@ -332,16 +333,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF6F6F6),
+                      color: context.colors.surfaceAlt,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
                       children: [
-                        // Balance row (white bg)
+                        // Balance row (card surface bg)
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: context.colors.surface,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -349,11 +350,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Balance',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Color(0xFF999999),
+                                      color: context.colors.textSecondary,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
@@ -374,16 +375,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                             fontSize: 22,
                                             fontWeight: FontWeight.w700,
                                             color: _canPay
-                                                ? const Color(0xFF4CAF50)
-                                                : const Color(0xFFD32F2F),
+                                                ? context.colors.success
+                                                : context.colors.error,
                                           ),
                                         ),
                                         const SizedBox(width: 6),
-                                        const Text(
+                                        Text(
                                           'UZS',
                                           style: TextStyle(
                                             fontSize: 13,
-                                            color: Color(0xFF999999),
+                                            color: context.colors.textSecondary,
                                           ),
                                         ),
                                       ],
@@ -400,7 +401,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                       vertical: 8,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF272942),
+                                      color: context.colors.brand,
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: const Row(
@@ -427,9 +428,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                               else
                                 GestureDetector(
                                   onTap: _onTopUp,
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.add_circle_outline,
-                                    color: Color(0xFFBBBBBB),
+                                    color: context.colors.textTertiary,
                                     size: 24,
                                   ),
                                 ),
@@ -437,38 +438,38 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        // Total row (white bg)
+                        // Total row (card surface bg)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: context.colors.surface,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
                             children: [
-                              const Text(
+                              Text(
                                 'Total',
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w500,
-                                  color: Color(0xFF272942),
+                                  color: context.colors.textPrimary,
                                 ),
                               ),
                               const Spacer(),
                               Text(
                                 _formatAmount(widget.totalAmount),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF272942),
+                                  color: context.colors.textPrimary,
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              const Text(
+                              Text(
                                 'UZS',
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: Color(0xFF999999),
+                                  color: context.colors.textSecondary,
                                 ),
                               ),
                             ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/api_service.dart';
+import '../theme/app_colors.dart';
 import 'article_detail_screen.dart';
 
 class SavedArticlesScreen extends StatefulWidget {
@@ -47,18 +48,18 @@ class _SavedArticlesScreenState extends State<SavedArticlesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.chevron_left, color: Color(0xFF272942), size: 28),
+          icon: Icon(Icons.chevron_left, color: context.colors.textPrimary, size: 28),
         ),
-        title: const Text(
+        title: Text(
           'Saved articles',
           style: TextStyle(
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -66,7 +67,7 @@ class _SavedArticlesScreenState extends State<SavedArticlesScreen> {
         centerTitle: true,
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFF5C542)))
+          ? Center(child: CircularProgressIndicator(color: context.colors.accentYellow))
           : _articles.isEmpty
               ? Center(
                   child: Column(
@@ -78,13 +79,13 @@ class _SavedArticlesScreenState extends State<SavedArticlesScreen> {
                         height: 40,
                       ),
                       const SizedBox(height: 12),
-                      const Text(
+                      Text(
                         'No saved articles yet',
                         style: TextStyle(
                           fontFamily: 'SF Pro',
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
-                          color: Color(0xFFAAAAAA),
+                          color: context.colors.textTertiary,
                         ),
                       ),
                     ],
@@ -113,7 +114,7 @@ class _SavedArticlesScreenState extends State<SavedArticlesScreen> {
                       ),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF6F6F6),
+                          color: context.colors.surfaceAlt,
                           borderRadius: BorderRadius.circular(14),
                         ),
                         clipBehavior: Clip.hardEdge,
@@ -138,8 +139,8 @@ class _SavedArticlesScreenState extends State<SavedArticlesScreen> {
                                       child: Container(
                                         width: 28,
                                         height: 28,
-                                        decoration: const BoxDecoration(
-                                          color: Colors.white,
+                                        decoration: BoxDecoration(
+                                          color: context.colors.surface,
                                           shape: BoxShape.circle,
                                         ),
                                         child: Center(
@@ -159,10 +160,10 @@ class _SavedArticlesScreenState extends State<SavedArticlesScreen> {
                               padding: const EdgeInsets.all(10),
                               child: Text(
                                 title,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF272942),
+                                  color: context.colors.textPrimary,
                                   height: 1.3,
                                 ),
                                 maxLines: 2,

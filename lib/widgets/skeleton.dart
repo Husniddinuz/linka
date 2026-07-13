@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 
 class Skeleton extends StatefulWidget {
   final double width;
@@ -56,10 +57,10 @@ class _SkeletonState extends State<Skeleton>
             gradient: LinearGradient(
               begin: Alignment(_animation.value - 1, 0),
               end: Alignment(_animation.value, 0),
-              colors: const [
-                Color(0xFFEEEEEE),
-                Color(0xFFF5F5F5),
-                Color(0xFFEEEEEE),
+              colors: [
+                context.colors.border,
+                context.colors.surfaceAlt,
+                context.colors.border,
               ],
             ),
           ),

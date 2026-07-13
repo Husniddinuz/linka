@@ -39,6 +39,19 @@ class UserService {
   /// random-partner speaking practice button on the student home.
   static bool get isExemptFromPlus => _current?.phone == _exemptPhone;
 
+  /// Static-OTP test accounts (see backend `STATIC_OTP_PHONES`). Kept in
+  /// sync with `apps/users/constants.py` on linka-backend.
+  static const testPhones = {
+    '+998101002233',
+    '+998900371655',
+    '+998779710744',
+  };
+
+  /// True when logged in as one of the static test accounts. Used to force
+  /// every remote [AppFeatureService] flag on for QA/reviewers, regardless
+  /// of what's currently toggled off in production.
+  static bool get isTestUser => testPhones.contains(_current?.phone);
+
   static Future<void> clear() async {
     final prefs = await _instance;
     await prefs.remove(_roleKey);

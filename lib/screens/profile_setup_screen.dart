@@ -12,6 +12,7 @@ import '../services/token_service.dart';
 import '../services/user_service.dart';
 import '../widgets/app_notify.dart';
 import '../utils/format.dart';
+import '../theme/app_colors.dart';
 import 'home_screen.dart';
 import 'role_selection_screen.dart';
 
@@ -272,7 +273,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -460,25 +461,25 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       child: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: context.colors.background,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: context.colors.background,
             elevation: 0,
             scrolledUnderElevation: 0,
             centerTitle: true,
             automaticallyImplyLeading: false,
             leading: IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.arrow_back_ios_rounded,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
                 size: 20,
               ),
               onPressed: _handleBack,
             ),
-          title: const Text(
+          title: Text(
             'Profile Setup',
             style: TextStyle(
-              color: Color(0xFF272942),
+              color: context.colors.textPrimary,
               fontSize: 17,
               fontWeight: FontWeight.w600,
             ),
@@ -741,10 +742,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         ? () {}
                         : (_canSubmit ? _submit : null),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF272942),
-                      disabledBackgroundColor: const Color(0xFFE0E0E0),
+                      backgroundColor: context.colors.brand,
+                      disabledBackgroundColor: context.colors.border,
                       foregroundColor: Colors.white,
-                      disabledForegroundColor: const Color(0xFFAAAAAA),
+                      disabledForegroundColor: context.colors.textTertiary,
                       padding: const EdgeInsets.symmetric(vertical: 18),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14)),
@@ -831,20 +832,20 @@ class _ProfileTextField extends StatelessWidget {
       inputFormatters: maxLength != null
           ? [LengthLimitingTextInputFormatter(maxLength!)]
           : null,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 15,
-        color: Color(0xFF272942),
+        color: context.colors.textPrimary,
         fontWeight: FontWeight.w500,
       ),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(
+        hintStyle: TextStyle(
           fontSize: 15,
-          color: Color(0xFFBBBBBB),
+          color: context.colors.textTertiary,
           fontWeight: FontWeight.w400,
         ),
         filled: true,
-        fillColor: const Color(0xFFF2F2F2),
+        fillColor: context.colors.surfaceAlt,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -863,9 +864,9 @@ class _ProfileTextField extends StatelessWidget {
         suffixText: maxLength != null
             ? '${controller.text.length}/$maxLength'
             : null,
-        suffixStyle: const TextStyle(
+        suffixStyle: TextStyle(
           fontSize: 13,
-          color: Color(0xFFAAAAAA),
+          color: context.colors.textTertiary,
         ),
       ),
     );
@@ -893,16 +894,16 @@ class _DropdownField extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         decoration: BoxDecoration(
-          color: const Color(0xFFF2F2F2),
+          color: context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
             Text(
               hint,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
-                color: Color(0xFFBBBBBB),
+                color: context.colors.textTertiary,
                 fontWeight: FontWeight.w400,
               ),
             ),
@@ -910,16 +911,16 @@ class _DropdownField extends StatelessWidget {
             if (value != null)
               Text(
                 value!,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             const SizedBox(width: 8),
-            const Icon(
+            Icon(
               Icons.keyboard_arrow_down_rounded,
-              color: Color(0xFFAAAAAA),
+              color: context.colors.textTertiary,
               size: 22,
             ),
           ],
@@ -956,10 +957,10 @@ class _UploadButton extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF272942).withValues(alpha: 0.08),
+                  color: context.colors.brand.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: const Color(0xFF272942), size: 20),
+                child: Icon(icon, color: context.colors.textPrimary, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -968,26 +969,26 @@ class _UploadButton extends StatelessWidget {
                   children: [
                     Text(
                       label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
-                        color: Color(0xFF272942),
+                        color: context.colors.textPrimary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 2),
-                    const Text(
+                    Text(
                       'Tap to choose a file',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFFAAAAAA),
+                        color: context.colors.textTertiary,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.arrow_forward_ios_rounded,
-                color: Color(0xFFCCCCCC),
+                color: context.colors.textTertiary,
                 size: 14,
               ),
             ],
@@ -1008,20 +1009,24 @@ class DottedBorderBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: _DottedBorderPainter(),
+      painter: _DottedBorderPainter(color: context.colors.border),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: Container(color: const Color(0xFFFCFCFD), child: child),
+        child: Container(color: context.colors.surface, child: child),
       ),
     );
   }
 }
 
 class _DottedBorderPainter extends CustomPainter {
+  final Color color;
+
+  _DottedBorderPainter({required this.color});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFFDDDDDD)
+      ..color = color
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
     final rrect = RRect.fromRectAndRadius(
@@ -1061,7 +1066,7 @@ class _OverallScoreCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFF272942),
+        color: context.colors.brand,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -1072,11 +1077,11 @@ class _OverallScoreCard extends StatelessWidget {
             size: 18,
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Overall IELTS',
                   style: TextStyle(
                     fontSize: 14,
@@ -1084,12 +1089,12 @@ class _OverallScoreCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
                   'Auto-calculated from sub-scores',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Color(0xFFAAAAAA),
+                    color: context.colors.textTertiary,
                   ),
                 ),
               ],
@@ -1099,7 +1104,7 @@ class _OverallScoreCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(
                 horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.colors.surface,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -1107,8 +1112,8 @@ class _OverallScoreCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 color: hasValue
-                    ? const Color(0xFF272942)
-                    : const Color(0xFFCCCCCC),
+                    ? context.colors.textPrimary
+                    : context.colors.textTertiary,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1135,26 +1140,26 @@ class _SectionHeader extends StatelessWidget {
           width: 4,
           height: 18,
           decoration: BoxDecoration(
-            color: const Color(0xFF272942),
+            color: context.colors.brand,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
         const SizedBox(width: 10),
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF272942),
+            color: context.colors.textPrimary,
           ),
         ),
         const Spacer(),
         if (trailing != null)
           Text(
             trailing!,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: Color(0xFFAAAAAA),
+              color: context.colors.textTertiary,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -1185,15 +1190,15 @@ class _PhotoPicker extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Color(0xFF272942),
+              color: context.colors.brand,
             ),
             child: Container(
               padding: const EdgeInsets.all(3),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white,
+                color: context.colors.surface,
               ),
               child: photo != null
                   ? CircleAvatar(
@@ -1206,9 +1211,9 @@ class _PhotoPicker extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF272942),
+              color: context.colors.brand,
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 3),
+              border: Border.all(color: context.colors.surface, width: 3),
             ),
             child: const Icon(
               Icons.camera_alt_rounded,
@@ -1240,7 +1245,7 @@ class _PriceRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F7),
+        color: context.colors.surfaceAlt,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -1248,22 +1253,22 @@ class _PriceRow extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.colors.surface,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.schedule_rounded,
                   size: 15,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                 ),
                 const SizedBox(width: 6),
                 Text(
                   '$minutes min',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF272942),
+                    color: context.colors.textPrimary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1278,32 +1283,32 @@ class _PriceRow extends StatelessWidget {
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               textAlign: TextAlign.right,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
                 fontWeight: FontWeight.w600,
               ),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: '0',
                 hintStyle: TextStyle(
                   fontSize: 15,
-                  color: Color(0xFFCCCCCC),
+                  color: context.colors.textTertiary,
                   fontWeight: FontWeight.w500,
                 ),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 isDense: true,
-                contentPadding: EdgeInsets.symmetric(vertical: 8),
+                contentPadding: const EdgeInsets.symmetric(vertical: 8),
               ),
             ),
           ),
           const SizedBox(width: 6),
-          const Text(
+          Text(
             'UZS',
             style: TextStyle(
               fontSize: 12,
-              color: Color(0xFFAAAAAA),
+              color: context.colors.textTertiary,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1354,7 +1359,7 @@ class _VideoUploadOverlay extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.colors.surface,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
@@ -1382,8 +1387,8 @@ class _VideoUploadOverlay extends StatelessWidget {
                             fileName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF272942),
+                            style: TextStyle(
+                              color: context.colors.textPrimary,
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1391,8 +1396,8 @@ class _VideoUploadOverlay extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                             sizeLine,
-                            style: const TextStyle(
-                              color: Color(0xFF8A8A99),
+                            style: TextStyle(
+                              color: context.colors.textSecondary,
                               fontSize: 12,
                             ),
                           ),
@@ -1403,8 +1408,8 @@ class _VideoUploadOverlay extends StatelessWidget {
                     if (!processing)
                       Text(
                         '$percent%',
-                        style: const TextStyle(
-                          color: Color(0xFF272942),
+                        style: TextStyle(
+                          color: context.colors.textPrimary,
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                         ),
@@ -1417,9 +1422,8 @@ class _VideoUploadOverlay extends StatelessWidget {
                   child: LinearProgressIndicator(
                     minHeight: 6,
                     value: (preparing || processing) ? null : p,
-                    backgroundColor: const Color(0xFFE8E8EF),
-                    valueColor:
-                        const AlwaysStoppedAnimation(Color(0xFF272942)),
+                    backgroundColor: context.colors.surfaceAlt,
+                    valueColor: AlwaysStoppedAnimation(context.colors.brand),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -1429,8 +1433,8 @@ class _VideoUploadOverlay extends StatelessWidget {
                       : processing
                           ? 'Processing on our servers…'
                           : 'Uploading your intro video',
-                  style: const TextStyle(
-                    color: Color(0xFF272942),
+                  style: TextStyle(
+                    color: context.colors.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1564,7 +1568,7 @@ class _DropdownSheet extends StatelessWidget {
           width: 36,
           height: 4,
           decoration: BoxDecoration(
-            color: const Color(0xFFDDDDDD),
+            color: context.colors.border,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
@@ -1578,18 +1582,18 @@ class _DropdownSheet extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                 ),
               ),
               const Spacer(),
               GestureDetector(
                 onTap: () => Navigator.pop(context),
-                child: const Icon(
+                child: Icon(
                   Icons.close,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                   size: 22,
                 ),
               ),
@@ -1598,7 +1602,7 @@ class _DropdownSheet extends StatelessWidget {
         ),
 
         const SizedBox(height: 8),
-        const Divider(height: 1, color: Color(0xFFEEEEEE)),
+        Divider(height: 1, color: context.colors.border),
 
         Flexible(
           child: SingleChildScrollView(
@@ -1618,9 +1622,9 @@ class _DropdownSheet extends StatelessWidget {
                       children: [
                         Text(
                           opt,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
-                            color: Color(0xFF272942),
+                            color: context.colors.textPrimary,
                           ),
                         ),
                         const Spacer(),
@@ -1630,12 +1634,12 @@ class _DropdownSheet extends StatelessWidget {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: isSelected
-                                ? const Color(0xFFF5C542)
+                                ? context.colors.accentYellow
                                 : Colors.transparent,
                             border: Border.all(
                               color: isSelected
-                                  ? const Color(0xFFF5C542)
-                                  : const Color(0xFFCCCCCC),
+                                  ? context.colors.accentYellow
+                                  : context.colors.textTertiary,
                               width: 1.5,
                             ),
                           ),

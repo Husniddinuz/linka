@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/cached_avatar.dart';
 import '../widgets/skeleton.dart';
 
@@ -66,7 +67,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
     final updated = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -86,7 +87,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
+      backgroundColor: context.colors.surfaceAlt,
       body: SafeArea(
         child: Column(
           children: [
@@ -105,7 +106,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
     if (_error != null) return _ErrorState(message: _error!, onRetry: _load);
     if (_reviews.isEmpty) return _EmptyState(isTutor: widget.isTutor);
     return RefreshIndicator(
-      color: const Color(0xFF272942),
+      color: context.colors.textPrimary,
       onRefresh: _load,
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
@@ -126,6 +127,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
 class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
@@ -137,24 +139,24 @@ class _Header extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: colors.surface,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.chevron_left_rounded,
                 size: 24,
-                color: Color(0xFF272942),
+                color: colors.textPrimary,
               ),
             ),
           ),
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
                 'My reviews',
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF272942),
+                  color: colors.textPrimary,
                 ),
               ),
             ),
@@ -204,9 +206,10 @@ class _ReviewCard extends StatelessWidget {
       imageUrl = tutor?['image'] as String?;
     }
 
+    final colors = context.colors;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -222,9 +225,9 @@ class _ReviewCard extends StatelessWidget {
           // Top accent bar with rating
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              color: Color(0xFF272942),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            decoration: BoxDecoration(
+              color: colors.brand,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: Row(
               children: [
@@ -239,7 +242,7 @@ class _ReviewCard extends StatelessWidget {
                           : Icons.star_outline_rounded,
                       size: 20,
                       color: i < rating
-                          ? const Color(0xFFF5C542)
+                          ? colors.accentYellow
                           : Colors.white.withValues(alpha: 0.25),
                     ),
                   )),
@@ -247,10 +250,10 @@ class _ReviewCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   '$rating / 5',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFFF5C542),
+                    color: colors.accentYellow,
                   ),
                 ),
                 const Spacer(),
@@ -284,18 +287,18 @@ class _ReviewCard extends StatelessWidget {
                           if (participantName.isNotEmpty)
                             Text(
                               participantName,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF272942),
+                                color: colors.textPrimary,
                               ),
                             ),
                           Text(
                             participantLabel,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
-                              color: Color(0xFFAAAAAA),
+                              color: colors.textTertiary,
                             ),
                           ),
                         ],
@@ -309,24 +312,24 @@ class _ReviewCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF2F2F2),
+                          color: colors.surfaceAlt,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               Icons.edit_outlined,
                               size: 13,
-                              color: Color(0xFF666666),
+                              color: colors.textSecondary,
                             ),
-                            SizedBox(width: 4),
+                            const SizedBox(width: 4),
                             Text(
                               'Edit',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF666666),
+                                color: colors.textSecondary,
                               ),
                             ),
                           ],
@@ -341,15 +344,15 @@ class _ReviewCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8F8F8),
+                      color: colors.surfaceAlt,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       comment,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w400,
-                        color: Color(0xFF444444),
+                        color: colors.textPrimary,
                         height: 1.5,
                       ),
                     ),
@@ -453,6 +456,7 @@ class _EditReviewSheetState extends State<_EditReviewSheet> {
     final tutor = widget.review['tutor'] as Map<String, dynamic>?;
     final tutorName = tutor?['display_name'] as String? ?? 'Tutor';
     final imageUrl = tutor?['image'] as String?;
+    final colors = context.colors;
 
     return SafeArea(
       top: false,
@@ -468,7 +472,7 @@ class _EditReviewSheetState extends State<_EditReviewSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEEEEEE),
+                  color: colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -485,17 +489,17 @@ class _EditReviewSheetState extends State<_EditReviewSheet> {
                   children: [
                     Text(
                       tutorName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF272942),
+                        color: colors.textPrimary,
                       ),
                     ),
-                    const Text(
+                    Text(
                       'Edit your review',
                       style: TextStyle(
                         fontSize: 13,
-                        color: Color(0xFFAAAAAA),
+                        color: colors.textTertiary,
                       ),
                     ),
                   ],
@@ -508,7 +512,7 @@ class _EditReviewSheetState extends State<_EditReviewSheet> {
             Container(
               padding: const EdgeInsets.symmetric(vertical: 20),
               decoration: BoxDecoration(
-                color: const Color(0xFF272942).withValues(alpha: 0.06),
+                color: colors.brand.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
@@ -527,8 +531,8 @@ class _EditReviewSheetState extends State<_EditReviewSheet> {
                                 : Icons.star_outline_rounded,
                             size: 40,
                             color: filled
-                                ? const Color(0xFFF5C542)
-                                : const Color(0xFFDDDDDD),
+                                ? colors.accentYellow
+                                : colors.border,
                           ),
                         ),
                       );
@@ -537,10 +541,10 @@ class _EditReviewSheetState extends State<_EditReviewSheet> {
                   const SizedBox(height: 8),
                   Text(
                     _labels[(_rating - 1).clamp(0, 4)],
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF272942),
+                      color: colors.textPrimary,
                     ),
                   ),
                 ],
@@ -553,19 +557,19 @@ class _EditReviewSheetState extends State<_EditReviewSheet> {
               controller: _commentController,
               minLines: 3,
               maxLines: 5,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: Color(0xFF272942),
+                color: colors.textPrimary,
                 height: 1.5,
               ),
               decoration: InputDecoration(
                 hintText: 'Share your experience...',
-                hintStyle: const TextStyle(
+                hintStyle: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFFBBBBBB),
+                  color: colors.textTertiary,
                 ),
                 filled: true,
-                fillColor: const Color(0xFFF5F5F7),
+                fillColor: colors.surfaceAlt,
                 contentPadding: const EdgeInsets.all(16),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -578,9 +582,9 @@ class _EditReviewSheetState extends State<_EditReviewSheet> {
               const SizedBox(height: 8),
               Text(
                 _error!,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: Color(0xFFE74C3C),
+                  color: colors.error,
                 ),
               ),
             ],
@@ -595,8 +599,8 @@ class _EditReviewSheetState extends State<_EditReviewSheet> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: _saving
-                      ? const Color(0xFF272942).withValues(alpha: 0.5)
-                      : const Color(0xFF272942),
+                      ? colors.brand.withValues(alpha: 0.5)
+                      : colors.brand,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: _saving
