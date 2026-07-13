@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/ielts_registration_service.dart';
 import '../widgets/mock_test_styles.dart';
+import '../widgets/skeleton.dart';
 import 'ielts_id_upload_screen.dart';
 
 /// Candidate profile + registration submission — the core of the flow.
@@ -318,7 +319,13 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
                     ),
                   ),
                 )
-              : _buildWizard(),
+              // Registration is several sequential IDP calls (profile update,
+              // ban check, register, payment method, receipt) — can take a
+              // few seconds, so swap the wizard for a skeleton rather than
+              // leaving the form sitting there with just a button spinner.
+              : _submitting
+                  ? const _RegisterSkeleton()
+                  : _buildWizard(),
     );
   }
 
@@ -404,7 +411,6 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
                 flex: 2,
                 child: MtPrimaryButton(
                   label: isLast ? 'Register' : 'Next',
-                  loading: _submitting,
                   onPressed: isLast ? _submit : () => _goToStep(_step + 1),
                 ),
               ),
@@ -741,6 +747,61 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
           style: const TextStyle(fontFamily: 'SF Pro', fontSize: 15, color: MockTestColors.navy),
         ),
       ),
+    );
+  }
+}
+
+/// Shown in place of the wizard while [_IeltsProfileFormScreenState._submit]
+/// works through its chain of IDP calls — mirrors the shape of the form/
+/// summary the user was just looking at instead of a blank spinner screen.
+class _RegisterSkeleton extends StatelessWidget {
+  const _RegisterSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        const Skeleton(height: 12.5, width: 150, borderRadius: 4),
+        const SizedBox(height: 8),
+        const Skeleton(height: 4, borderRadius: 4),
+        const SizedBox(height: 20),
+        const Text(
+          'Submitting your registration…',
+          style: TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, color: MockTestColors.grey),
+        ),
+        const SizedBox(height: 20),
+        _card([
+          const Skeleton(height: 14, width: double.infinity, borderRadius: 6),
+          const SizedBox(height: 14),
+          const Skeleton(height: 14, width: double.infinity, borderRadius: 6),
+          const SizedBox(height: 14),
+          const Skeleton(height: 14, width: 160, borderRadius: 6),
+        ]),
+        const SizedBox(height: 16),
+        _card([
+          const Skeleton(height: 14, width: double.infinity, borderRadius: 6),
+          const SizedBox(height: 14),
+          const Skeleton(height: 14, width: 200, borderRadius: 6),
+        ]),
+        const SizedBox(height: 16),
+        _card([
+          const Skeleton(height: 14, width: double.infinity, borderRadius: 6),
+          const SizedBox(height: 14),
+          const Skeleton(height: 14, width: double.infinity, borderRadius: 6),
+          const SizedBox(height: 14),
+          const Skeleton(height: 14, width: 120, borderRadius: 6),
+        ]),
+      ],
+    );
+  }
+
+  Widget _card(List<Widget> children) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: mtSoftCard(radius: 18),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
     );
   }
 }

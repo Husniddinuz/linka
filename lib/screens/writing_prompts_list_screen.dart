@@ -15,7 +15,9 @@ class WritingPromptsListScreen extends StatefulWidget {
   State<WritingPromptsListScreen> createState() => _WritingPromptsListScreenState();
 }
 
-class _WritingPromptsListScreenState extends State<WritingPromptsListScreen> {
+class _WritingPromptsListScreenState extends State<WritingPromptsListScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController = TabController(length: 2, vsync: this);
   final Future<List<Map<String, dynamic>>> _future = MockTestService.fetchWritingPrompts();
   bool _isLocked = false;
 
@@ -32,10 +34,39 @@ class _WritingPromptsListScreenState extends State<WritingPromptsListScreen> {
   }
 
   @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: mtAppBar(context, title: 'Writing'),
+      appBar: mtAppBar(
+        context,
+        title: 'Writing',
+        // Task 1 and Task 2 each get their own tab (rather than one long
+        // scrolling list) so Task 2 stays a single tap away no matter how
+        // many Task 1 prompts there are — burying it below a long Task 1
+        // list made students think only Task 1 existed.
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(46),
+          child: Container(
+            color: Colors.white,
+            padding: const EdgeInsets.only(bottom: 8),
+            child: TabBar(
+              controller: _tabController,
+              labelColor: MockTestColors.navy,
+              unselectedLabelColor: MockTestColors.greyLight,
+              indicatorColor: MockTestColors.navy,
+              indicatorSize: TabBarIndicatorSize.label,
+              labelStyle: const TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, fontWeight: FontWeight.w600),
+              tabs: const [Tab(text: 'Task 1'), Tab(text: 'Task 2')],
+            ),
+          ),
+        ),
+      ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _future,
         builder: (context, snapshot) {
@@ -57,54 +88,41 @@ class _WritingPromptsListScreenState extends State<WritingPromptsListScreen> {
           final prompts = snapshot.data ?? const [];
           final task1 = prompts.where((p) => p['task_number'] == 1).toList();
           final task2 = prompts.where((p) => p['task_number'] == 2).toList();
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          return TabBarView(
+            controller: _tabController,
             children: [
-              const _TaskSectionLabel(text: 'TASK 1'),
-              const SizedBox(height: 10),
-              ..._buildTaskPrompts(task1),
-              const SizedBox(height: 22),
-              const _TaskSectionLabel(text: 'TASK 2'),
-              const SizedBox(height: 10),
-              ..._buildTaskPrompts(task2),
+              _PromptList(prompts: task1, locked: _isLocked),
+              _PromptList(prompts: task2, locked: _isLocked),
             ],
           );
         },
       ),
     );
   }
-
-  List<Widget> _buildTaskPrompts(List<Map<String, dynamic>> taskPrompts) {
-    final locked = _isLocked && taskPrompts.length > _freePromptsPerTask;
-    final visible = locked ? taskPrompts.sublist(0, _freePromptsPerTask) : taskPrompts;
-    final hidden = locked ? taskPrompts.sublist(_freePromptsPerTask) : const <Map<String, dynamic>>[];
-    return [
-      for (final p in visible) _PromptCard(prompt: p, locked: false),
-      if (locked)
-        MtLockedSection(
-          hiddenCount: hidden.length,
-          itemLabel: 'prompts',
-          lockedCards: [for (final p in hidden) _PromptCard(prompt: p, locked: true)],
-        ),
-    ];
-  }
 }
 
-class _TaskSectionLabel extends StatelessWidget {
-  const _TaskSectionLabel({required this.text});
-  final String text;
+class _PromptList extends StatelessWidget {
+  const _PromptList({required this.prompts, required this.locked});
+
+  final List<Map<String, dynamic>> prompts;
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontFamily: 'SF Pro',
-        fontSize: 12.5,
-        fontWeight: FontWeight.w700,
-        color: MockTestColors.greyLight,
-        letterSpacing: 0.8,
-      ),
+    final isLocked = locked && prompts.length > _freePromptsPerTask;
+    final visible = isLocked ? prompts.sublist(0, _freePromptsPerTask) : prompts;
+    final hidden = isLocked ? prompts.sublist(_freePromptsPerTask) : const <Map<String, dynamic>>[];
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        for (final p in visible) _PromptCard(prompt: p, locked: false),
+        if (isLocked)
+          MtLockedSection(
+            hiddenCount: hidden.length,
+            itemLabel: 'prompts',
+            lockedCards: [for (final p in hidden) _PromptCard(prompt: p, locked: true)],
+          ),
+      ],
     );
   }
 }

@@ -37,6 +37,18 @@ class PodcastPlaybackService {
   List<PodcastTrack> _queue = [];
   int _currentIndex = -1;
 
+  // Every screen shares this one player (see loadAdHoc below), so a load
+  // that takes a while to prepare — e.g. a chat voice message, which is
+  // fully downloaded over HTTP before it's handed to the player — can
+  // finish *after* the user has navigated elsewhere and started a different
+  // load (a Mock Test Listening track, a Speaking Sample). Without this
+  // guard, that late completion silently hijacks playback with stale audio.
+  // [beginLoad] claims a new generation; [isCurrent] tells a caller whether
+  // its generation is still the latest one, i.e. nothing has loaded since.
+  int _generation = 0;
+  int beginLoad() => ++_generation;
+  bool isCurrent(int generation) => generation == _generation;
+
   bool get hasNext => _currentIndex >= 0 && _currentIndex < _queue.length - 1;
   bool get hasPrevious => _currentIndex > 0;
 
@@ -76,6 +88,7 @@ class PodcastPlaybackService {
   /// handed to the native player as one playlist so lock-screen/notification
   /// skip-next and skip-previous controls reflect the real queue position.
   Future<void> setQueue(List<PodcastTrack> tracks, int startIndex) async {
+    final gen = beginLoad();
     _queue = List.of(tracks);
     if (currentTrack.value?.id == tracks[startIndex].id) {
       // Already playing the requested track; just adopt the new queue and keep
@@ -89,6 +102,7 @@ class PodcastPlaybackService {
       tracks.map(_sourceFor).toList(),
       initialIndex: startIndex,
     );
+    if (!isCurrent(gen)) return;
     await _player.play();
   }
 
@@ -107,7 +121,16 @@ class PodcastPlaybackService {
   /// the second instance throws "supports only a single player instance".
   /// Clears the podcast queue so the mini player and the queue-completion/
   /// index listeners above don't act on a now-stale podcast track.
-  Future<Duration?> loadAdHoc(String id, Uri uri, {String title = ''}) {
+  ///
+  /// Pass [generation] when the caller already did slow prep (e.g. a
+  /// download) before calling this and grabbed its own token via
+  /// [beginLoad] beforehand — otherwise a fresh one is claimed here. Always
+  /// returns whatever duration the player resolved, even if stale; check
+  /// [isCurrent] with the same generation before acting on the result (e.g.
+  /// calling play()) since a duration of `null` is also legitimately
+  /// possible for formats that report it asynchronously.
+  Future<Duration?> loadAdHoc(String id, Uri uri, {String title = '', int? generation}) async {
+    final gen = generation ?? beginLoad();
     _queue = [];
     _currentIndex = -1;
     currentTrack.value = null;
@@ -128,6 +151,7 @@ class PodcastPlaybackService {
 
   Future<void> load(PodcastTrack track) async {
     if (currentTrack.value?.id == track.id) return;
+    beginLoad();
     _queue = [track];
     _currentIndex = 0;
     currentTrack.value = track;

@@ -371,7 +371,6 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                     _CardGroup(
                       children: [
                         const _ThemeToggleRow(),
-                        const _Divider(),
                         _MenuRow(
                           icon: 'assets/images/buttons/notifications.svg',
                           label: 'Notifications',
@@ -649,36 +648,53 @@ class _ThemeToggleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return ValueListenableBuilder<bool>(
-      valueListenable: ThemeService.isDarkNotifier,
-      builder: (context, isDark, _) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Row(
-            children: [
-              Icon(
-                isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                size: 22,
-                color: colors.textPrimary,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  'Dark mode',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        ThemeService.isDarkNotifier,
+        AppFeatureService.notifier,
+      ]),
+      builder: (context, _) {
+        // Admin has locked the app to a single theme (via the light_mode /
+        // dark_mode flags) — nothing left for the user to choose.
+        final lightAllowed = AppFeatureService.isEnabled('light_mode');
+        final darkAllowed = AppFeatureService.isEnabled('dark_mode');
+        if (!lightAllowed || !darkAllowed) {
+          return const SizedBox.shrink();
+        }
+
+        final isDark = ThemeService.isDark;
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                    size: 22,
                     color: colors.textPrimary,
                   ),
-                ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      'Dark mode',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Switch.adaptive(
+                    value: isDark,
+                    activeThumbColor: colors.brand,
+                    onChanged: (value) => ThemeService.setDark(value),
+                  ),
+                ],
               ),
-              Switch.adaptive(
-                value: isDark,
-                activeThumbColor: colors.brand,
-                onChanged: (value) => ThemeService.setDark(value),
-              ),
-            ],
-          ),
+            ),
+            const _Divider(),
+          ],
         );
       },
     );

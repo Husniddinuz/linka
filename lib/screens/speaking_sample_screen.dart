@@ -54,12 +54,17 @@ class _SpeakingSampleTutorScreenState extends State<SpeakingSampleTutorScreen> {
     });
     final audioUrl = part['audio_url'] as String?;
     if (audioUrl != null && audioUrl.isNotEmpty) {
+      final gen = _player.beginLoad();
       await _player.loadAdHoc(
         'speaking-tutor-${widget.tutor['id']}-part${part['part']}',
         Uri.parse(audioUrl),
         title: part['title']?.toString() ?? '',
+        generation: gen,
       );
-      _player.play();
+      // Bail if another load (e.g. navigating to Mock Test Listening) won
+      // the race while this one was fetching — don't resurrect this part's
+      // audio out from under whatever the user moved on to.
+      if (_player.isCurrent(gen)) _player.play();
     }
     final cues = await SubtitleService.fetchCues(part['subtitle_url'] as String?);
     if (!mounted || _selectedPart != index) return;

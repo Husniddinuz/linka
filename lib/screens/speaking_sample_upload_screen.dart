@@ -604,6 +604,12 @@ class _AudioRecorderControlState extends State<_AudioRecorderControl> {
     });
   }
 
+  // Below this, the file is effectively silent/empty — e.g. the iOS
+  // Simulator has no real microphone and some encoders write a near-empty
+  // container (~28 bytes) instead of failing outright. A real recording of
+  // even a couple of seconds is comfortably larger than this.
+  static const _minRecordingBytes = 2000;
+
   Future<void> _stopRecording() async {
     _recordTimer?.cancel();
     final duration = _recordSeconds;
@@ -613,6 +619,22 @@ class _AudioRecorderControlState extends State<_AudioRecorderControl> {
     });
     final path = await _recorder.stop();
     if (duration < 1 || path == null || !mounted) return;
+
+    final file = File(path);
+    final bytes = await file.length();
+    if (bytes < _minRecordingBytes) {
+      try {
+        await file.delete();
+      } catch (_) {}
+      if (mounted) {
+        AppNotify.show(context,
+            message: 'Recording came out empty — try again (on a simulator, '
+                'make sure a microphone input is configured, or test on a '
+                'real device).');
+      }
+      return;
+    }
+
     setState(() {
       _recordedPath = path;
       _recordedDuration = duration;

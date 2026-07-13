@@ -57,10 +57,27 @@ class MockTestService {
     return ApiService.get('/writing-attempts/quota/');
   }
 
-  /// Tutors with real Speaking sample answers, each covering Part 1/2/3
-  /// (some tutors may only have 2 of the 3 parts).
-  static Future<List<Map<String, dynamic>>> fetchSpeakingSamples() async {
-    final data = await ApiService.getList('/speaking-samples/');
+  /// Speaking sample answers, each covering Part 1/2/3 (some tutors may only
+  /// have 2 of the 3 parts). Optionally scoped to a single tutor via
+  /// [tutorId] (preferred) or [tutorName] (for admin-authored samples with no
+  /// real tutor account, where `tutor_id` is null).
+  static Future<List<Map<String, dynamic>>> fetchSpeakingSamples({
+    int? tutorId,
+    String? tutorName,
+  }) async {
+    final params = <String>[];
+    if (tutorId != null) params.add('tutor_id=$tutorId');
+    if (tutorName != null) params.add('tutor_name=${Uri.encodeQueryComponent(tutorName)}');
+    final qs = params.isNotEmpty ? '?${params.join('&')}' : '';
+    final data = await ApiService.getList('/speaking-samples/$qs');
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  /// Tutors with at least one published Speaking sample, sorted alphabetically
+  /// by name. `tutor_id` is null for admin-authored samples with no real
+  /// tutor account (grouped by name in that case).
+  static Future<List<Map<String, dynamic>>> fetchSpeakingSampleTutors() async {
+    final data = await ApiService.getList('/speaking-samples/tutors/');
     return data.cast<Map<String, dynamic>>();
   }
 

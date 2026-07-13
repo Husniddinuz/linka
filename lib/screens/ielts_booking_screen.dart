@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/ielts_registration_service.dart';
 import '../widgets/mock_test_styles.dart';
+import '../widgets/skeleton.dart';
 import 'ielts_signup_screen.dart';
 
 /// Real IELTS test date/centre search, backed directly by IDP's own booking
@@ -114,7 +115,7 @@ class _IeltsBookingScreenState extends State<IeltsBookingScreen> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: MockTestColors.navy));
+      return const _BookingSkeleton();
     }
     if (_error != null) {
       return ListView(
@@ -268,5 +269,65 @@ class _SessionCard extends StatelessWidget {
       buffer.write(s[i]);
     }
     return buffer.toString();
+  }
+}
+
+/// Shown while the first page of sessions is loading — mirrors [_SessionCard]
+/// so the list doesn't jump in shape once real data arrives.
+class _BookingSkeleton extends StatelessWidget {
+  const _BookingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      itemCount: 6,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (_, _) => const _SessionCardSkeleton(),
+    );
+  }
+}
+
+class _SessionCardSkeleton extends StatelessWidget {
+  const _SessionCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: mtSoftCard(radius: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Skeleton(width: 44, height: 44, circle: true),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Skeleton(height: 15.5, width: 160, borderRadius: 5),
+                    SizedBox(height: 6),
+                    Skeleton(height: 13, width: 110, borderRadius: 4),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Skeleton(height: 24, width: 70, borderRadius: 20),
+            ],
+          ),
+          const Divider(height: 24, color: MockTestColors.divider),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: const [
+              Skeleton(height: 12.5, width: 100, borderRadius: 4),
+              Skeleton(height: 14, width: 80, borderRadius: 5),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

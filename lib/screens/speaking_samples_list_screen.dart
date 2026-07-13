@@ -4,8 +4,9 @@ import '../widgets/mock_test_styles.dart';
 import 'speaking_sample_screen.dart';
 
 /// Grid of tutors with real Speaking sample answers for students to study —
-/// read-only reference content, no submission/grading. Each card opens the
-/// tutor's Part 1/2/3 samples with audio + live transcript.
+/// read-only reference content, no submission/grading. Tapping a tutor
+/// drills into their submitted topics (see [SpeakingSampleTutorTopicsScreen]);
+/// tapping a topic opens that sample's Part 1/2/3 audio + live transcript.
 class SpeakingSamplesListScreen extends StatefulWidget {
   const SpeakingSamplesListScreen({super.key});
 
@@ -14,7 +15,7 @@ class SpeakingSamplesListScreen extends StatefulWidget {
 }
 
 class _SpeakingSamplesListScreenState extends State<SpeakingSamplesListScreen> {
-  final Future<List<Map<String, dynamic>>> _future = MockTestService.fetchSpeakingSamples();
+  final Future<List<Map<String, dynamic>>> _future = MockTestService.fetchSpeakingSampleTutors();
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +58,32 @@ class _SpeakingSamplesListScreenState extends State<SpeakingSamplesListScreen> {
               crossAxisSpacing: 14,
               childAspectRatio: 0.72,
             ),
-            itemBuilder: (context, i) => _TutorCard(tutor: tutors[i]),
+            itemBuilder: (context, i) {
+              final tutor = tutors[i];
+              final tutorId = (tutor['tutor_id'] as num?)?.toInt();
+              final tutorName = tutor['tutor_name']?.toString() ?? '';
+              final tutorImageUrl = tutor['tutor_image_url'] as String?;
+              final tutorSpeakingScore = tutor['tutor_speaking_score']?.toString();
+              final sampleCount = (tutor['sample_count'] as num?)?.toInt() ?? 0;
+
+              return _TutorCard(
+                name: tutorName,
+                imageUrl: tutorImageUrl,
+                scoreLabel: tutorSpeakingScore != null ? 'IELTS $tutorSpeakingScore' : null,
+                subtitle: '$sampleCount topic${sampleCount == 1 ? '' : 's'}',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SpeakingSampleTutorTopicsScreen(
+                      tutorId: tutorId,
+                      tutorName: tutorName,
+                      tutorImageUrl: tutorImageUrl,
+                      tutorSpeakingScore: tutorSpeakingScore,
+                    ),
+                  ),
+                ),
+              );
+            },
           );
         },
       ),
@@ -65,35 +91,120 @@ class _SpeakingSamplesListScreenState extends State<SpeakingSamplesListScreen> {
   }
 }
 
-/// Full-bleed photo card: name/part count and band score are overlaid on
-/// the photo itself (gradient scrim + corner badge) rather than stacked
-/// below it, so the card reads like a tutor/coach profile, not a product tile.
-class _TutorCard extends StatelessWidget {
-  const _TutorCard({required this.tutor});
-  final Map<String, dynamic> tutor;
+/// One tutor's submitted Speaking topics — a grid of that tutor's samples,
+/// one card per submitted topic. Tapping a topic opens the existing
+/// Part 1/2/3 audio/transcript viewer, unchanged.
+class SpeakingSampleTutorTopicsScreen extends StatefulWidget {
+  const SpeakingSampleTutorTopicsScreen({
+    super.key,
+    required this.tutorId,
+    required this.tutorName,
+    required this.tutorImageUrl,
+    required this.tutorSpeakingScore,
+  });
+
+  final int? tutorId;
+  final String tutorName;
+  final String? tutorImageUrl;
+  final String? tutorSpeakingScore;
+
+  @override
+  State<SpeakingSampleTutorTopicsScreen> createState() => _SpeakingSampleTutorTopicsScreenState();
+}
+
+class _SpeakingSampleTutorTopicsScreenState extends State<SpeakingSampleTutorTopicsScreen> {
+  late final Future<List<Map<String, dynamic>>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = MockTestService.fetchSpeakingSamples(
+      tutorId: widget.tutorId,
+      tutorName: widget.tutorId == null ? widget.tutorName : null,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final name = tutor['tutor_name']?.toString() ?? '';
-    final imageUrl = tutor['tutor_image_url'] as String?;
-    // The tutor's own IELTS Speaking score (their credential) — distinct
-    // from this specific sample's band_score.
-    final speakingScore = tutor['tutor_speaking_score']?.toString();
-    final parts = (tutor['parts'] as List?) ?? const [];
-
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => SpeakingSampleTutorScreen(tutor: tutor)),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: mtAppBar(context, title: widget.tutorName),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator(color: MockTestColors.yellow));
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Failed to load: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
+                ),
+              ),
+            );
+          }
+          final samples = snapshot.data ?? const [];
+          if (samples.isEmpty) {
+            return const Center(
+              child: Text(
+                'No speaking samples yet',
+                style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
+              ),
+            );
+          }
+          return GridView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            itemCount: samples.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 14,
+              childAspectRatio: 0.72,
+            ),
+            itemBuilder: (context, i) => _TopicCard(sample: samples[i]),
+          );
+        },
       ),
+    );
+  }
+}
+
+/// Full-bleed photo card: name/subtitle and score badge are overlaid on
+/// the photo itself (gradient scrim + corner badge) rather than stacked
+/// below it, so the card reads like a tutor/coach profile, not a product
+/// tile. Used for the top-level tutor grid — [scoreLabel], when present, is
+/// the tutor's own IELTS Speaking credential, not any single sample's score.
+class _TutorCard extends StatelessWidget {
+  const _TutorCard({
+    required this.name,
+    required this.imageUrl,
+    required this.scoreLabel,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final String name;
+  final String? imageUrl;
+  final String? scoreLabel;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (imageUrl != null && imageUrl.isNotEmpty)
+            if (imageUrl != null && imageUrl!.isNotEmpty)
               Image.network(
-                imageUrl,
+                imageUrl!,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => const _TutorImageFallback(),
               )
@@ -109,7 +220,7 @@ class _TutorCard extends StatelessWidget {
                 ),
               ),
             ),
-            if (speakingScore != null)
+            if (scoreLabel != null)
               Positioned(
                 top: 10,
                 right: 10,
@@ -117,7 +228,7 @@ class _TutorCard extends StatelessWidget {
                   background: MockTestColors.yellow,
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   child: Text(
-                    'IELTS $speakingScore',
+                    scoreLabel!,
                     style: const TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 11.5,
@@ -153,7 +264,111 @@ class _TutorCard extends StatelessWidget {
                       const Icon(Icons.mic_rounded, color: Colors.white70, size: 13),
                       const SizedBox(width: 4),
                       Text(
-                        '${parts.length} sample parts',
+                        subtitle,
+                        style: const TextStyle(fontFamily: 'SF Pro', fontSize: 11.5, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Same full-bleed photo visual language as [_TutorCard], one level down:
+/// each card is a single submitted topic (sample) for the tutor selected on
+/// the previous screen. The score badge here is that specific sample's own
+/// `band_score` — distinct from the tutor's overall `tutor_speaking_score`
+/// shown at the tutor-list level.
+class _TopicCard extends StatelessWidget {
+  const _TopicCard({required this.sample});
+  final Map<String, dynamic> sample;
+
+  @override
+  Widget build(BuildContext context) {
+    final id = sample['id']?.toString() ?? '';
+    final title = sample['topic_title']?.toString() ?? 'Sample #$id';
+    final imageUrl = sample['tutor_image_url'] as String?;
+    final band = sample['band_score']?.toString();
+    final parts = (sample['parts'] as List?) ?? const [];
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => SpeakingSampleTutorScreen(tutor: sample)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (imageUrl != null && imageUrl.isNotEmpty)
+              Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const _TutorImageFallback(),
+              )
+            else
+              const _TutorImageFallback(),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: [0.45, 1],
+                  colors: [Colors.transparent, Color(0xCC0B0C1A)],
+                ),
+              ),
+            ),
+            if (band != null)
+              Positioned(
+                top: 10,
+                right: 10,
+                child: MtPill(
+                  background: MockTestColors.yellow,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  child: Text(
+                    'Band $band',
+                    style: const TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      color: MockTestColors.navy,
+                    ),
+                  ),
+                ),
+              ),
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.mic_rounded, color: Colors.white70, size: 13),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${parts.length} parts recorded',
                         style: const TextStyle(fontFamily: 'SF Pro', fontSize: 11.5, color: Colors.white70),
                       ),
                     ],
