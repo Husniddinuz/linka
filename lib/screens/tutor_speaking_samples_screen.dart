@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
+import '../widgets/skeleton.dart';
+import 'speaking_sample_screen.dart';
 import 'speaking_sample_upload_screen.dart';
 
 /// Tutor's own IELTS Speaking samples — list + delete. The "+ Add sample"
@@ -53,6 +57,19 @@ class _TutorSpeakingSamplesScreenState
     if (result == true) _load();
   }
 
+  void _openSample(_SpeakingSample sample) {
+    if (sample.parts.isEmpty) {
+      AppNotify.show(context, message: 'This sample has no parts to play yet.');
+      return;
+    }
+    // The my-endpoint returns the same shape the student viewer expects.
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SpeakingSampleTutorScreen(tutor: sample.raw),
+      ),
+    );
+  }
+
   Future<void> _confirmDelete(_SpeakingSample sample) async {
     final colors = context.colors;
     final confirmed = await showDialog<bool>(
@@ -88,7 +105,10 @@ class _TutorSpeakingSamplesScreenState
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
               'Delete',
-              style: TextStyle(color: colors.error, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: colors.error,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -105,57 +125,173 @@ class _TutorSpeakingSamplesScreenState
     } catch (_) {
       if (!mounted) return;
       setState(() => _samples = previous);
-      AppNotify.show(context,
-          message: 'Failed to delete sample. Please try again.');
+      AppNotify.show(
+        context,
+        message: 'Failed to delete sample. Please try again.',
+      );
     }
+  }
+
+  String get _subtitle {
+    if (_loading) return 'Loading…';
+    if (_samples.isEmpty) return 'Show students how it\'s done';
+    final published = _samples.where((s) => s.isPublished).length;
+    return '${_samples.length} sample${_samples.length == 1 ? '' : 's'}'
+        ' · $published live';
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Scaffold(
-      backgroundColor: colors.background,
-      appBar: AppBar(
-        backgroundColor: colors.surface,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        iconTheme: IconThemeData(color: colors.textPrimary),
-        title: Text(
-          'My speaking samples',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-            color: colors.textPrimary,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final canvas = isDark ? colors.background : colors.surfaceAlt;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: canvas,
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _openUpload,
+          backgroundColor: colors.brand,
+          foregroundColor: colors.onBrand,
+          elevation: 2,
+          icon: const Icon(Symbols.add_rounded, weight: 600),
+          label: const Text(
+            'Add sample',
+            style: TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
-        centerTitle: true,
+        body: Column(
+          children: [
+            _Hero(
+              title: 'My speaking samples',
+              subtitle: _subtitle,
+              watermark: Symbols.mic_rounded,
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                color: Colors.white,
+                backgroundColor: colors.brand,
+                onRefresh: _load,
+                child: _loading
+                    ? const _ListSkeleton()
+                    : _samples.isEmpty
+                    ? _CenteredScrollable(
+                        child: _EmptyState(onUpload: _openUpload),
+                      )
+                    : ListView.separated(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                        itemCount: _samples.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (_, i) => _SampleCard(
+                          sample: _samples[i],
+                          onTap: () => _openSample(_samples[i]),
+                          onDelete: () => _confirmDelete(_samples[i]),
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openUpload,
-        backgroundColor: colors.brand,
-        foregroundColor: colors.onBrand,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add sample'),
+    );
+  }
+}
+
+// ─── Hero header ────────────────────────────────────────────────────────────
+
+class _Hero extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData watermark;
+  const _Hero({
+    required this.title,
+    required this.subtitle,
+    required this.watermark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final gradientEnd = Color.lerp(colors.brand, Colors.black, 0.35)!;
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [colors.brand, gradientEnd],
+        ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
       ),
-      body: RefreshIndicator(
-        color: colors.textPrimary,
-        onRefresh: _load,
-        child: _loading
-            ? _CenteredScrollable(
-                child: CircularProgressIndicator(color: colors.textPrimary),
-              )
-            : _samples.isEmpty
-                ? _CenteredScrollable(child: _EmptyState(onUpload: _openUpload))
-                : ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                    itemCount: _samples.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) => _SampleCard(
-                      sample: _samples[i],
-                      onDelete: () => _confirmDelete(_samples[i]),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned(
+            right: -18,
+            bottom: -24,
+            child: Icon(
+              watermark,
+              size: 110,
+              fill: 1,
+              color: Colors.white.withValues(alpha: 0.06),
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.14),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Symbols.arrow_back_ios_new_rounded,
+                        size: 18,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -181,6 +317,43 @@ class _CenteredScrollable extends StatelessWidget {
   }
 }
 
+class _ListSkeleton extends StatelessWidget {
+  const _ListSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      itemCount: 4,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (_, _) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colors.border),
+        ),
+        child: const Row(
+          children: [
+            Skeleton(height: 42, width: 42, borderRadius: 14),
+            SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Skeleton(height: 15, width: 130, borderRadius: 6),
+                SizedBox(height: 8),
+                Skeleton(height: 12, width: 90, borderRadius: 6),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyState extends StatelessWidget {
   final VoidCallback onUpload;
   const _EmptyState({required this.onUpload});
@@ -194,17 +367,26 @@ class _EmptyState extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 96,
-            height: 96,
-            decoration: BoxDecoration(color: colors.surfaceAlt, shape: BoxShape.circle),
-            child: Icon(Icons.mic_rounded, color: colors.textPrimary, size: 44),
+            width: 88,
+            height: 88,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: colors.surface,
+              shape: BoxShape.circle,
+              border: Border.all(color: colors.border),
+            ),
+            child: Icon(
+              Symbols.mic_rounded,
+              color: colors.textTertiary,
+              size: 38,
+            ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 22),
           Text(
             'No speaking samples yet',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 20,
+              fontSize: 19,
               fontWeight: FontWeight.w700,
               color: colors.textPrimary,
             ),
@@ -214,9 +396,13 @@ class _EmptyState extends StatelessWidget {
             'Record your own Speaking answers so students can hear a real '
             'band-scored sample.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, height: 1.5, color: colors.textSecondary),
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: colors.textSecondary,
+            ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 26),
           GestureDetector(
             onTap: onUpload,
             child: Container(
@@ -228,13 +414,18 @@ class _EmptyState extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.add_rounded, color: colors.onBrand, size: 22),
+                  Icon(
+                    Symbols.add_rounded,
+                    color: colors.onBrand,
+                    size: 20,
+                    weight: 600,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Add your first sample',
                     style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: colors.onBrand,
                     ),
                   ),
@@ -252,92 +443,172 @@ class _EmptyState extends StatelessWidget {
 
 class _SampleCard extends StatelessWidget {
   final _SpeakingSample sample;
+  final VoidCallback onTap;
   final VoidCallback onDelete;
-  const _SampleCard({required this.sample, required this.onDelete});
+  const _SampleCard({
+    required this.sample,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  String get _partsLabel {
+    final parts = sample.parts.map((p) => p.part).toList()..sort();
+    if (parts.isEmpty) return 'No parts uploaded';
+    if (parts.length == 1) return 'Part ${parts.first}';
+    final head = parts.sublist(0, parts.length - 1).join(', ');
+    return 'Parts $head & ${parts.last}';
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final partNumbers = sample.parts.map((p) => p.part).toList()..sort();
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration:
-                    BoxDecoration(color: colors.surfaceAlt, shape: BoxShape.circle),
-                child: Icon(Icons.mic_rounded, color: colors.textPrimary, size: 20),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colors.border),
+          boxShadow: [
+            BoxShadow(
+              color: colors.shadow.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: colors.surfaceAlt,
+                borderRadius: BorderRadius.circular(14),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      (sample.bandScore != null && sample.bandScore!.isNotEmpty)
-                          ? 'IELTS ${sample.bandScore}'
-                          : 'Speaking sample',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: colors.textPrimary,
-                      ),
+              child: Icon(
+                Symbols.mic_rounded,
+                color: colors.textPrimary,
+                size: 20,
+                opticalSize: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _partsLabel,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: colors.textPrimary,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      partNumbers.isEmpty
-                          ? 'No parts uploaded'
-                          : 'Part${partNumbers.length > 1 ? 's' : ''} '
-                              '${partNumbers.join(', ')}',
-                      style: TextStyle(fontSize: 12.5, color: colors.textSecondary),
-                    ),
-                  ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      if (sample.bandScore != null &&
+                          sample.bandScore!.isNotEmpty) ...[
+                        _BandBadge(band: sample.bandScore!),
+                        const SizedBox(width: 8),
+                      ],
+                      _StatusLabel(isPublished: sample.isPublished),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            GestureDetector(
+              onTap: onDelete,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Icon(
+                  Symbols.delete_rounded,
+                  color: colors.error,
+                  size: 20,
+                  opticalSize: 20,
                 ),
               ),
-              GestureDetector(
-                onTap: onDelete,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: Icon(Icons.delete_outline_rounded, color: colors.error, size: 20),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _StatusPill(isPublished: sample.isPublished),
-        ],
+            ),
+            Icon(
+              Symbols.chevron_right_rounded,
+              color: colors.textTertiary,
+              size: 20,
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _StatusPill extends StatelessWidget {
-  final bool isPublished;
-  const _StatusPill({required this.isPublished});
+// ─── Shared bits ────────────────────────────────────────────────────────────
+
+class _BandBadge extends StatelessWidget {
+  final String band;
+  const _BandBadge({required this.band});
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final bg = isPublished ? colors.successBg : colors.accentYellow.withValues(alpha: 0.18);
-    final fg = isPublished ? colors.success : colors.textPrimary;
+    final gold = Theme.of(context).brightness == Brightness.dark
+        ? colors.accentYellow
+        : const Color(0xFFB8860B);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-      child: Text(
-        isPublished ? 'Published' : 'Pending review',
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: colors.accentYellow.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: colors.accentYellow.withValues(alpha: 0.45)),
       ),
+      child: Text(
+        'IELTS $band',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.2,
+          color: gold,
+          height: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusLabel extends StatelessWidget {
+  final bool isPublished;
+  const _StatusLabel({required this.isPublished});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final gold = Theme.of(context).brightness == Brightness.dark
+        ? colors.accentYellow
+        : const Color(0xFFB8860B);
+    final color = isPublished ? colors.success : gold;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          isPublished ? 'Published' : 'Not live',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -350,11 +621,16 @@ class _SpeakingSample {
   final bool isPublished;
   final List<_SpeakingPart> parts;
 
+  /// Full server payload — same shape the student viewer expects, so the
+  /// tutor can preview the sample exactly as students will see it.
+  final Map<String, dynamic> raw;
+
   const _SpeakingSample({
     required this.id,
     this.bandScore,
     required this.isPublished,
     required this.parts,
+    required this.raw,
   });
 
   factory _SpeakingSample.fromJson(Map<String, dynamic> j) {
@@ -366,6 +642,7 @@ class _SpeakingSample {
       parts: partsJson
           .map((p) => _SpeakingPart.fromJson(p as Map<String, dynamic>))
           .toList(),
+      raw: j,
     );
   }
 }
@@ -375,7 +652,11 @@ class _SpeakingPart {
   final int part;
   final String title;
 
-  const _SpeakingPart({required this.id, required this.part, required this.title});
+  const _SpeakingPart({
+    required this.id,
+    required this.part,
+    required this.title,
+  });
 
   factory _SpeakingPart.fromJson(Map<String, dynamic> j) {
     return _SpeakingPart(

@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 
-/// Form for a tutor to submit their own IELTS Writing sample essay for
-/// review, against an admin-curated topic. The tutor first picks a
+/// Form for a tutor to submit their own IELTS Writing sample essay,
+/// against an admin-curated topic. The tutor first picks a
 /// [_WritingTopic] (which supplies the task number, prompt, and optional
-/// chart/graph image) and then writes their sample essay for it. On
-/// success, pops with `true` so the caller can refresh its list.
+/// chart/graph image) and then writes their sample essay for it. The
+/// sample is published immediately on submit. On success, pops with `true`
+/// so the caller can refresh its list.
 class WritingSampleUploadScreen extends StatefulWidget {
   const WritingSampleUploadScreen({super.key});
 
@@ -21,6 +23,11 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
   final _bandController = TextEditingController();
   final _commentController = TextEditingController();
 
+  // Mirrors the backend's essay markup (apps/mock_tests/essay_markup.py):
+  // `==phrase==(note)` inline in the essay text becomes a tappable
+  // highlight with an examiner note in the student-facing sample screen.
+  static final _highlightPattern = RegExp(r'==(.+?)==\((.+?)\)', dotAll: true);
+
   List<_WritingTopic> _topics = [];
   bool _loadingTopics = true;
   bool _topicsFailed = false;
@@ -30,6 +37,8 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
   @override
   void initState() {
     super.initState();
+    // Rebuild so the "Highlights" list below the essay field tracks edits.
+    _essayController.addListener(() => setState(() {}));
     _loadTopics();
   }
 
@@ -70,6 +79,78 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
     setState(() => _selectedTopic = topic);
   }
 
+  Future<void> _addHighlight() async {
+    final text = _essayController.text;
+    final sel = _essayController.selection;
+    if (!sel.isValid || sel.isCollapsed) {
+      AppNotify.show(context,
+          message: 'Select the part of your essay you want to highlight first.');
+      return;
+    }
+    // Trim whitespace off the selection edges so the markup hugs the phrase.
+    var start = sel.start;
+    var end = sel.end;
+    while (start < end && text[start].trim().isEmpty) {
+      start++;
+    }
+    while (end > start && text[end - 1].trim().isEmpty) {
+      end--;
+    }
+    if (start == end) {
+      AppNotify.show(context,
+          message: 'Select the part of your essay you want to highlight first.');
+      return;
+    }
+    final phrase = text.substring(start, end);
+    final overlapsExisting = _highlightPattern
+        .allMatches(text)
+        .any((m) => start < m.end && end > m.start);
+    if (overlapsExisting || phrase.contains('==')) {
+      AppNotify.show(context, message: 'That part already has a highlight.');
+      return;
+    }
+
+    final note = await _promptForNote(phrase);
+    if (note == null) return;
+
+    final markup = '==$phrase==($note)';
+    _essayController.value = TextEditingValue(
+      text: text.replaceRange(start, end, markup),
+      selection: TextSelection.collapsed(offset: start + markup.length),
+    );
+  }
+
+  /// Bottom sheet asking for the note attached to [phrase]. Returns the
+  /// sanitized note, or null if dismissed. Parentheses become brackets and
+  /// `==` is stripped so the note can never break the markup delimiters.
+  Future<String?> _promptForNote(String phrase) async {
+    final raw = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: context.colors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _HighlightNoteSheet(phrase: phrase),
+    );
+    if (raw == null) return null;
+    final note = raw
+        .trim()
+        .replaceAll('==', '')
+        .replaceAll('(', '[')
+        .replaceAll(')', ']');
+    return note.isEmpty ? null : note;
+  }
+
+  void _removeHighlight(RegExpMatch match) {
+    final phrase = match.group(1)!;
+    _essayController.value = TextEditingValue(
+      text: _essayController.text
+          .replaceRange(match.start, match.end, phrase),
+      selection: TextSelection.collapsed(offset: match.start + phrase.length),
+    );
+  }
+
   Future<void> _submit() async {
     if (_submitting) return;
     final topic = _selectedTopic;
@@ -99,7 +180,7 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
 
       if (!mounted) return;
       AppNotify.show(context,
-          message: 'Writing sample submitted for review!',
+          message: 'Writing sample published!',
           type: NotifyType.success);
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
@@ -219,7 +300,26 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
                 const SizedBox(height: 16),
                 _buildTopicPreview(colors, topic),
                 const SizedBox(height: 16),
-                _FieldLabel('Sample essay'),
+                Row(
+                  children: [
+                    _FieldLabel('Sample essay'),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: _submitting ? null : _addHighlight,
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        foregroundColor: colors.textPrimary,
+                      ),
+                      icon: const Icon(Icons.border_color_rounded, size: 14),
+                      label: const Text(
+                        'Highlight',
+                        style: TextStyle(
+                            fontSize: 12.5, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _essayController,
@@ -229,7 +329,37 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
                   style: TextStyle(fontSize: 14, color: colors.textPrimary),
                   decoration:
                       fieldDecoration(context, hint: 'Write or paste the full essay'),
+                  contextMenuBuilder: (context, editableTextState) {
+                    final items = List<ContextMenuButtonItem>.of(
+                        editableTextState.contextMenuButtonItems);
+                    final sel = editableTextState.textEditingValue.selection;
+                    if (sel.isValid && !sel.isCollapsed) {
+                      items.insert(
+                        0,
+                        ContextMenuButtonItem(
+                          label: 'Highlight',
+                          onPressed: () {
+                            editableTextState.hideToolbar();
+                            _addHighlight();
+                          },
+                        ),
+                      );
+                    }
+                    return AdaptiveTextSelectionToolbar.buttonItems(
+                      anchors: editableTextState.contextMenuAnchors,
+                      buttonItems: items,
+                    );
+                  },
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  'Select a part of your essay, then tap Highlight to mark it '
+                  'as important and add a note — students tap the highlight to '
+                  'read it. It is stored as ==phrase==(note) in the text.',
+                  style: TextStyle(
+                      fontSize: 11.5, height: 1.4, color: colors.textTertiary),
+                ),
+                _buildHighlightsList(colors),
                 const SizedBox(height: 16),
                 _FieldLabel('Band score (optional)'),
                 const SizedBox(height: 6),
@@ -237,6 +367,7 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
                   controller: _bandController,
                   enabled: !_submitting,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: bandScoreInputFormatters(),
                   style: TextStyle(fontSize: 14, color: colors.textPrimary),
                   decoration: fieldDecoration(context, hint: 'e.g. 7.5'),
                 ),
@@ -274,7 +405,7 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
                               strokeWidth: 2, color: colors.onBrand),
                         )
                       : const Text(
-                          'Submit for review',
+                          'Submit',
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                         ),
                 ),
@@ -346,6 +477,69 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Current highlights parsed live from the essay text, each with its
+  /// note and a remove button that unwraps the markup back to plain text.
+  Widget _buildHighlightsList(AppColors colors) {
+    final matches =
+        _highlightPattern.allMatches(_essayController.text).toList();
+    if (matches.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        _FieldLabel('Highlights'),
+        const SizedBox(height: 6),
+        for (final m in matches)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+            decoration: BoxDecoration(
+              color: colors.surfaceAlt,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        m.group(1)!,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          height: 1.4,
+                          fontWeight: FontWeight.w700,
+                          color: colors.textPrimary,
+                          backgroundColor:
+                              colors.accentYellow.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        m.group(2)!,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.4,
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(Icons.close_rounded,
+                      size: 18, color: colors.textTertiary),
+                  onPressed: _submitting ? null : () => _removeHighlight(m),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
@@ -422,6 +616,106 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
   }
 }
 
+/// Content of the "Add highlight" bottom sheet. Owns its note controller so
+/// it is disposed when the sheet unmounts — the sheet keeps building during
+/// its exit animation after showModalBottomSheet's future resolves, so the
+/// caller must not dispose the controller itself.
+class _HighlightNoteSheet extends StatefulWidget {
+  final String phrase;
+  const _HighlightNoteSheet({required this.phrase});
+
+  @override
+  State<_HighlightNoteSheet> createState() => _HighlightNoteSheetState();
+}
+
+class _HighlightNoteSheetState extends State<_HighlightNoteSheet> {
+  final _noteController = TextEditingController();
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Add highlight',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: colors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: colors.accentYellow.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '"${widget.phrase}"',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontStyle: FontStyle.italic,
+                  color: colors.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _noteController,
+              autofocus: true,
+              minLines: 2,
+              maxLines: 4,
+              style: TextStyle(fontSize: 14, color: colors.textPrimary),
+              decoration:
+                  fieldDecoration(context, hint: 'Why is this part important?'),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _noteController,
+                builder: (context, value, _) => ElevatedButton(
+                  onPressed: value.text.trim().isEmpty
+                      ? null
+                      : () => Navigator.pop(context, value.text),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colors.brand,
+                    foregroundColor: colors.onBrand,
+                    disabledBackgroundColor: colors.surfaceAlt,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text(
+                    'Add highlight',
+                    style:
+                        TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Topic model ────────────────────────────────────────────────────────────
 
 class _WritingTopic {
@@ -451,6 +745,19 @@ class _WritingTopic {
 }
 
 // ─── Shared field styling ───────────────────────────────────────────────────
+
+/// Input formatters for an IELTS band-score field. Decimal keypads in
+/// comma-decimal locales (e.g. ru/uz) offer no dot key, but the backend's
+/// DecimalField only accepts a dot — so map commas to dots as typed, and
+/// allow at most one separator.
+List<TextInputFormatter> bandScoreInputFormatters() => [
+      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+      TextInputFormatter.withFunction((oldValue, newValue) {
+        final text = newValue.text.replaceAll(',', '.');
+        if ('.'.allMatches(text).length > 1) return oldValue;
+        return newValue.copyWith(text: text);
+      }),
+    ];
 
 InputDecoration fieldDecoration(BuildContext context, {String? hint}) {
   final colors = context.colors;

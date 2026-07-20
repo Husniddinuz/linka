@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
+import '../theme/app_colors.dart';
 
 class PlusMemberCard extends StatelessWidget {
   final String plan;
@@ -18,12 +20,8 @@ class PlusMemberCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const gradient = LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Color(0xFFD8D674), Color(0xFF8EC79A), Color(0xFF2E4E5C)],
-      stops: [0.0, 0.38, 1.0],
-    );
+    final colors = context.colors;
+    final gradientEnd = Color.lerp(colors.brand, Colors.black, 0.35)!;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -35,129 +33,162 @@ class PlusMemberCard extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
-              gradient: gradient,
-              boxShadow: const [
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [colors.brand, gradientEnd],
+              ),
+              border: Border.all(
+                color: colors.accentYellow.withValues(alpha: 0.35),
+              ),
+              boxShadow: [
                 BoxShadow(
-                  color: Color(0x38272942),
+                  color: colors.shadow.withValues(alpha: 0.16),
                   blurRadius: 24,
-                  offset: Offset(0, 8),
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
             clipBehavior: Clip.antiAlias,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+            child: Stack(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                  child: Row(
-                    children: [
-                      const _PlusCrest(),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                Positioned(
+                  right: -18,
+                  top: -20,
+                  child: Icon(
+                    Symbols.workspace_premium_rounded,
+                    size: 110,
+                    fill: 1,
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Symbols.workspace_premium_rounded,
+                              size: 22,
+                              fill: 1,
+                              color: colors.accentYellow,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  "You're PLUS",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 17,
-                                    height: 1.1,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.22),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    plan,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 10,
-                                      letterSpacing: 0.3,
+                                Row(
+                                  children: [
+                                    const Text(
+                                      "You're PLUS",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 16,
+                                        height: 1.1,
+                                        letterSpacing: 0.2,
+                                      ),
                                     ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.18),
+                                        borderRadius:
+                                            BorderRadius.circular(5),
+                                      ),
+                                      child: Text(
+                                        plan,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 10,
+                                          letterSpacing: 0.4,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  'All benefits unlocked · since $memberSince',
+                                  style: TextStyle(
+                                    color:
+                                        Colors.white.withValues(alpha: 0.75),
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 11,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'All benefits unlocked · since $memberSince',
-                              style: const TextStyle(
-                                color: Color(0xD1FFFFFF),
-                                fontWeight: FontWeight.w500,
-                                fontSize: 11,
-                              ),
+                          ),
+                          if (onTap != null)
+                            Icon(
+                              Symbols.chevron_right_rounded,
+                              size: 20,
+                              color: Colors.white.withValues(alpha: 0.7),
                             ),
-                          ],
-                        ),
+                        ],
                       ),
-                      const Icon(
-                        Icons.chevron_right,
-                        size: 20,
-                        color: Color(0xB3FFFFFF),
+                    ),
+                    Container(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
                       ),
-                    ],
-                  ),
-                ),
-                Container(
-                  color: Colors.white.withValues(alpha: 0.10),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  child: Row(
-                    children: const [
-                      _Benefit(label: 'Unlimited chat', dot: Color(0xFF1CB219)),
-                      _Benefit(
-                        label: 'Webinar & Debates',
-                        dot: Color(0xFFFFC65C),
+                      child: const Row(
+                        children: [
+                          _Benefit(label: 'Unlimited chat'),
+                          _Benefit(label: 'Webinars & debates'),
+                          _Benefit(label: 'Priority support'),
+                        ],
                       ),
-                      _Benefit(
-                        label: 'Priority support',
-                        dot: Color(0xFFFF8D28),
+                    ),
+                    Container(
+                      color: Colors.black.withValues(alpha: 0.22),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 9,
                       ),
-                    ],
-                  ),
-                ),
-                Container(
-                  color: Colors.black.withValues(alpha: 0.22),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 9,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Next renewal · $nextRenewal',
-                        style: const TextStyle(
-                          color: Color(0xB8FFFFFF),
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11,
-                        ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Next renewal · $nextRenewal',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.72),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
+                          ),
+                          Text(
+                            priceLabel,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        priceLabel,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -168,36 +199,9 @@ class PlusMemberCard extends StatelessWidget {
   }
 }
 
-class _PlusCrest extends StatelessWidget {
-  const _PlusCrest();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.94),
-        shape: BoxShape.circle,
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x1F000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: const Center(
-        child: Icon(Icons.auto_awesome, size: 22, color: Color(0xFF2E4E5C)),
-      ),
-    );
-  }
-}
-
 class _Benefit extends StatelessWidget {
   final String label;
-  final Color dot;
-  const _Benefit({required this.label, required this.dot});
+  const _Benefit({required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -205,19 +209,20 @@ class _Benefit extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+          Icon(
+            Symbols.check_rounded,
+            size: 12,
+            weight: 800,
+            color: Colors.white.withValues(alpha: 0.9),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
           Flexible(
             child: Text(
               label,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Colors.white,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
                 fontSize: 10.5,
                 letterSpacing: 0.1,
               ),

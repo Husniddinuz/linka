@@ -135,13 +135,14 @@ class _SpeakingSampleTutorScreenState extends State<SpeakingSampleTutorScreen> {
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(14),
-          decoration: mtSoftCard(color: MockTestColors.chipBg, radius: 14),
+          decoration: mtSoftCard(color: MockTestColors.greenBg, radius: 14),
           child: Text(
             part['question_text']?.toString() ?? '',
             style: const TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 14,
               height: 1.5,
+              fontWeight: FontWeight.w700,
               color: MockTestColors.navy,
             ),
           ),

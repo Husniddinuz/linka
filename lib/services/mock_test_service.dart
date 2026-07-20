@@ -51,8 +51,9 @@ class MockTestService {
     return data.cast<Map<String, dynamic>>();
   }
 
-  /// {is_plus, limit, used_today, remaining} — `limit`/`remaining` are null
-  /// for Plus users (unlimited).
+  /// {is_plus, limit, used, remaining} — `limit`/`remaining` are null
+  /// for Plus users (unlimited). The limit is a total free window, not a
+  /// daily allowance.
   static Future<Map<String, dynamic>> fetchWritingQuota() {
     return ApiService.get('/writing-attempts/quota/');
   }

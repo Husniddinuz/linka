@@ -1,18 +1,22 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:audioplayers/audioplayers.dart' as ap;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
-import 'writing_sample_upload_screen.dart' show fieldDecoration;
+import 'writing_sample_upload_screen.dart'
+    show bandScoreInputFormatters, fieldDecoration;
 
 /// Form for a tutor to record and submit their own IELTS Speaking sample
 /// against an admin-curated topic. The tutor first picks a [_SpeakingTopic],
 /// which supplies the title/question for whichever parts it defines; the
-/// tutor only records audio for those parts. Submission first creates the
+/// tutor records audio in-app or uploads an existing audio file from the
+/// phone for those parts. Submission first creates the
 /// parent sample, then uploads each recorded part. On full success, pops
 /// with `true` so the caller can refresh its list.
 class SpeakingSampleUploadScreen extends StatefulWidget {
@@ -132,7 +136,7 @@ class _SpeakingSampleUploadScreenState
 
       if (!mounted) return;
       AppNotify.show(context,
-          message: 'Speaking sample submitted for review!',
+          message: 'Speaking sample published!',
           type: NotifyType.success);
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
@@ -257,6 +261,7 @@ class _SpeakingSampleUploadScreenState
                 controller: _bandController,
                 enabled: !_submitting,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: bandScoreInputFormatters(),
                 style: TextStyle(fontSize: 14, color: colors.textPrimary),
                 decoration: fieldDecoration(context, hint: 'e.g. 7.5'),
               ),
@@ -269,7 +274,7 @@ class _SpeakingSampleUploadScreenState
                   )
                 else ...[
                   Text(
-                    'Record at least one part before submitting.',
+                    'Record or upload audio for at least one part before submitting.',
                     style: TextStyle(fontSize: 12.5, color: colors.textSecondary),
                   ),
                   const SizedBox(height: 12),
@@ -306,7 +311,7 @@ class _SpeakingSampleUploadScreenState
                               strokeWidth: 2, color: colors.onBrand),
                         )
                       : const Text(
-                          'Submit for review',
+                          'Submit',
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                         ),
                 ),
@@ -435,6 +440,10 @@ class _PartFormState {
   String? recordedPath;
   int recordedDuration = 0;
 
+  /// Original file name when the audio came from the file picker rather
+  /// than an in-app recording; null for recordings.
+  String? pickedFileName;
+
   _PartFormState(this.topicPart);
 
   int get partNumber => topicPart.part;
@@ -490,14 +499,16 @@ class _PartSection extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 12),
-          _FieldLabel('Recording'),
+          _FieldLabel('Audio'),
           const SizedBox(height: 6),
           _AudioRecorderControl(
             enabled: enabled,
             initialPath: part.recordedPath,
             initialDuration: part.recordedDuration,
+            initialFileName: part.pickedFileName,
             onPathChanged: (p) => part.recordedPath = p,
             onDurationChanged: (d) => part.recordedDuration = d,
+            onFileNameChanged: (n) => part.pickedFileName = n,
           ),
         ],
       ),
@@ -526,21 +537,27 @@ class _FieldLabel extends StatelessWidget {
 //
 // Adapted from the voice-message recorder in `channel_chat_screen.dart`
 // (start → stop → preview, using `record` for capture and `audioplayers`
-// for local playback) — the only recording UX in the app today.
+// for local playback). Alternatively the tutor can pick an existing audio
+// file from the phone; the pick is copied into our temp dir so its
+// lifecycle matches a recording (safe to delete on discard/topic change).
 
 class _AudioRecorderControl extends StatefulWidget {
   final bool enabled;
   final String? initialPath;
   final int initialDuration;
+  final String? initialFileName;
   final ValueChanged<String?> onPathChanged;
   final ValueChanged<int> onDurationChanged;
+  final ValueChanged<String?> onFileNameChanged;
 
   const _AudioRecorderControl({
     required this.enabled,
     required this.initialPath,
     required this.initialDuration,
+    required this.initialFileName,
     required this.onPathChanged,
     required this.onDurationChanged,
+    required this.onFileNameChanged,
   });
 
   @override
@@ -556,6 +573,11 @@ class _AudioRecorderControlState extends State<_AudioRecorderControl> {
   Timer? _recordTimer;
   String? _recordedPath;
   int _recordedDuration = 0;
+  String? _pickedName;
+  // Static: only one native picker session may exist app-wide — a second
+  // pickFiles call while one is open makes the plugin reject it
+  // (multiple_request), so gate across all part controls, not per control.
+  static bool _picking = false;
   bool _previewPlaying = false;
 
   @override
@@ -563,6 +585,7 @@ class _AudioRecorderControlState extends State<_AudioRecorderControl> {
     super.initState();
     _recordedPath = widget.initialPath;
     _recordedDuration = widget.initialDuration;
+    _pickedName = widget.initialFileName;
   }
 
   @override
@@ -638,9 +661,112 @@ class _AudioRecorderControlState extends State<_AudioRecorderControl> {
     setState(() {
       _recordedPath = path;
       _recordedDuration = duration;
+      _pickedName = null;
     });
     widget.onPathChanged(path);
     widget.onDurationChanged(duration);
+    widget.onFileNameChanged(null);
+  }
+
+  // Matches the certificate-upload cap in `profile_setup_screen.dart`;
+  // a 5-minute AAC answer is only a few MB, so this only rejects
+  // pathological picks (e.g. long uncompressed WAVs).
+  static const _maxPickedBytes = 50 * 1024 * 1024;
+
+  Future<void> _pickAudioFile() async {
+    if (_picking) return;
+    _picking = true;
+    try {
+      // Not FileType.audio: on iOS that opens the Apple Music library
+      // picker (MPMediaPickerController), which can't browse the Files app
+      // at all — recordings saved there appear unselectable. Custom
+      // extensions route through the document picker instead.
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: [
+          'mp3', 'm4a', 'aac', 'wav', 'aiff', 'caf', 'ogg', 'opus', 'flac',
+          'wma', 'amr',
+        ],
+      );
+      if (result == null ||
+          result.files.isEmpty ||
+          result.files.first.path == null ||
+          !mounted) {
+        return;
+      }
+      final picked = result.files.first;
+      final sourcePath = picked.path!;
+
+      final bytes = await File(sourcePath).length();
+      if (bytes < _minRecordingBytes) {
+        if (mounted) {
+          AppNotify.show(context,
+              message: 'This audio file appears to be empty. '
+                  'Please choose another one.');
+        }
+        return;
+      }
+      if (bytes > _maxPickedBytes) {
+        if (mounted) {
+          AppNotify.show(context,
+              message: 'Audio file must be under 50 MB.');
+        }
+        return;
+      }
+
+      // Copy into our own uniquely-named temp file: the picker's cache path
+      // is reused per file name, so two parts picking the same file would
+      // share a path — and discarding one part would delete the other's
+      // audio out from under it.
+      final dir = await getTemporaryDirectory();
+      final destPath =
+          '${dir.path}/speaking_sample_pick_${DateTime.now().millisecondsSinceEpoch}_${picked.name}';
+      await File(sourcePath).copy(destPath);
+
+      // Probe duration for the "Recorded · mm:ss" label; a failed probe is
+      // not fatal — the file name is still shown.
+      int duration = 0;
+      final probe = ap.AudioPlayer();
+      try {
+        await probe.setSource(ap.DeviceFileSource(destPath));
+        duration = (await probe.getDuration())?.inSeconds ?? 0;
+      } catch (_) {
+      } finally {
+        await probe.dispose();
+      }
+
+      if (!mounted) {
+        try {
+          File(destPath).deleteSync();
+        } catch (_) {}
+        return;
+      }
+      setState(() {
+        _recordedPath = destPath;
+        _recordedDuration = duration;
+        _pickedName = picked.name;
+      });
+      widget.onPathChanged(destPath);
+      widget.onDurationChanged(duration);
+      widget.onFileNameChanged(picked.name);
+    } on PlatformException catch (e) {
+      // A previous native picker session never completed (e.g. dismissed
+      // without a callback); the plugin stays stuck until app restart.
+      if (mounted) {
+        AppNotify.show(context,
+            message: e.code == 'multiple_request'
+                ? 'The file picker is stuck from an earlier attempt — '
+                    'please fully close and reopen the app.'
+                : 'Could not open the file picker. Please try again.');
+      }
+    } catch (_) {
+      if (mounted) {
+        AppNotify.show(context,
+            message: 'Could not load that audio file. Please try another.');
+      }
+    } finally {
+      _picking = false;
+    }
   }
 
   Future<void> _discardRecording() async {
@@ -649,10 +775,12 @@ class _AudioRecorderControlState extends State<_AudioRecorderControl> {
     setState(() {
       _recordedPath = null;
       _recordedDuration = 0;
+      _pickedName = null;
       _previewPlaying = false;
     });
     widget.onPathChanged(null);
     widget.onDurationChanged(0);
+    widget.onFileNameChanged(null);
     if (oldPath != null) {
       try {
         File(oldPath).deleteSync();
@@ -731,7 +859,13 @@ class _AudioRecorderControlState extends State<_AudioRecorderControl> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Recorded · ${_fmt(_recordedDuration)}',
+                _pickedName != null
+                    ? (_recordedDuration > 0
+                        ? '$_pickedName · ${_fmt(_recordedDuration)}'
+                        : _pickedName!)
+                    : 'Recorded · ${_fmt(_recordedDuration)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -773,8 +907,37 @@ class _AudioRecorderControlState extends State<_AudioRecorderControl> {
       );
     }
 
+    return Row(
+      children: [
+        Expanded(
+          child: _idleAction(
+            colors,
+            icon: Icons.mic_none_rounded,
+            label: 'Record',
+            onTap: widget.enabled ? _startRecording : null,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _idleAction(
+            colors,
+            icon: Icons.upload_file_rounded,
+            label: 'Upload file',
+            onTap: widget.enabled ? _pickAudioFile : null,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _idleAction(
+    AppColors colors, {
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+  }) {
     return GestureDetector(
-      onTap: widget.enabled ? _startRecording : null,
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
@@ -783,15 +946,20 @@ class _AudioRecorderControlState extends State<_AudioRecorderControl> {
           border: Border.all(color: colors.border),
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.mic_none_rounded, color: colors.textPrimary, size: 22),
-            const SizedBox(width: 10),
-            Text(
-              'Tap to record audio',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: colors.textPrimary,
+            Icon(icon, color: colors.textPrimary, size: 22),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: colors.textPrimary,
+                ),
               ),
             ),
           ],

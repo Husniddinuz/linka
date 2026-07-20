@@ -3,11 +3,9 @@ import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
 import 'writing_test_screen.dart';
 
-const int _freePromptsPerTask = 2;
-
-/// Writing Task 1 & 2 prompts. Non-Plus users see the first
-/// [_freePromptsPerTask] prompts of each task normally; the rest are shown
-/// blurred with an upgrade prompt.
+/// Writing Task 1 & 2 prompts. All prompts are open to everyone — the free
+/// window is on AI-graded *submissions* (see WritingTestScreen's quota),
+/// not on viewing prompts.
 class WritingPromptsListScreen extends StatefulWidget {
   const WritingPromptsListScreen({super.key});
 
@@ -19,19 +17,6 @@ class _WritingPromptsListScreenState extends State<WritingPromptsListScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController = TabController(length: 2, vsync: this);
   final Future<List<Map<String, dynamic>>> _future = MockTestService.fetchWritingPrompts();
-  bool _isLocked = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkPlusStatus();
-  }
-
-  Future<void> _checkPlusStatus() async {
-    final locked = await mtCheckContentLocked();
-    if (!mounted) return;
-    setState(() => _isLocked = locked);
-  }
 
   @override
   void dispose() {
@@ -91,8 +76,8 @@ class _WritingPromptsListScreenState extends State<WritingPromptsListScreen>
           return TabBarView(
             controller: _tabController,
             children: [
-              _PromptList(prompts: task1, locked: _isLocked),
-              _PromptList(prompts: task2, locked: _isLocked),
+              _PromptList(prompts: task1),
+              _PromptList(prompts: task2),
             ],
           );
         },
@@ -102,47 +87,34 @@ class _WritingPromptsListScreenState extends State<WritingPromptsListScreen>
 }
 
 class _PromptList extends StatelessWidget {
-  const _PromptList({required this.prompts, required this.locked});
+  const _PromptList({required this.prompts});
 
   final List<Map<String, dynamic>> prompts;
-  final bool locked;
 
   @override
   Widget build(BuildContext context) {
-    final isLocked = locked && prompts.length > _freePromptsPerTask;
-    final visible = isLocked ? prompts.sublist(0, _freePromptsPerTask) : prompts;
-    final hidden = isLocked ? prompts.sublist(_freePromptsPerTask) : const <Map<String, dynamic>>[];
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        for (final p in visible) _PromptCard(prompt: p, locked: false),
-        if (isLocked)
-          MtLockedSection(
-            hiddenCount: hidden.length,
-            itemLabel: 'prompts',
-            lockedCards: [for (final p in hidden) _PromptCard(prompt: p, locked: true)],
-          ),
+        for (final p in prompts) _PromptCard(prompt: p),
       ],
     );
   }
 }
 
 class _PromptCard extends StatelessWidget {
-  const _PromptCard({required this.prompt, required this.locked});
+  const _PromptCard({required this.prompt});
   final Map<String, dynamic> prompt;
-  final bool locked;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: GestureDetector(
-        onTap: locked
-            ? null
-            : () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => WritingTestScreen(prompt: prompt)),
-                ),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => WritingTestScreen(prompt: prompt)),
+        ),
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: mtSoftCard(),
@@ -173,10 +145,10 @@ class _PromptCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(
-                locked ? Icons.lock_rounded : Icons.chevron_right_rounded,
+              const Icon(
+                Icons.chevron_right_rounded,
                 color: MockTestColors.greyLight,
-                size: locked ? 18 : 24,
+                size: 24,
               ),
             ],
           ),

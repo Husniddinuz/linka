@@ -1,0 +1,3698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IELTS Full Reading Practice</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #ffffff;
+            line-height: 1.4;
+            font-size: 16px;
+        }
+
+
+
+        .header {
+            background-color: #ffffff;
+            padding: 12px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .ielts-logo {
+            display: none;
+        }
+
+        .test-info {
+            display: flex;  
+            align-items: center;
+            gap: 30px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .audio-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+        }
+
+        .audio-icon {
+            width: 16px;
+            height: 16px;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon></svg>') no-repeat center;
+        }
+
+        .header-icons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .telegram-link {
+            color: #0088cc;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .telegram-link:hover {
+            text-decoration: underline;
+        }
+
+        .telegram-link::before {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            background-color: currentColor;
+            -webkit-mask-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.78 18.65l.28-4.23l7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3L3.64 12c-.88-.25-.89-1.37.2-1.64l16.56-6.4c.75-.29 1.4.22 1.2.94l-2.67 12.61c-.22.95-1.13 1.18-1.78.73l-4.5-3.32l-2.23 2.15c-.47.44-1.29.21-1.48-.37z"/></svg>');
+            mask-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.78 18.65l.28-4.23l7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3L3.64 12c-.88-.25-.89-1.37.2-1.64l16.56-6.4c.75-.29 1.4.22 1.2.94l-2.67 12.61c-.22.95-1.13 1.18-1.78.73l-4.5-3.32l-2.23 2.15c-.47.44-1.29.21-1.48-.37z"/></svg>');
+            background-size: contain;
+            background-repeat: no-repeat;
+        }
+
+        #volume-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 80px;
+            height: 4px;
+            background: #ddd;
+            outline: none;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        #volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #333;
+            cursor: pointer;
+        }
+
+        #volume-slider::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #333;
+            cursor: pointer;
+            border: none;
+        }
+
+        .icon {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            opacity: 0.7;
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .icon:hover {
+            opacity: 1;
+        }
+        
+        #play-pause-btn {
+            background: none;
+            border: none;
+            padding: 0;
+        }
+
+        .main-container {
+            margin-top: 60px;
+            display: flex;
+            flex-direction: column;
+            background: #ffffff;
+            height: calc(100vh - 60px); /* Full height minus header */
+            position: relative;
+        }
+
+        /* Page watermark */
+        body::after {
+            content: "@MINDLESS_WRITER";
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%) rotate(-20deg);
+            font-size: 72px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: #000000;
+            opacity: 0.04; /* subtle */
+            pointer-events: none;
+            z-index: 0;
+            white-space: nowrap;
+        }
+
+        .panels-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .passage-panel {
+            flex: 1;
+            padding: 20px 20px 100px;
+            overflow-y: auto;
+            min-width: 200px; /* Minimum width */
+        }
+
+        /* Passage Content */
+        .text-center {
+            text-align: center;
+        }
+        .reading-passage h4 {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+       
+        .reading-passage p {
+            margin-bottom: 1.2em;
+        }
+
+        .question ul li label {
+            display: block;
+            margin-top: 8px;
+            cursor: pointer;
+        }
+
+        .questions-panel {
+            flex: 1;
+            padding: 20px 20px 100px;
+            overflow-y: auto;
+            min-width: 200px; /* Minimum width */
+            border-left: 1px solid #e0e0e0;
+        }
+
+        .resizer {
+            width: 10px;
+            cursor: col-resize;
+            background-color: #f0f0f0;
+            background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="30" viewBox="0 0 10 30"><path d="M4 11h2v2H4zM4 15h2v2H4zM4 19h2v2H4z" fill="%23888"/></svg>');
+            background-repeat: no-repeat;
+            background-position: center;
+            flex-shrink: 0;
+            flex-grow: 0;
+        }
+
+        /* Left Panel */
+        .left-panel {
+            width: 100%;
+            padding: 20px;
+        }
+
+        /* Right Panel */
+        .right-panel {
+            display: none;
+            width: 50%;
+            padding: 20px;
+            position: relative;
+        }
+
+        .help-button {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+
+        .help-button:hover {
+            background: #357abd;
+        }
+
+        .section-title {
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .people-section {
+            margin-bottom: 30px;
+        }
+
+        .people-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #ccc;
+        }
+
+        .people-table th {
+            text-align: left;
+            padding: 10px;
+            font-weight: bold;
+            border: 1px solid #ddd;
+        }
+
+        .people-table td {
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+        }
+
+        .person-name {
+            font-size: 16px;
+        }
+
+        .question-number {
+            background: white;
+            border: 1px solid #4a90e2;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 14px;
+            color: #4a90e2;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        .assigned-responsibility {
+            background: #f0f0f0;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 14px;
+            border: 1px solid #ddd;
+        }
+
+        .responsibilities-section {
+            margin-bottom: 30px;
+        }
+
+        .responsibility-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .responsibility-item {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: move;
+            font-size: 16px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .responsibility-item:hover {
+            background: #e9ecef;
+            transform: translateY(-1px);
+        }
+
+        .responsibility-item.dragging {
+            opacity: 0.5;
+        }
+
+        .questions-section {
+            margin-bottom: 20px;
+        }
+
+        .question-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .instruction {
+            margin-bottom: 20px;
+            font-size: 16px;
+            color: #666;
+        }
+
+        /* Map Styles */
+        .map-container {
+            position: relative;
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .map-svg {
+            border: 2px solid #333;
+            background: white;
+        }
+
+        .map-room {
+            fill: #f9f9f9;
+            stroke: #333;
+            stroke-width: 1;
+        }
+
+        .map-text {
+            font-family: Arial, sans-serif;
+            font-size: 13px;
+            text-anchor: middle;
+            fill: #333;
+        }
+
+        .map-number {
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+            font-weight: bold;
+            text-anchor: middle;
+            fill: #333;
+        }
+
+        .room-labels {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .room-label {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: move;
+            font-size: 16px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .room-label:hover {
+            background: #e9ecef;
+            transform: translateY(-1px);
+        }
+
+        .room-label.dragging {
+            opacity: 0.5;
+        }
+
+        /* Navigation Arrows */
+        .nav-arrows {
+            position: fixed;
+            bottom: 100px;
+            right: 20px;
+            display: flex;
+            gap: 6px;
+            z-index: 101;
+        }
+
+        .nav-arrow {
+            width: 48px;
+            height: 48px;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: 700;
+            color: #fff;
+            transition: transform 0.1s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            outline: none;
+        }
+        .nav-arrow.prev { background-color: #4b5563; }
+        .nav-arrow.next { background-color: #000000; }
+
+        .nav-arrow:hover { transform: translateY(-1px); }
+        .nav-arrow:active { transform: translateY(0); }
+        .nav-arrow:focus-visible { box-shadow: 0 0 0 3px rgba(59,130,246,0.4); }
+
+        .nav-arrow:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Bottom Navigation - Exact Match */
+        .nav-row {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+        
+            padding: 0;
+            display: flex;
+            align-items: center;
+            height: 80px;
+            z-index: 100;
+        }
+
+        .footer__questionWrapper___1tZ46 {
+            display: flex;
+            align-items: center;
+            margin-right: 20px;
+        }
+
+
+        .footer__questionNo___3WNct {
+            background: none;
+            border: none;
+            padding: 10px 15px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: background-color 0.2s;
+        }
+
+        .footer__questionNo___3WNct:hover {
+            background-color: #f8f9fa;
+        }
+
+        .section-prefix {
+            font-size: 16px;
+        }
+
+        .sectionNr {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .attemptedCount {
+            font-size: 14px;
+            color: #666;
+            margin-left: 5px;
+            font-weight: 400; /* Normal weight */
+        }
+
+        @media (max-width: 768px) {
+            .attemptedCount {
+                display: none;
+            }
+        }
+
+        .footer__questionWrapper___1tZ46.selected .attemptedCount {
+            display: none;
+        }
+
+        .footer__subquestionWrapper___9GgoP {
+            display: none;
+            gap: 2px;
+            margin-left: 10px;
+        }
+
+        .footer__questionWrapper___1tZ46.selected .footer__subquestionWrapper___9GgoP {
+            display: flex;
+        }
+
+        .subQuestion {
+            width: 32px;
+            height: 32px;
+            border: 1px solid #ccc;
+            background: white;
+            color: #333;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            border-radius: 2px;
+        }
+
+        .subQuestion.answered {
+            background-color: #e9ecef;
+            border-color: #ddd;
+        }
+        .subQuestion.correct {
+            background-color: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+        .subQuestion.incorrect {
+            background-color: #dc3545;
+            color: white;
+            border-color: #dc3545;
+        }
+
+        .subQuestion:hover {
+            background-color: #f0f0f0;
+            border-color: #999;
+        }
+
+        .subQuestion.active {
+            background-color: #4a90e2;
+            color: white;
+            border-color: #4a90e2;
+        }
+
+        .subQuestion.completed {
+            background-color: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        .footer__deliverButton___3FM07 {
+            margin-left: auto;
+            margin-right: 20px;
+            background-color: #f3f4f6;
+            color: #111827;
+            border: 1px solid #d1d5db;
+            padding: 10px 16px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            transition: transform 0.08s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            min-width: 160px;
+            justify-content: center;
+        }
+
+        .footer__deliverButton___3FM07:hover {
+            background-color: #ebedf0;
+            border-color: #c7ccd4;
+        }
+
+        .footer__deliverButton___3FM07:active {
+            transform: translateY(1px);
+        }
+
+        .footer__deliverButton___3FM07:focus-visible {
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.35);
+            outline: none;
+        }
+
+        .footer__deliverButton___3FM07:disabled {
+            background: #eef0f3;
+            color: #9ca3af;
+            cursor: not-allowed;
+            border-color: #e5e7eb;
+            box-shadow: none;
+        }
+
+        
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Context Menu */
+        .context-menu {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            display: none;
+            min-width: 140px;
+        }
+
+        .context-menu-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            font-size: 16px;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .context-menu-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .context-menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .highlight {
+            background-color: #ffff00;
+        }
+
+        .comment-highlight {
+            background-color: #90EE90;
+            position: relative;
+            cursor: help;
+        }
+
+        .comment-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            white-space: nowrap;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .comment-highlight:hover .comment-tooltip {
+            opacity: 1;
+        }
+
+        .question {
+            margin-bottom: 40px;
+        }
+        .question p {
+            margin-bottom: 10px;
+        }
+        .question ul, .question .people-table {
+            margin-top: 0;
+        }
+        .question-prompt {
+            margin-bottom: 20px;
+        }
+        .question ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        .question ul li {
+            margin-bottom: 5px;
+        }
+        .answer-input {
+            border: 1px solid #bfbfbf;
+            border-radius: 4px;
+            background-color: #fff;
+            padding: 2px 8px;
+            font-size: 16px;
+            text-align: left;
+            font-weight: 700;
+            margin-right: 6px;
+            margin-left: 6px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            height: 28px;
+            min-width: 150px;
+        }
+        .answer-input.active-input,
+        .answer-input:focus {
+            border-color: #3581d8;
+            border-width: 2px;
+            outline: none;
+        }
+        .answer-input::placeholder {
+            color: #666;
+            font-weight: 700;
+            text-align: center;
+        }
+        .answer-input.correct {
+            border-color: #28a745;
+            background-color: #e9f7ef;
+        }
+        .answer-input.incorrect {
+            border-color: #dc3545;
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .answer-input {
+    z-index: 10;
+    position: relative;
+    pointer-events: auto;
+}
+        .summary-text .answer-input {
+            width: 120px;
+            height: 24px;
+            font-size: 14px;
+            margin: 0 4px;
+        }
+        .answer-inputs {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .answer-inputs .answer-input {
+            width: 200px;
+            height: 30px;
+            font-size: 16px;
+        }
+        .drag-drop-container {
+            display: flex;
+            gap: 30px;
+            margin-top: 20px;
+            align-items: flex-start;
+        }
+        .recommendations-box {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-height: 200px;
+        }
+        .drag-item {
+            background: white;
+            border: 1px solid #9c9c9c;
+            font-weight: 600;
+            padding: 0px 5px;
+            border-radius: 4px;
+            cursor: move;
+            font-size: 16px;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .drag-item:hover {
+            background: #e9ecef;
+        }
+        .drag-item.dragging {
+            opacity: 0.5;
+        }
+        .drag-item.selected {
+            border-color: #4a90e2;
+            box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.5);
+        }
+        .drop-zone {
+            border: 2px dashed #aaa;
+            border-radius: 4px;
+            width: 50%;
+            margin-top: 19px;
+            margin-bottom: 5px;
+            transition: background-color 0.2s, border-color 0.2s;
+            padding: 0.5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .drop-zone.drag-over {
+            background-color: #e6f4ff;
+            border-color: #4a90e2;
+        }
+        .drop-zone.correct {
+            background-color: #e9f7ef;
+            border-color: #28a745;
+            border-style: solid;
+        }
+        .drop-zone.incorrect {
+            background-color: #f8d7da;
+            border-color: #dc3545;
+            border-style: solid;
+        }
+        .drop-zone.disabled {
+            pointer-events: none;
+        }
+        .drop-zone .drag-item {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            padding: 2px;
+        }
+        .drag-options-container {
+            margin-top: 10px;
+        }
+        .drag-options-container .drag-item {
+            display: block;
+            width: fit-content;
+            font-size: 15px;
+            padding: 0.5px 10px;
+            margin-bottom: 5px;
+        }
+        .drag-options-container .drag-item:last-child {
+            margin-bottom: 0;
+        }
+        .q-number {
+            color: #888;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .questions-container {
+            width: 100%;
+        }
+        audio {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .part-header {
+            background-color: #f1f2ec;
+            padding: 15px 20px;
+            border: 1px solid #e0e0e0;
+            text-align: left;
+            margin: 10px 20px;
+            border-radius: 5px;
+        }
+        .part-header p {
+            margin: 0;
+        }
+        .part-header p:first-child {
+            margin-bottom: 5px;
+        }
+
+        .question li.correct {
+            color: #155724;
+            font-weight: bold;
+        }
+        .question li.incorrect {
+            color: #721c24;
+        }
+        .question li.correct::before {
+            content: '✔ ';
+            color: #28a745;
+        }
+        .question li.incorrect::before {
+            content: '✖ ';
+            color: #dc3545;
+        }
+
+        .example-box {
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+
+        .timer-container {
+            display: flex;
+            position: relative;
+            cursor: default;
+            color: #333;
+            font-size: 16px;
+            font-weight: 500;
+            align-items: center;
+        }
+        .timer-container .timer-tooltip {
+            display: none;
+        }
+
+        .timer-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 15px;
+        }
+
+        .timer-controls button {
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 50%;
+            padding: 0;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+        .timer-controls button:hover {
+            background: #e0e0e0;
+        }
+
+        .timer-controls button svg {
+            width: 20px;
+            height: 20px;
+            fill: #333;
+        }
+
+        .audio-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(40, 40, 40, 0.9);
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+        }
+        .audio-modal-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            max-width: 500px;
+            padding: 20px;
+        }
+        .audio-modal-content p {
+            font-size: 16px;
+            line-height: 1.5;
+            color: #eee;
+        }
+        .audio-modal-icon {
+            margin-bottom: 20px;
+        }
+        .modal-play-btn {
+            background-color: #000;
+            color: white;
+            border: 1px solid white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background-color 0.2s;
+        }
+        .modal-play-btn:hover {
+            background-color: #333;
+        }
+        #goto-widget {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        #goto-input {
+            width: 80px;
+            padding: 4px 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        #goto-btn {
+            padding: 4px 10px;
+            border: 1px solid #ccc;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* Styles for TRUE/FALSE/NOT GIVEN questions */
+        .tf-question {
+            margin-bottom: 25px;
+            padding: 10px 0px;
+            border-radius: 4px;
+            transition: border-color 0.3s, background-color 0.3s;
+        }
+        .tf-question-line {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            padding: 5px 0px;
+            border-radius: 4px;
+        }
+        .tf-question-number, .question-number-box {
+            border: 2px solid #ccc;
+            padding: 2px 8px;
+            margin-right: 10px;
+            border-radius: 3px;
+            font-weight: bold;
+            transition: border-color 0.3s;
+            display: inline-block;
+        }
+        /* Active question blue outline for TF (clears when navigating away) */
+        .tf-question.active-question .tf-question-number {
+            border-color: #4a90e2;
+        }
+        .tf-question-text {
+            padding-top: 3px;
+        }
+        .tf-options {
+            padding-left: 5px;
+        }
+        .tf-option {
+            display: block;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            background-color: #fff;
+        }
+        .tf-option:hover {
+            background-color: #f1f7ff;
+            border-color: #c6dcfb;
+        }
+        .tf-option:has(input[type="radio"]:checked) {
+            background-color: #cfe3f9;
+            border-color: #7db3f5;
+        }
+        /* Answer checking states for TF/NG */
+        .tf-option.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            border-width: 1px;
+        }
+        .tf-option.incorrect {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            border-width: 1px;
+        }
+        /* Ensure selected-blue visuals don't conflict once results are shown */
+        body.results-mode .tf-option:has(input[type="radio"]:checked) {
+            box-shadow: none;
+        }
+        .tf-option input[type="radio"] {
+            margin-right: 10px;
+            transform: scale(1.2);
+        }
+        .tf-question.correct .tf-question-line {
+            background-color: #e9f7ef;
+        }
+        .tf-question.incorrect .tf-question-line {
+            background-color: #f8d7da;
+        }
+        .matching-question-container {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        .matching-options-bank {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .matching-questions {
+            flex: 1.5;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .matching-question-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+
+            border: 2px solid transparent;
+            border-radius: 4px;
+            transition: border-color 0.3s;
+        }
+        .matching-question-item > span {
+            flex: 1;
+        }
+        .matching-question-item.correct {
+            background-color: #e9f7ef;
+            border-color: #28a745 !important;
+        }
+        .matching-question-item.incorrect {
+            background-color: #f8d7da;
+            border-color: #dc3545 !important;
+        }
+        .matching-question-item .drop-zone {
+            width: auto;
+            min-width: 200px;
+            flex-shrink: 0;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            font-weight: bold;
+            color: #aaa;
+        }
+        .matching-options-bank .drag-item {
+            font-size: 15px;
+            text-align: center;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
+        }
+
+        .questions-panel {
+            flex: 1;
+            padding: 20px 20px 100px;
+            overflow-y: auto;
+            min-width: 200px; /* Minimum width */
+            border-left: 1px solid #e0e0e0;
+        }
+        .matching-question-item.incorrect {
+            background-color: #f8d7da;
+            border-color: #dc3545 !important;
+        }
+        .summary-completion-container {
+            margin-top: 20px;
+        }
+        .summary-text p {
+            line-height: 3.0;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        .summary-text li {
+            line-height: 2.2;
+            margin-bottom: 10px;
+        }
+        .summary-drop-zone {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            vertical-align: middle;
+            max-width:200px;
+            height: 25px;
+            border: 2px dashed #999;
+            border-radius: 4px;
+            margin: 0 5px;
+            padding: 0 5px;
+            transition: border-color 0.3s, box-shadow 0.3s, background-color 0.3s;
+            color: #aaa;
+            font-weight: bold;
+        }
+        .summary-drop-zone.filled {
+            border-color: #4a90e2;
+        }
+        .summary-drop-zone.active-input {
+             border-color: #4a90e2;
+             box-shadow: none;
+        }
+        .summary-drop-zone .drag-item {
+            font-size: 15px;
+            font-weight: bold;
+            background-color: transparent;
+            border: none;
+            padding: 0;
+            text-align: center;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .summary-options-bank {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .summary-options-bank .drag-item {
+            flex-grow: 1;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        /* Filled drop-zone pill styling */
+        .drop-zone.filled {
+            background-color: transparent;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            padding: 0;
+        }
+        .drop-zone.filled .drag-item {
+            border: 2px solid #4a90e2;
+            border-radius: 10px;
+            padding: 4px 10px 4px 36px; /* extra left space for letter badge */
+            font-weight: 700;
+            background: #fff;
+            box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.15);
+            cursor: default;
+            white-space: nowrap;
+            position: relative;          /* allow left badge positioning */
+            text-align: center;          /* center the option text */
+        }
+
+        /* Show the letter as a left badge inside the pill when dropped */
+        .drop-zone.filled .drag-item::before {
+            content: attr(data-value);
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            color: #4a90e2;
+            background: #ffffff;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        /* Hide the inline <strong>letter</strong> inside the pill to avoid duplication */
+        .drop-zone.filled .drag-item strong {
+            display: none;
+        }
+        .multi-choice-question {
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            border: 3px solid transparent;
+            transition: border-color 0.3s, background-color 0.3s;
+        }
+        /* MCQ number badge: style first strong within prompt */
+        .multi-choice-question .question-prompt p > strong:first-child {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 24px;
+            padding: 2px 6px;
+            margin-right: 8px;
+            border: 1px solid #d0d7e2;
+            border-radius: 6px;
+            background: #fff;
+        }
+        /* Active question blue outline for MCQ (clears when navigating away) */
+        .multi-choice-question.active-question .question-prompt p > strong:first-child {
+            border-color: #4a90e2;
+            border-width: 2px;
+        }
+        .multi-choice-option {
+            padding: 10px 12px;
+            background-color: #fff;
+            transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .multi-choice-option:hover {
+            background-color: #f1f7ff;
+            border-color: #c6dcfb;
+        }
+        .multi-choice-option:has(input:checked) {
+            background-color: #cfe3f9;
+            border-color: #7db3f5;
+        }
+        /* Answer checking states for MCQ */
+        .multi-choice-option.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            box-shadow: inset 0 0 0 2px rgba(40, 167, 69, 0.25) !important;
+            border-width: 1px;
+            border-radius: 6px;
+        }
+        .multi-choice-option.incorrect {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            box-shadow: inset 0 0 0 2px rgba(220, 53, 69, 0.25) !important;
+            border-width: 1px;
+            border-radius: 6px;
+        }
+        /* Correct answer reveal for unselected option after checking */
+        .tf-option.correct-answer-highlight,
+        .multi-choice-option.correct-answer-highlight {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+        }
+        body.results-mode .multi-choice-option:has(input:checked) { box-shadow: none; }
+        .multi-choice-option label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .multi-choice-option input[type="checkbox"],
+        .multi-choice-option input[type="radio"] {
+            margin-right: 12px;
+            transform: scale(1.3);
+            accent-color: #4a90e2;
+        }
+        .multi-choice-option.correct {
+            background-color: #e9f7ef;
+        }
+        .multi-choice-option.incorrect {
+            background-color: #f8d7da;
+        }
+        .matching-question-item.incorrect {
+            background-color: #f8d7da;
+            border-color: #dc3545 !important;
+        }
+        .matching-question-item .drop-zone.filled {
+            border-color: #4a90e2;
+        }
+        .matching-question-item .drop-zone {
+            width: 200px;
+            height: 40px;
+        }
+        .paragraph-matching-question {
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            margin-bottom: 12px;
+        }
+        .paragraph-matching-question .answer-input {
+            width: 80px;
+            flex-shrink: 0;
+        }
+
+        .matching-form-container {
+            margin-top: 20px;
+        }
+        .matching-form-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .matching-form-label {
+            flex-shrink: 0;
+        }
+
+        /* Results Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(17, 24, 39, 0.6);
+            backdrop-filter: blur(3px);
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.hidden {
+            display: none;
+        }
+        .modal-content {
+            background: #ffffff;
+            padding: 24px;
+            border-radius: 14px;
+            width: 92%;
+            max-width: 780px;
+            max-height: 86vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+        }
+        .modal-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #666;
+        }
+        .modal-content h2 {
+            text-align: center;
+            margin-bottom: 18px;
+            color: #111827;
+        }
+        .results-summary {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 16px;
+            text-align: center;
+            border-bottom: 1px solid #eef2f7;
+            padding-bottom: 12px;
+        }
+        .results-summary p {
+            margin: 0;
+            font-size: 14px;
+            color: #374151;
+        }
+        .results-summary p span {
+            display: inline-block;
+            padding: 4px 10px;
+            margin-left: 6px;
+            border-radius: 999px;
+            background: #f3f4f6;
+            font-weight: 700;
+            color: #111827;
+        }
+        .results-details-container {
+            overflow-y: auto;
+            padding-right: 10px; /* For scrollbar */
+            border-radius: 8px;
+        }
+        .result-row {
+            display: grid;
+            grid-template-columns: 56px 1fr 1fr;
+            gap: 12px;
+            padding: 10px 8px;
+            border-bottom: 1px solid #eef2f7;
+            font-size: 15px;
+            align-items: center;
+        }
+        .result-row.correct {
+            background-color: #f3faf5;
+        }
+        .result-row.incorrect {
+            background-color: #fff5f5;
+        }
+        .result-row .q-num {
+            font-weight: 700;
+            color: #111827;
+            background: #ffffff;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            width: 42px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .result-row .user-ans {
+            color: #374151;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .result-row .correct-ans {
+            color: #065f46;
+            font-weight: 600;
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .correct-answer-display {
+            font-weight: bold;
+            color: #28a745;
+            margin-left: 10px;
+            font-size: 14px;
+        }
+        
+        
+        .centered-title {
+    text-align: center;
+    font-size: 50px;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+        .matching-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        
+        .matching-table th {
+            background-color: #007bff;
+            color: white;
+            padding: 12px;
+            text-align: center;
+            font-weight: bold;
+            border: 1px solid #ddd;
+        }
+        
+        .matching-table td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            vertical-align: top;
+        }
+        
+        .matching-table .statement {
+            text-align: left;
+            width: 60%;
+        }
+        
+        .matching-table .table-radio {
+            margin: 0;
+            transform: scale(1.2);
+        }
+        
+        .matching-table td:not(.statement) {
+            text-align: center;
+            width: 6.67%;
+            min-width: 60px;
+        }
+        
+        .matching-table th:not(:first-child) {
+            width: 6.67%;
+            min-width: 60px;
+        }
+        
+        .matching-table td:not(.statement):has(input:checked) {
+            background-color: #e3f2fd;
+        }
+        
+        .matching-table input[type="radio"]:checked {
+            accent-color: #007bff;
+        }
+        
+        .matching-table td.correct {
+            background-color: #d4edda !important;
+            border-color: #c3e6cb;
+        }
+        
+        .matching-table td.incorrect {
+            background-color: #f8d7da !important;
+            border-color: #f5c6cb;
+        }
+        
+        .matching-table td.correct-answer-highlight {
+            background-color: #d4edda !important;
+            border-color: #c3e6cb;
+        }
+        
+        .matching-table .options-row {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .matching-table .options-row td {
+            font-weight: 500;
+            text-align: center;
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+        
+        .matching-table .options-row td:first-child {
+            text-align: left;
+            font-weight: normal;
+        }
+        
+        .matching-table td.correct-answer-highlight {
+            background-color: #d4edda !important;
+            border-color: #c3e6cb;
+        }
+        
+        .matching-table .clickable-cell {
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            min-height: 40px;
+            border: 1px solid #ddd;
+            position: relative;
+        }
+        
+        .matching-table .clickable-cell:hover {
+            background-color: #f0f8ff;
+            border-color: #007bff;
+        }
+        
+        .matching-table .clickable-cell.selected {
+            background-color: #e3f2fd;
+        }
+        
+        .matching-table .clickable-cell.correct {
+            background-color: #d4edda !important;
+            border-color: #c3e6cb;
+        }
+        
+        .matching-table .clickable-cell.incorrect {
+            background-color: #f8d7da !important;
+            border-color: #f5c6cb;
+        }
+        
+        .matching-table .clickable-cell::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: transparent;
+            transition: background-color 0.2s ease;
+        }
+        
+        
+        
+        /* Explanation Section Styles */
+        .explanation-section {
+            margin-top: 40px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .explanation-section h3 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .explanation-content p {
+            margin-bottom: 15px;
+            line-height: 1.6;
+            font-size: 16px;
+        }
+        
+        .explanation-content strong {
+            color: #4a90e2;
+            font-weight: 600;
+        }
+        
+        #show-explanation-btn {
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        #show-explanation-btn:hover {
+            background-color: #357abd;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="timer-container">
+            <span class="timer-display">60:00</span>
+            <div class="timer-controls">
+                <button id="timer-toggle-btn" title="Pause/Resume Timer">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M8 5v14l11-7L8 5z"/></svg>
+                </button>
+                <button id="timer-reset-btn" title="Reset Timer">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+                </button>
+            </div>
+        </div>
+        <a href="https://t.me/+SoPpY9nBi3U0NTE1" target="_blank" class="telegram-link">
+            MINDLESS_WRITER
+        </a>
+    </div>
+
+    <div class="main-container" id="main-container">
+        <div id="passage-header-container">
+            <div id="part-header-1" class="part-header">
+                <p><strong>Part 1</strong></p>
+                <p>Read the text and answer questions 1-13.</p>
+            </div>
+            <div id="part-header-2" class="part-header hidden">
+                <p><strong>Part 2</strong></p>
+                <p>Read the text and answer questions 14-26.</p>
+            </div>
+            <div id="part-header-3" class="part-header hidden">
+                <p><strong>Part 3</strong></p>
+                <p>Read the text and answer questions 27-40.</p>
+            </div>
+        </div>
+        <div class="panels-container">
+            <div class="passage-panel" id="passage-panel">
+                <div id="passage-text-1" class="reading-passage">
+                    <h4 class="text-center">What are you laughing at?</h4>
+                    <p><strong>A</strong>&nbsp;&nbsp;We like to think that laughing is the height of human sophistication. Our big brains let us see the humour in a strategically positioned pun, an unexpected plot twist or a clever piece of wordplay. But while joking and wit are uniquely human inventions, laughter certainly is not. Other creatures, including chimpanzees, gorillas and even rats, chuckle. Obviously, they don't crack up at Homer Simpson or titter at the boss's dreadful jokes, but the fact that they laugh in the first place suggests that sniggers and chortles have been around for a lot longer than we have. It points the way to the origins of laughter, suggesting a much more practical purpose than you might think.</p>
+                    <p><strong>B</strong>&nbsp;&nbsp;There is no doubt that laughing typically involves groups of people. 'Laughter evolved as a signal to others – it almost disappears when we are alone,' says Robert Provine, a neuroscientist at the University of Maryland. Provine found that most laughter comes as a polite reaction to everyday remarks such as 'see you later', rather than anything particularly funny. And the way we laugh depends on the company we're keeping. Men tend to laugh longer and harder when they are with other men, perhaps as a way of bonding. Women tend to laugh more and at a higher pitch when men are present, possibly indicating flirtation or even submission.</p>
+                    <p><strong>C</strong>&nbsp;&nbsp;To find the origins of laughter, Provine believes we need to look at play. He points out that the masters of laughing are children, and nowhere is their talent more obvious than in the boisterous antics of play, the original context. Well-known primate watchers, including Dian Fossey and Jane Goodall, have long argued that chimps laugh while at play. The sound they produce is known as a panting laugh. It seems obvious when you watch their behavior – they even have the same ticklish spots as we do. But remove the context, and the parallel between human laughter and a chimp's characteristic pant laugh is not so clear. When Provine played a tape of the pant laughs to 119 of his students, for example, only two guessed correctly what it was.</p>
+                    <p><strong>D</strong>&nbsp;&nbsp;These findings underline how chimp and human laughter vary. When we laugh the sound is usually produced by chopping up a single exhalation into a series of shorter bursts, whereas chimps produce a panting sequence with one sound produced on each inward and outward breath. The question is: does this pant laughter have the same source as our own laughter? New research lends weight to the idea that it does. The findings come from Elke Zimmerman, head of the Institute for Zoology in Germany, who compared the sounds made by babies and chimpanzees in response to tickling during the first year of their life. Using sound spectrographs to reveal the pitch and intensity of vocalizations, she discovered that chimp and human baby laughter follow broadly the same pattern. Zimmerman believes the closeness of baby laughter to chimp laughter supports the idea that laughter was around long before humans arrived on the scene. What started simply as a modification of breathing associated with enjoyable and playful interactions has acquired a symbolic meaning as an indicator of pleasure.</p>
+                    <p><strong>E</strong>&nbsp;&nbsp;Pinpointing when laughter developed is another matter. Humans and chimps share a common ancestor that lived perhaps 8 million years ago, but animals might have been laughing long before that. More distantly related primates, including gorillas, laugh, and anecdotal evidence suggests that other social mammals may do too. Scientists are currently testing such stories with a comparative analysis of just how common laughter is among animals. So far, though, the most compelling evidence for laughter beyond primates comes from research done by Jaak Panksepp from Bowling Green State University, Ohio, into the ultrasonic chirps produced by rats during play and in response to tickling.</p>
+                    <p><strong>F</strong>&nbsp;&nbsp;All this still doesn't answer the question of why we laugh at all. One idea is that laughter and tickling originated as a way of sealing the relationship between mother and child. Another is that the reflex response to tickling is protective, alerting us to the presence of crawling creatures that might harm us or compelling us to defend the parts of our bodies that are most vulnerable in hand-to-hand combat. But the idea that has gained most popularity in recent years is that laughter in response to tickling is a way for two individuals to signal and test their trust in one another. This hypothesis starts from the observation that although a little tickle can be enjoyable if it goes on too long it can be torture. By engaging in a bout of tickling, we put ourselves at the mercy of another individual, and laughing is a signal that we trust them not to harm us. The involuntary nature of laughter is what makes it a reliable signal of trust according to Tom Flamson, a laughter researcher at the University of California, Los Angeles. 'Even in rats, laughter, tickle, play and trust are linked. Rats chirp a lot when they play,' says Flamson. 'These chirps can be aroused by tickling. And they get bonded to us as a result, which certainly seems like a show of trust.'</p>
+                    <p><strong>G</strong>&nbsp;&nbsp;We'll never know which animal laughed the first laugh, or why. But we can be sure it wasn't in response to a prehistoric joke. The funny thing is that while the origins of laughter are probably quite serious, we owe human laughter and our language-based humor to the same unique skill. While other animals pant, we alone can control our breath well enough to produce the sound of laughter. Without that control, there would also be no speech – and no jokes to endure.</p>
+                </div>
+                <div id="passage-text-2" class="reading-passage hidden">
+                    <h4 class="text-center">Leaf-Cutting Ants and Fungus</h4>
+                    <p><strong>A</strong>&nbsp;&nbsp;The ants and their agriculture have been extensively studied over the years, but the recent research has uncovered intriguing new findings of the fungus they cultivate, how they domesticated it and how they cultivate it and preserve it from pathogens. For example, the fungus farms, which the ants were thought to keep free of pathogens, turn out to be vulnerable to a devastating mold, found nowhere else but in ants' nests. To keep the mold in check, the ants long ago made a discovery that would do credit to any pharmaceutical laboratory.</p>
+                    <p><strong>B</strong>&nbsp;&nbsp;Leaf-cutting ants and their fungus farms are a marvel of nature and perhaps the best-known example of symbiosis, the mutual dependence of two species. The ant's achievement is remarkable – the biologist Edward O. Wilson has called it "one of the major breakthroughs in animal evolution" – because it allows them to eat, courtesy of their mushroom's digestive powers, the otherwise poisoned harvest of tropical forests whose leaves are laden with terpenoids, alkaloids and other chemicals designed to sicken browsers.</p>
+                    <p>Leaf-cutting ants and their fungus farms are a marvel of nature and perhaps the best-known example of symbiosis, the mutual dependence of two species. The ant's achievement is remarkable – the biologist Edward O. Wilson has called it "one of the major breakthroughs in animal evolution" – because it allows them to eat, courtesy of their mushroom's digestive powers, the otherwise poisoned harvest of tropical forests whose leaves are laden with terpenoids, alkaloids and other chemicals designed to sicken browsers.</p>
+                    <p><strong>C</strong>&nbsp;&nbsp;Fungus growing seems to have originated only once in evolution because all gardening ants belong to a single tribe, the descendants of the first fungus farmer. There are more than 200 known species of the attine ant tribe, divided into 12 groups, or genera. The leaf-cutters use fresh vegetation; the other groups, known as the lower attines because their nests are smaller and their techniques more primitive, feed their gardens with detritus like dead leaves, insects and faeces.</p>
+                    <p><strong>D</strong>&nbsp;&nbsp;The leaf-cutters' fungus was indeed descended from a single strain, propagated clonally, or just by budding, for at least 23 million years. But the lower attine ants used different varieties of the fungus, and in one case a quite separate species, the four biologists discovered. The pure strain of fungus grown by the leaf-cutters, it seemed to Mr Currie, resembled the monocultures of various human crops, that are very productive for a while and then succumb to some disastrous pathogen, such as the Irish potato blight. Monocultures, which lack the genetic diversity to respond to changing environmental threats, are sitting ducks for parasites. Mr Currie felt there had to be a parasite in the ant-fungus system. But a century of ant research offered no support for the idea. Textbooks describe how leaf-cutter ants scrupulously weed their gardens of all foreign organisms. "People kept telling me, 'You know the ants keep their gardens free of parasites, don't you?'" Mr Currie said of his efforts to find a hidden interloper.</p>
+                    <p><strong>E</strong>&nbsp;&nbsp;But after three years of sifting through attine ant gardens, Mr Currie discovered they are far from free of infection. In last month's issue of the Proceeding of the National Academy of Sciences, he and two colleagues, Dr Mueller and David Mairoch, isolated several alien organisms, particularly a family of parasitic molds called Escovopsis.</p>
+                    <p>But after three years of sifting through attine ant gardens, Mr Currie discovered they are far from free of infection. In last month's issue of the Proceeding of the National Academy of Sciences, he and two colleagues, Dr Mueller and David Mairoch, isolated several alien organisms, particularly a family of parasitic molds called Escovopsis.</p>
+                    <p><strong>F</strong>&nbsp;&nbsp;Escovopsis turns out to be a highly virulent pathogen that can devastate a fungus garden in a couple of days. It blooms like a while cloud, with the garden dimly visible underneath. In a day or two, the whole garden is enveloped. "Other ants won't go near it and the ants associated with the garden just starve to death," Dr. Rehner said. "They just seem to give up, except for those that have rescued their larvae." The deadly mold then turns greenish-brown as it enters its spore-forming stage.</p>
+                    <p><strong>G</strong>&nbsp;&nbsp;Evidently, the ants usually manage to keep Escovopsis and other parasites under control. But with any lapse in control, or if the ants are removed, Escovopsis will quickly burst forth. Although new leaf-cutter gardens start off free of Escovopsis, within two years some 60 percent become infected. The discovery of Escovopsis's role brings a new level of understanding of the evolution of the attine ants. "In the last decade, evolutionary biologists have been increasingly aware of the role of parasites as driving forces in evolution," Dr Schultz said. There is now a possible reason to explain why the lower attine species keep changing the variety of fungus in their mushroom gardens, and occasionally domesticating new ones – to stay one step ahead of the relentless Escovopsis.</p>
+                    <p><strong>H</strong>&nbsp;&nbsp;Interestingly, Mr. Currie found that the leaf-cutters had in general fewer alien molds in their gardens than the lower attines, yet they had more Escovopsis infections. It seems that the price they pay for cultivating a pure variety of fungus is a higher risk from Escovopsis. But the leaf-cutters may have a little alternative: they cultivate a special variety of fungus which, unlike those grown by the lower attines, produces nutritious swollen tips for the ants to eat.</p>
+                    <p><strong>I</strong>&nbsp;&nbsp;Discovery of a third partner in the ant-fungus symbiosis raises the question of how the attine ants, especially the leaf-cutters, keep this dangerous interloper under control. Amazingly enough, Mr Currie has again provided the answer. "People have known for a hundred years that ants have a whitish growth on the cuticle," said Dr Mueller, referring to the insects' body surface. "People would say this is like a cuticular wax. But Cameron was the first one in
+                </div>
+                <div id="passage-text-3" class="reading-passage hidden">
+                    <h4 class="text-center">Assessing the risk</h4>
+                    <p><strong>A</strong>&nbsp;&nbsp;As a title for a supposedly unprejudiced debate on scientific progress, "Panic attack: interrogating our obsession with risk" did not bode well. Held last week at the Royal Institution in London, the event brought together scientists from across the world to ask why society is so obsessed with risk and to call for a "more rational" approach. "We seem to be organising society around the grandmotherly maxim of 'better safe than sorry'," exclaimed Spiked, the online publication that organised the event. "What are the consequences of this overbearing concern with risks?"</p>
+                    <p><strong>B</strong>&nbsp;&nbsp;The debate was preceded by a survey of 40 scientists who were invited to describe how awful our lives would be if the "precautionary principle" had been allowed to prevail in the past. Their response was: no heart surgery or antibiotics, and hardly any drugs at all; no aeroplanes, bicycles or high-voltage power grids; no pasteurisation, pesticides or biotechnology; no quantum mechanics; no wheel; no "discovery" of America. In short, their message was: no risk, no gain.</p>
+                    <p><strong>C</strong>&nbsp;&nbsp;They have absolutely missed the point. The precautionary principle is a subtle idea. It has various forms, but all of them generally include some notion of cost-effectiveness. Thus the point is not simply to ban things that are not known to be absolutely safe. Rather, it says: "Of course you can make no progress without risk. But if there is no obvious gain from taking the risk, then don't take it."</p>
+                    <p><strong>D</strong>&nbsp;&nbsp;Clearly, all the technologies listed by the 40 well-chosen savants were innately risky at their inception, as all technologies are. But all of them would have received the green light under the precautionary principle because they all had the potential to offer tremendous benefits – the solutions to very big problems – if only the snags could be overcome.</p>
+                    <p><strong>E</strong>&nbsp;&nbsp;If the precautionary principle had been in place, the scientists tell us, we would not have antibiotics. But of course, we would – if the version of the principle that sensible people now understand had been applied. When penicillin was discovered in the 1920s, infective bacteria were laying waste to the world. Children died from diphtheria and whooping cough, every open-drain brought the threat of typhoid, and any wound could lead to septicaemia and even gangrene.</p>
+                    <p><strong>F</strong>&nbsp;&nbsp;Penicillin was turned into a practical drug during the Second World War when the many pestilences that result from were threatened to kill more people than the bombs. Of course antibiotics were a priority. Of course, the risks, such as they could be perceived, were worth taking.</p>
+                    <p><strong>G</strong>&nbsp;&nbsp;And so with the other items on the scientists' list: electric light bulbs, blood transfusions. CAT scans, knives, the measles vaccine – the precautionary principle would have prevented all of them, they tell us. But this is just plain wrong. If the precautionary principle had been applied properly, all these creations would have passed muster, because all offered incomparable advantages compared to the risks perceived at the time.</p>
+                    <p><strong>H</strong>&nbsp;&nbsp;Another issue is at stake here. Statistics are not the only concept people use when weighing up risk. Human beings, subtle and evolved creatures that we are, do not survive to three-score years and ten simply by thinking like pocket calculators. A crucial issue is the consumer's choice. In deciding whether to pursue the development of new technology, the consumer's right to choose should be considered alongside considerations of risk and benefit. Clearly, skiing is more dangerous than genetically modified tomatoes. But people who ski choose to do so; they do not have skiing thrust upon them by portentous experts of the kind who now feel they have the right to reconstruct our crops. Even with skiing, there is the matter of cost-effectiveness to consider: skiing, I am told, is exhilarating. Where is the exhilaration in GM soya?</p>
+                    <p><strong>I</strong>&nbsp;&nbsp;Indeed, in contrast to all the other items on Spiked's list, GM crops stand out as an example of a technology whose benefits are far from clear. Some of the risks can at least be defined. But in the present economic climate, the benefits that might accrue from them seem dubious. Promoters of GM crops believe that the future population of the world cannot be fed without them. That is untrue. The crops that really matter are wheat and rice, and there is no GM research in the pipeline that will seriously affect the yield of either. GM is used to make production cheaper and hence more profitable, which is an extremely questionable ambition.</p>
+                    <p><strong>J</strong>&nbsp;&nbsp;The precautionary principle provides the world with a very important safeguard. If it had been in place in the past it might, for example, have prevented insouciant miners from polluting major rivers with mercury. We have come to a sorry pass when scientists, who should above all be dispassionate scholars, feel they should misrepresent such a principle for the purposes of commercial and political propaganda. People at large continue to mistrust science and the high technologies it produces partly because they doubt the wisdom of scientists. On such evidence as this, these doubts are fully justified.</p>
+                </div>
+            </div>
+            <div class="resizer" id="resizer"></div>
+            <div class="questions-panel" id="questions-panel">
+                <div id="questions-1" class="question-set">
+                    <div class="questions-container">
+                        <div class="question" data-q-start="1" data-q-end="6">
+                            <div class="question-prompt">
+                                <p><strong>Questions 1-6</strong></p>
+                                <p>Look at the following research findings (questions 1-6) and the list of people below. Match each finding with the correct person <strong>A</strong>, <strong>B</strong>, <strong>C</strong> or <strong>D</strong>.</p>
+                                <p><em>NB You may use any letter more than once.</em></p>
+                            </div>
+                            <div class="people-section">
+                                
+                                <p><strong>A</strong> Tom Flamson</p>
+                                <p><strong>B</strong> Elke Zimmerman</p>
+                                <p><strong>C</strong> Robert Provine</p>
+                                <p><strong>D</strong> Jaak Panksepp</p>
+                                </div>
+                            <div class="table-container">
+                                <table class="matching-table">
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>A</th>
+                                            <th>B</th>
+                                            <th>C</th>
+                                            <th>D</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="statement">1. Babies and chimps produce similar sounds of laughter.</td>
+                                            <td class="clickable-cell" data-question="1" data-value="A" onclick="selectCell(this, 1, 'A')"></td>
+                                            <td class="clickable-cell" data-question="1" data-value="B" onclick="selectCell(this, 1, 'B')"></td>
+                                            <td class="clickable-cell" data-question="1" data-value="C" onclick="selectCell(this, 1, 'C')"></td>
+                                            <td class="clickable-cell" data-question="1" data-value="D" onclick="selectCell(this, 1, 'D')"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="statement">2. Primates are not the only animals who produce laughter.</td>
+                                            <td class="clickable-cell" data-question="2" data-value="A" onclick="selectCell(this, 2, 'A')"></td>
+                                            <td class="clickable-cell" data-question="2" data-value="B" onclick="selectCell(this, 2, 'B')"></td>
+                                            <td class="clickable-cell" data-question="2" data-value="C" onclick="selectCell(this, 2, 'C')"></td>
+                                            <td class="clickable-cell" data-question="2" data-value="D" onclick="selectCell(this, 2, 'D')"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="statement">3. Laughter also suggests that we feel safe and easy with others.</td>
+                                            <td class="clickable-cell" data-question="3" data-value="A" onclick="selectCell(this, 3, 'A')"></td>
+                                            <td class="clickable-cell" data-question="3" data-value="B" onclick="selectCell(this, 3, 'B')"></td>
+                                            <td class="clickable-cell" data-question="3" data-value="C" onclick="selectCell(this, 3, 'C')"></td>
+                                            <td class="clickable-cell" data-question="3" data-value="D" onclick="selectCell(this, 3, 'D')"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="statement">4. Laughter is a response to a polite situation instead of humour.</td>
+                                            <td class="clickable-cell" data-question="4" data-value="A" onclick="selectCell(this, 4, 'A')"></td>
+                                            <td class="clickable-cell" data-question="4" data-value="B" onclick="selectCell(this, 4, 'B')"></td>
+                                            <td class="clickable-cell" data-question="4" data-value="C" onclick="selectCell(this, 4, 'C')"></td>
+                                            <td class="clickable-cell" data-question="4" data-value="D" onclick="selectCell(this, 4, 'D')"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="statement">5. Animal laughter evolved before human laughter.</td>
+                                            <td class="clickable-cell" data-question="5" data-value="A" onclick="selectCell(this, 5, 'A')"></td>
+                                            <td class="clickable-cell" data-question="5" data-value="B" onclick="selectCell(this, 5, 'B')"></td>
+                                            <td class="clickable-cell" data-question="5" data-value="C" onclick="selectCell(this, 5, 'C')"></td>
+                                            <td class="clickable-cell" data-question="5" data-value="D" onclick="selectCell(this, 5, 'D')"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="statement">6. Laughter is a social activity.</td>
+                                            <td class="clickable-cell" data-question="6" data-value="A" onclick="selectCell(this, 6, 'A')"></td>
+                                            <td class="clickable-cell" data-question="6" data-value="B" onclick="selectCell(this, 6, 'B')"></td>
+                                            <td class="clickable-cell" data-question="6" data-value="C" onclick="selectCell(this, 6, 'C')"></td>
+                                            <td class="clickable-cell" data-question="6" data-value="D" onclick="selectCell(this, 6, 'D')"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                                </div>
+
+                        <div class="question" data-q-start="7" data-q-end="10">
+                            <div class="question-prompt">
+                                <p><strong>Questions 7-10</strong></p>
+                                <p>Complete the summary using the list of words, <strong>A–K</strong>, below.</p>
+                                <p>Write the correct letter, <strong>A–K</strong>, in boxes 7-10 on your answer sheet.</p>
+                            </div>
+                            <div class="summary-text">
+                                <p>Some researchers believe that laughter first evolved out of <span class="drop-zone summary-drop-zone" data-dnd-group="p1-7-10" data-q-start="7">7</span>. The investigation has revealed that human and chimp laughter may have the same <span class="drop-zone summary-drop-zone" data-dnd-group="p1-7-10" data-q-start="8">8</span>. Besides, scientists have been aware that <span class="drop-zone summary-drop-zone" data-dnd-group="p1-7-10" data-q-start="9">9</span> laugh, however, it now seems that laughter might be more widespread than once we thought. Although the reasons why humans started to laugh are still unknown, it seems that laughter may result from the <span class="drop-zone summary-drop-zone" data-dnd-group="p1-7-10" data-q-start="10">10</span> we feel with another person.</p>
+                                </div>
+                            <div class="summary-options-bank drag-options-container" data-dnd-group="p1-7-10">
+                                <div class="drag-item" draggable="true" data-dnd-group="p1-7-10" data-value="A"><strong>A</strong> evolution</div>
+                                <div class="drag-item" draggable="true" data-dnd-group="p1-7-10" data-value="B"><strong>B</strong> chirps</div>
+                                <div class="drag-item" draggable="true" data-dnd-group="p1-7-10" data-value="C"><strong>C</strong> origins</div>
+                                <div class="drag-item" draggable="true" data-dnd-group="p1-7-10" data-value="D"><strong>D</strong> voice</div>
+                                <div class="drag-item" draggable="true" data-dnd-group="p1-7-10" data-value="E"><strong>E</strong> confidence</div>
+                                <div class="drag-item" draggable="true" data-dnd-group="p1-7-10" data-value="F"><strong>F</strong> rats</div>
+                                <div class="drag-item" draggable="true" data-dnd-group="p1-7-10" data-value="G"><strong>G</strong> primates</div>
+                                <div class="drag-item" draggable="true" data-dnd-group="p1-7-10" data-value="H"><strong>H</strong> response</div>
+                                <div class="drag-item" draggable="true" data-dnd-group="p1-7-10" data-value="I"><strong>I</strong> play</div>
+                                <div class="drag-item" draggable="true" data-dnd-group="p1-7-10" data-value="J"><strong>J</strong> children</div>
+                                <div class="drag-item" draggable="true" data-dnd-group="p1-7-10" data-value="K"><strong>K</strong> tickling</div>
+                            </div>
+                                </div>
+
+                        <div class="question" data-q-start="11" data-q-end="13">
+                            <div class="question-prompt">
+                                <p><strong>Questions 11-13</strong></p>
+                                <p>Do the following statements agree with the information given in Reading Passage 1?</p>
+                                <p>In boxes 11-13 on your answer sheet, write</p>
+                                <ul style="list-style: none; padding-left: 0;">
+                                    <li><strong>TRUE</strong> if the statement is true</li>
+                                    <li><strong>FALSE</strong> if the statement is false</li>
+                                    <li><strong>NOT GIVEN</strong> if the information is not given in the passage</li>
+                                </ul>
+                            </div>
+                            <div class="tf-question" data-q-start="11" data-q-end="11">
+                                <div class="tf-question-line"><span class="tf-question-number">11</span><span class="tf-question-text">Both men and women laugh more when they are with members of the same sex.</span></div>
+                                <div class="tf-options">
+                                    <label class="tf-option"><input type="radio" name="q11" value="TRUE"> TRUE</label>
+                                    <label class="tf-option"><input type="radio" name="q11" value="FALSE"> FALSE</label>
+                                    <label class="tf-option"><input type="radio" name="q11" value="NOT GIVEN"> NOT GIVEN</label>
+                                </div>
+                            </div>
+                            <div class="tf-question" data-q-start="12" data-q-end="12">
+                                <div class="tf-question-line"><span class="tf-question-number">12</span><span class="tf-question-text">Primates lack sufficient breath control to be able to produce laughs the way humans do.</span></div>
+                                <div class="tf-options">
+                                    <label class="tf-option"><input type="radio" name="q12" value="TRUE"> TRUE</label>
+                                    <label class="tf-option"><input type="radio" name="q12" value="FALSE"> FALSE</label>
+                                    <label class="tf-option"><input type="radio" name="q12" value="NOT GIVEN"> NOT GIVEN</label>
+                                </div>
+                            </div>
+                            <div class="tf-question" data-q-start="13" data-q-end="13">
+                                <div class="tf-question-line"><span class="tf-question-number">13</span><span class="tf-question-text">Chimpanzees produce laughter in a wider range of situations than rats do.</span></div>
+                                <div class="tf-options">
+                                    <label class="tf-option"><input type="radio" name="q13" value="TRUE"> TRUE</label>
+                                    <label class="tf-option"><input type="radio" name="q13" value="FALSE"> FALSE</label>
+                                    <label class="tf-option"><input type="radio" name="q13" value="NOT GIVEN"> NOT GIVEN</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="questions-2" class="question-set hidden">
+                    <div class="questions-container">
+                        <div class="question" data-q-start="14" data-q-end="19">
+                            <div class="question-prompt">
+                                <p><strong>Questions 14-19</strong></p>
+                                <p>Use the information in the passage to match the options (listed A–C) with activities or features of ants below.</p>
+                                <p><em>NB You may use any letter more than once</em></p>
+                                <div style="margin-top:8px;">
+                                    <p><strong>A</strong> Leaf-cutting ants</p>
+                                    <p><strong>B</strong> Lower attines</p>
+                                    <p><strong>C</strong> Both</p>
+                                </div>
+                            </div>
+                            <div class="table-container">
+                                <table class="matching-table">
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>A</th>
+                                            <th>B</th>
+                                            <th>C</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="statement">14. Build small nests and live with the different foreign fungus.</td>
+                                            <td class="clickable-cell" data-question="14" data-value="A" onclick="selectCell(this, 14, 'A')"></td>
+                                            <td class="clickable-cell" data-question="14" data-value="B" onclick="selectCell(this, 14, 'B')"></td>
+                                            <td class="clickable-cell" data-question="14" data-value="C" onclick="selectCell(this, 14, 'C')"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="statement">15. Use toxic leaves to feed the fungus.</td>
+                                            <td class="clickable-cell" data-question="15" data-value="A" onclick="selectCell(this, 15, 'A')"></td>
+                                            <td class="clickable-cell" data-question="15" data-value="B" onclick="selectCell(this, 15, 'B')"></td>
+                                            <td class="clickable-cell" data-question="15" data-value="C" onclick="selectCell(this, 15, 'C')"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="statement">16. Raise fungus which doesn't live with other foreigners.</td>
+                                            <td class="clickable-cell" data-question="16" data-value="A" onclick="selectCell(this, 16, 'A')"></td>
+                                            <td class="clickable-cell" data-question="16" data-value="B" onclick="selectCell(this, 16, 'B')"></td>
+                                            <td class="clickable-cell" data-question="16" data-value="C" onclick="selectCell(this, 16, 'C')"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="statement">17. Use substance to fight against Escovopsis.</td>
+                                            <td class="clickable-cell" data-question="17" data-value="A" onclick="selectCell(this, 17, 'A')"></td>
+                                            <td class="clickable-cell" data-question="17" data-value="B" onclick="selectCell(this, 17, 'B')"></td>
+                                            <td class="clickable-cell" data-question="17" data-value="C" onclick="selectCell(this, 17, 'C')"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="statement">18. Use dead vegetable to feed the fungus.</td>
+                                            <td class="clickable-cell" data-question="18" data-value="A" onclick="selectCell(this, 18, 'A')"></td>
+                                            <td class="clickable-cell" data-question="18" data-value="B" onclick="selectCell(this, 18, 'B')"></td>
+                                            <td class="clickable-cell" data-question="18" data-value="C" onclick="selectCell(this, 18, 'C')"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="statement">19. Are free of parasites explained previously?</td>
+                                            <td class="clickable-cell" data-question="19" data-value="A" onclick="selectCell(this, 19, 'A')"></td>
+                                            <td class="clickable-cell" data-question="19" data-value="B" onclick="selectCell(this, 19, 'B')"></td>
+                                            <td class="clickable-cell" data-question="19" data-value="C" onclick="selectCell(this, 19, 'C')"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="question" data-q-start="20" data-q-end="24">
+                            <div class="question-prompt">
+                                <p><strong>Questions 20-24</strong></p>
+                                <p>The Reading Passage has ten paragraphs A–J. Which paragraph contains the following information?</p>
+                                <p>Write the correct letter <strong>A–J</strong>, in boxes 20-24 on your answer sheet.</p>
+                            </div>
+                            <div class="matching-form-container">
+                                <div class="matching-form-row">
+                                    <span class="matching-form-label"><strong>20.</strong> Dangerous outcome of Escovopsis.</span>
+                                    <select class="answer-input" id="q20"><option value="">Select</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option><option value="G">G</option><option value="H">H</option><option value="I">I</option><option value="J">J</option></select>
+                                </div>
+                                <div class="matching-form-row">
+                                    <span class="matching-form-label"><strong>21.</strong> The disadvantage of growing single fungus.</span>
+                                    <select class="answer-input" id="q21"><option value="">Select</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option><option value="G">G</option><option value="H">H</option><option value="I">I</option><option value="J">J</option></select>
+                                </div>
+                                <div class="matching-form-row">
+                                    <span class="matching-form-label"><strong>22.</strong> Comparison of features of two different nests.</span>
+                                    <select class="answer-input" id="q22"><option value="">Select</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option><option value="G">G</option><option value="H">H</option><option value="I">I</option><option value="J">J</option></select>
+                                </div>
+                                <div class="matching-form-row">
+                                    <span class="matching-form-label"><strong>23.</strong> Two achievements made by ants earlier than human.</span>
+                                    <select class="answer-input" id="q23"><option value="">Select</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option><option value="G">G</option><option value="H">H</option><option value="I">I</option><option value="J">J</option></select>
+                                </div>
+                                <div class="matching-form-row">
+                                    <span class="matching-form-label"><strong>24.</strong> Advantage of growing a new breed of fungus.</span>
+                                    <select class="answer-input" id="q24"><option value="">Select</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option><option value="G">G</option><option value="H">H</option><option value="I">I</option><option value="J">J</option></select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="question" data-q-start="25" data-q-end="26">
+                            <div class="question-prompt">
+                                <p><strong>Questions 25-26</strong></p>
+                                <p>Choose the correct answer.</p>
+                            </div>
+                            <div class="multi-choice-question" data-q-start="25" data-q-end="25">
+                                <div class="question-prompt"><p><strong>25</strong> How does the author think of Currie's opinion?</p></div>
+                                <div class="multi-choice-option"><label><input type="radio" name="q25" value="A"> his viewpoint was verified later.</label></div>
+                                <div class="multi-choice-option"><label><input type="radio" name="q25" value="B"> earlier study has sufficient evidence.</label></div>
+                                <div class="multi-choice-option"><label><input type="radio" name="q25" value="C"> no details mentioned in the article.</label></div>
+                                <div class="multi-choice-option"><label><input type="radio" name="q25" value="D"> his opinion was proved to be wrong.</label></div>
+                                    </div>
+                            <div class="multi-choice-question" data-q-start="26" data-q-end="26">
+                                <div class="question-prompt"><p><strong>26</strong> What did scientists find on the skin of ants under a microscope?</p></div>
+                                <div class="multi-choice-option"><label><input type="radio" name="q26" value="A"> some white cloud mold embed in their skin</label></div>
+                                <div class="multi-choice-option"><label><input type="radio" name="q26" value="B"> that Wax is all over their skin.</label></div>
+                                <div class="multi-choice-option"><label><input type="radio" name="q26" value="C"> a substance which is useful to humans.</label></div>
+                                <div class="multi-choice-option"><label><input type="radio" name="q26" value="D"> a substance which suppresses the growth of fungus.</label></div>
+                                    </div>
+                                    </div>
+                                    </div>
+                                </div>
+                <div id="questions-3" class="question-set hidden">
+                    <div class="questions-container">
+                        <div class="question" data-q-start="27" data-q-end="32">
+                            <div class="question-prompt">
+                                <p><strong>Questions 27-32</strong></p>
+                                <p>Do the following statements agree with the information given in Reading Passage 3?</p>
+                                <p>In boxes 27-32 on your answer sheet, write</p>
+                                <ul style="list-style: none; padding-left: 0;">
+                                    <li><strong>TRUE</strong> if the statement is true</li>
+                                    <li><strong>FALSE</strong> if the statement is false</li>
+                                    <li><strong>NOT GIVEN</strong> if the information is not given in the passage</li>
+                                </ul>
+                            </div>
+                            <div class="tf-question" data-q-start="27" data-q-end="27">
+                                <div class="tf-question-line"><span class="tf-question-number">27</span><span class="tf-question-text">The title of the debate is not unbiased.</span></div>
+                                <div class="tf-options">
+                                    <label class="tf-option"><input type="radio" name="q27" value="TRUE"> TRUE</label>
+                                    <label class="tf-option"><input type="radio" name="q27" value="FALSE"> FALSE</label>
+                                    <label class="tf-option"><input type="radio" name="q27" value="NOT GIVEN"> NOT GIVEN</label>
+                            </div>
+                        </div>
+                            <div class="tf-question" data-q-start="28" data-q-end="28">
+                                <div class="tf-question-line"><span class="tf-question-number">28</span><span class="tf-question-text">All the scientists invited to the debate were from the field of medicine.</span></div>
+                                <div class="tf-options">
+                                    <label class="tf-option"><input type="radio" name="q28" value="TRUE"> TRUE</label>
+                                    <label class="tf-option"><input type="radio" name="q28" value="FALSE"> FALSE</label>
+                                    <label class="tf-option"><input type="radio" name="q28" value="NOT GIVEN"> NOT GIVEN</label>
+                    </div>
+                </div>
+                            <div class="tf-question" data-q-start="29" data-q-end="29">
+                                <div class="tf-question-line"><span class="tf-question-number">29</span><span class="tf-question-text">The message those scientists who conducted the survey were sending was people shouldn't take risks.</span></div>
+                                <div class="tf-options">
+                                    <label class="tf-option"><input type="radio" name="q29" value="TRUE"> TRUE</label>
+                                    <label class="tf-option"><input type="radio" name="q29" value="FALSE"> FALSE</label>
+                                    <label class="tf-option"><input type="radio" name="q29" value="NOT GIVEN"> NOT GIVEN</label>
+                                </div>
+                            </div>
+                            <div class="tf-question" data-q-start="30" data-q-end="30">
+                                <div class="tf-question-line"><span class="tf-question-number">30</span><span class="tf-question-text">All the 40 listed technologies are riskier than other technologies.</span></div>
+                                <div class="tf-options">
+                                    <label class="tf-option"><input type="radio" name="q30" value="TRUE"> TRUE</label>
+                                    <label class="tf-option"><input type="radio" name="q30" value="FALSE"> FALSE</label>
+                                    <label class="tf-option"><input type="radio" name="q30" value="NOT GIVEN"> NOT GIVEN</label>
+                            </div>
+                        </div>
+                            <div class="tf-question" data-q-start="31" data-q-end="31">
+                                <div class="tf-question-line"><span class="tf-question-number">31</span><span class="tf-question-text">It was worth taking the risks to invent antibiotics.</span></div>
+                                <div class="tf-options">
+                                    <label class="tf-option"><input type="radio" name="q31" value="TRUE"> TRUE</label>
+                                    <label class="tf-option"><input type="radio" name="q31" value="FALSE"> FALSE</label>
+                                    <label class="tf-option"><input type="radio" name="q31" value="NOT GIVEN"> NOT GIVEN</label>
+                            </div>
+                            </div>
+                            <div class="tf-question" data-q-start="32" data-q-end="32">
+                                <div class="tf-question-line"><span class="tf-question-number">32</span><span class="tf-question-text">All the other inventions on the list were also judged by the precautionary principle.</span></div>
+                                <div class="tf-options">
+                                    <label class="tf-option"><input type="radio" name="q32" value="TRUE"> TRUE</label>
+                                    <label class="tf-option"><input type="radio" name="q32" value="FALSE"> FALSE</label>
+                                    <label class="tf-option"><input type="radio" name="q32" value="NOT GIVEN"> NOT GIVEN</label>
+                            </div>
+                            </div>
+                            </div>
+
+                        <div class="question" data-q-start="33" data-q-end="39">
+                            <div class="question-prompt">
+                                <p><strong>Questions 33-39</strong></p>
+                                <p>Complete the following summary of the paragraphs of Reading Passage</p>
+                                <p>Using <strong>NO MORE THAN THREE WORDS</strong> from the Reading Passage for each answer.</p>
+                            </div>
+                            <div class="summary-text">
+                                <p>When applying the precautionary principle to decide whether to invent a new technology, people should also the consideration of the <input type="text" class="answer-input" id="q33" placeholder="33">, along with the usual consideration of <input type="text" class="answer-input" id="q34" placeholder="34">. For example, though risky and dangerous enough, people still enjoy <input type="text" class="answer-input" id="q35" placeholder="35"> for the excitement it provides. On the other hand, experts believe that future population desperately needs <input type="text" class="answer-input" id="q36" placeholder="36"> in spite of their undefined risks. However, the researchers conducted so far have not been directed towards increasing the yield of <input type="text" class="answer-input" id="q37" placeholder="37">, but to reduce the cost of <input type="text" class="answer-input" id="q38" placeholder="38"> and to bring more profit out of it. In the end, such selfish use of the precautionary principle for business and political gain has often led people to <input type="text" class="answer-input" id="q39" placeholder="39"> science for they believe scientists are not to be trusted.</p>
+                            </div>
+                        </div>
+
+                        <div class="question" data-q-start="40" data-q-end="40">
+                            <div class="question-prompt">
+                                <p><strong>Question 40</strong></p>
+                                <p>Choose the correct answer.</p>
+                            </div>
+                            <div class="multi-choice-question" data-q-start="40" data-q-end="40">
+                                <div class="question-prompt"><p><strong>40</strong> What is the main theme of the passage?</p></div>
+                                <div class="multi-choice-option"><label><input type="radio" name="q40" value="A"> A people have the right to doubt science and technologies</label></div>
+                                <div class="multi-choice-option"><label><input type="radio" name="q40" value="B"> B the precautionary principle could have prevented the development of science and technology</label></div>
+                                <div class="multi-choice-option"><label><input type="radio" name="q40" value="C"> C there are not enough people who truly understand the precautionary principle</label></div>
+                                <div class="multi-choice-option"><label><input type="radio" name="q40" value="D"> D the precautionary principle bids us take risks at all costs</label></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Arrows -->
+    <div class="nav-arrows">
+        <button class="nav-arrow prev" onclick="previousQuestion()" id="prevBtn" aria-label="Previous question">
+            <!-- Left arrow icon -->
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <button class="nav-arrow next" onclick="nextQuestion()" id="nextBtn" aria-label="Next question">
+            <!-- Right arrow icon -->
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="nav-row perScorableItem" aria-label="Questions">
+        <div class="footer__questionWrapper___1tZ46 multiple" role="tablist">
+            <button role="tab" class="footer__questionNo___3WNct" onclick="switchToPart(1)">
+                <span>
+                    <span aria-hidden="true" class="section-prefix">Part </span>
+                    <span class="sectionNr" aria-hidden="true">1</span>
+                    <span class="attemptedCount" aria-hidden="true">0 of 13</span>
+                </span>
+            </button>
+            <div class="footer__subquestionWrapper___9GgoP">
+                <button class="subQuestion scorable-item" onclick="goToQuestion(1)"><span class="sr-only">Question 1</span><span aria-hidden="true">1</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(2)"><span class="sr-only">Question 2</span><span aria-hidden="true">2</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(3)"><span class="sr-only">Question 3</span><span aria-hidden="true">3</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(4)"><span class="sr-only">Question 4</span><span aria-hidden="true">4</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(5)"><span class="sr-only">Question 5</span><span aria-hidden="true">5</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(6)"><span class="sr-only">Question 6</span><span aria-hidden="true">6</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(7)"><span class="sr-only">Question 7</span><span aria-hidden="true">7</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(8)"><span class="sr-only">Question 8</span><span aria-hidden="true">8</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(9)"><span class="sr-only">Question 9</span><span aria-hidden="true">9</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(10)"><span class="sr-only">Question 10</span><span aria-hidden="true">10</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(11)"><span class="sr-only">Question 11</span><span aria-hidden="true">11</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(12)"><span class="sr-only">Question 12</span><span aria-hidden="true">12</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(13)"><span class="sr-only">Question 13</span><span aria-hidden="true">13</span></button>
+            </div>
+        </div>
+        
+        <div class="footer__questionWrapper___1tZ46 selected multiple" role="tablist">
+            <button role="tab" class="footer__questionNo___3WNct" onclick="switchToPart(2)">
+                <span>
+                    <span aria-hidden="true" class="section-prefix">Part </span>
+                    <span class="sectionNr" aria-hidden="true">2</span>
+                    <span class="attemptedCount" aria-hidden="true">0 of 13</span>
+                </span>
+            </button>
+            <div class="footer__subquestionWrapper___9GgoP">
+                <button class="subQuestion scorable-item" onclick="goToQuestion(14)"><span class="sr-only">Question 14</span><span aria-hidden="true">14</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(15)"><span class="sr-only">Question 15</span><span aria-hidden="true">15</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(16)"><span class="sr-only">Question 16</span><span aria-hidden="true">16</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(17)"><span class="sr-only">Question 17</span><span aria-hidden="true">17</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(18)"><span class="sr-only">Question 18</span><span aria-hidden="true">18</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(19)"><span class="sr-only">Question 19</span><span aria-hidden="true">19</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(20)"><span class="sr-only">Question 20</span><span aria-hidden="true">20</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(21)"><span class="sr-only">Question 21</span><span aria-hidden="true">21</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(22)"><span class="sr-only">Question 22</span><span aria-hidden="true">22</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(23)"><span class="sr-only">Question 23</span><span aria-hidden="true">23</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(24)"><span class="sr-only">Question 24</span><span aria-hidden="true">24</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(25)"><span class="sr-only">Question 25</span><span aria-hidden="true">25</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(26)"><span class="sr-only">Question 26</span><span aria-hidden="true">26</span></button>
+            </div>
+        </div>
+        
+        <div class="footer__questionWrapper___1tZ46 multiple" role="tablist">
+            <button role="tab" class="footer__questionNo___3WNct" onclick="switchToPart(3)">
+                <span>
+                    <span aria-hidden="true" class="section-prefix">Part </span>
+                    <span class="sectionNr" aria-hidden="true">3</span>
+                    <span class="attemptedCount" aria-hidden="true">0 of 14</span>
+                </span>
+            </button>
+            <div class="footer__subquestionWrapper___9GgoP">
+                <button class="subQuestion scorable-item" onclick="goToQuestion(27)"><span class="sr-only">Question 27</span><span aria-hidden="true">27</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(28)"><span class="sr-only">Question 28</span><span aria-hidden="true">28</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(29)"><span class="sr-only">Question 29</span><span aria-hidden="true">29</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(30)"><span class="sr-only">Question 30</span><span aria-hidden="true">30</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(31)"><span class="sr-only">Question 31</span><span aria-hidden="true">31</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(32)"><span class="sr-only">Question 32</span><span aria-hidden="true">32</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(33)"><span class="sr-only">Question 33</span><span aria-hidden="true">33</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(34)"><span class="sr-only">Question 34</span><span aria-hidden="true">34</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(35)"><span class="sr-only">Question 35</span><span aria-hidden="true">35</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(36)"><span class="sr-only">Question 36</span><span aria-hidden="true">36</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(37)"><span class="sr-only">Question 37</span><span aria-hidden="true">37</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(38)"><span class="sr-only">Question 38</span><span aria-hidden="true">38</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(39)"><span class="sr-only">Question 39</span><span aria-hidden="true">39</span></button>
+                <button class="subQuestion scorable-item" onclick="goToQuestion(40)"><span class="sr-only">Question 40</span><span aria-hidden="true">40</span></button>
+            </div>
+        </div>
+        
+        <button id="deliver-button" aria-label="Review your answers" class="footer__deliverButton___3FM07">
+            <i class="fa fa fa-check" aria-hidden="true"></i>
+            <span>Check Answers</span>
+        </button>
+    </nav>
+
+    <!-- Context Menu -->
+    <div id="contextMenu" class="context-menu">
+        <div id="menu-highlight" class="context-menu-item" onclick="highlightText()">
+            Highlight
+        </div>
+        <div id="menu-note" class="context-menu-item" onclick="addNote()">
+            Note
+        </div>
+        <div id="menu-clear" class="context-menu-item" onclick="clearHighlight()">
+            Clear
+        </div>
+        <div id="menu-clear-all" class="context-menu-item" onclick="clearAllHighlights()">
+            Clear All
+        </div>
+    </div>
+
+    <div id="results-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button class="modal-close-btn" onclick="closeResultsModal()">&times;</button>
+            <h2>Results</h2>
+            <div class="results-summary">
+                <p>Score: <span id="results-score"></span> / 40</p>
+                <p>IELTS Band: <span id="results-band"></span></p>
+            </div>
+            <div id="results-details" class="results-details-container">
+                <!-- Results for each question will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- STATE VARIABLES ---
+        let currentPassage = 1;
+        let currentQuestion = 1;
+        let selectedRange = null;
+        let timeInSeconds = 3600;
+        let timerInterval;
+        let draggedItem = null;
+        let activeQuestionElement = null;
+        let selectedDragItem = null;
+
+        // --- GLOBAL FUNCTIONS ---
+        function getFirstQuestionOfPart(part) {
+            switch(part) {
+                case 1: return 1;
+                case 2: return 14;
+                case 3: return 27;
+                default: return 1;
+            }
+        }
+
+        // --- DOM ELEMENTS ---
+        const timerDisplay = document.querySelector('.timer-display');
+        const timerToggleButton = document.getElementById('timer-toggle-btn');
+        const timerResetButton = document.getElementById('timer-reset-btn');
+        const deliverButton = document.getElementById('deliver-button');
+        const resizer = document.getElementById('resizer');
+        const passagePanel = document.getElementById('passage-panel');
+        const questionsPanel = document.getElementById('questions-panel');
+        const contextMenu = document.getElementById('contextMenu');
+
+        // --- ICON SVGs ---
+        const playIcon = '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M8 5v14l11-7L8 5z"/></svg>';
+        const pauseIcon = '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+
+        // --- ANSWERS ---
+        const correctAnswers = {
+            // Part 1 (1-13) - What are you laughing at?
+            '1': 'B', // Babies and chimps produce similar laughter → Elke Zimmerman
+            '2': 'D', // Beyond primates (rats) → Jaak Panksepp
+            '3': 'A', // Laughter signals trust/safety → Tom Flamson
+            '4': 'C', // Polite reaction rather than humour → Robert Provine
+            '5': 'B', // Laughter predates humans → Elke Zimmerman
+            '6': 'C', // Laughter is social → Robert Provine
+            '7': 'I', // play
+            '8': 'C', // origins
+            '9': 'G', // primates
+            '10': 'E', // confidence (trust)
+            '11': 'NOT GIVEN',
+            '12': 'TRUE',
+            '13': 'NOT GIVEN',
+            // Part 2 (14-26) - Leaf-Cutting Ants and Fungus
+            '14': 'B', // small nests, different foreign fungus → lower attines
+            '15': 'A', // toxic leaves to feed fungus → leaf-cutters
+            '16': 'A', // pure monoculture → leaf-cutters
+            '17': 'C', // Streptomyces used by both
+            '18': 'B', // dead vegetation → lower attines
+            '19': 'A', // free of parasites
+            '20': 'F', // dangerous outcome of Escovopsis
+            '21': 'H', // disadvantage of monoculture
+            '22': 'C', // comparison of two nests' infections and tradeoffs
+            '23': 'J', // two achievements beyond human tech
+            '24': 'G', // advantage of special variety with swollen tips
+            '25': 'A', // Currie's view verified later
+            '26': 'C', // substance suppresses growth of Escovopsis
+            // Part 3 (27-40) - Assessing the risk
+            '27': 'TRUE',
+            '28': 'NOT GIVEN',
+            '29': 'FALSE',
+            '30': 'NOT GIVEN',
+            '31': 'TRUE',
+            '32': 'NOT GIVEN',
+            '33': ['consumer\'s right', 'consumer\'s choice'],
+            '34': 'risk and benefit',
+            '35': 'Skiing',
+            '36': 'GM crops',
+            '37': 'wheat and rice',
+            '38': 'production',
+            '39': 'mistrust',
+            '40': 'A'
+        };
+
+        // --- INITIALIZATION ---
+        function initialize() {
+            console.log(`🚀 Initializing application...`);
+            startTimer();
+            initializeDragAndDrop();
+            setupCheckboxLimits();
+            setupExampleHeading();
+            console.log(`📋 Setting up initial state - switching to part 1`);
+            switchToPart(1); // Also calls goToQuestion(1) and updateNavigation
+            
+            document.body.addEventListener('input', updateAllIndicators);
+            document.body.addEventListener('change', updateAllIndicators);
+            deliverButton.addEventListener('click', checkAnswers);
+            timerToggleButton.addEventListener('click', toggleTimer);
+            timerResetButton.addEventListener('click', resetTimer);
+
+            // Auto-close dropdowns for Questions 14-17 on selection
+            ['q14','q15','q16','q17'].forEach(id => {
+                const sel = document.getElementById(id);
+                if (sel) {
+                    sel.addEventListener('change', () => sel.blur());
+                }
+            });
+
+            // Add click listeners to question containers for navigation
+            document.querySelectorAll('[data-q-start]').forEach(el => {
+                el.addEventListener('click', (event) => {
+                    // Stop event propagation to prevent parent container clicks
+                    event.stopPropagation();
+                    
+                    const qNum = parseInt(el.dataset.qStart, 10);
+                    const qEnd = parseInt(el.dataset.qEnd, 10);
+                    
+                    console.log(`🖱️ Question container clicked - qNum: ${qNum}, qEnd: ${qEnd}, currentQuestion: ${currentQuestion}, element:`, el);
+                    
+                    // Handle cases where qNum is NaN
+                    if (isNaN(qNum)) {
+                        console.log(`ℹ️ Container without valid question number, ignoring navigation`);
+                        return;
+                    }
+                    
+                    // Only navigate if this is a single question (qStart === qEnd) or if we're clicking on a specific question within a group
+                    if (qNum === qEnd || el.classList.contains('tf-question')) {
+                        if (currentQuestion !== qNum) {
+                            console.log(`🚀 Navigating from question ${currentQuestion} to question ${qNum}`);
+                            goToQuestion(qNum);
+                        } else {
+                            console.log(`ℹ️ Already on question ${qNum}, no navigation needed`);
+                        }
+                    } else {
+                        console.log(`ℹ️ Ignoring click on group container (${qNum}-${qEnd})`);
+                    }
+                });
+            });
+            
+            // Add specific click listeners for individual question elements to prevent parent container interference
+            document.querySelectorAll('.tf-question, .summary-text').forEach(el => {
+                el.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const qNum = parseInt(el.dataset.qStart, 10);
+                    console.log(`🎯 Individual question element clicked - qNum: ${qNum}, currentQuestion: ${currentQuestion}, element:`, el);
+                    
+                    // Handle cases where qNum is NaN (like .summary-text containers)
+                    if (isNaN(qNum)) {
+                        console.log(`ℹ️ Container without specific question number, ignoring navigation`);
+                        return;
+                    }
+                    
+                    if (currentQuestion !== qNum) {
+                        console.log(`🚀 Navigating from question ${currentQuestion} to question ${qNum} (individual element)`);
+                        goToQuestion(qNum);
+                    } else {
+                        console.log(`ℹ️ Already on question ${qNum}, no navigation needed (individual element)`);
+                    }
+                });
+            });
+            
+            // Add specific click listeners for individual input elements in questions 33-36
+            document.querySelectorAll('.answer-input[id^="q3"]').forEach(input => {
+                input.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const qNum = parseInt(input.id.replace('q', ''), 10);
+                    console.log(`📝 Input element clicked - qNum: ${qNum}, currentQuestion: ${currentQuestion}, input:`, input);
+                    
+                    if (currentQuestion !== qNum) {
+                        console.log(`🚀 Navigating from question ${currentQuestion} to question ${qNum} (input element)`);
+                        goToQuestion(qNum);
+                    } else {
+                        console.log(`ℹ️ Already on question ${qNum}, no navigation needed (input element)`);
+                    }
+                });
+            });
+            
+            // Add click listeners for the paragraph elements containing questions 33-36
+            document.querySelectorAll('.summary-text p').forEach(p => {
+                p.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    // Extract question number from the paragraph text (e.g., "33" from "<strong>33</strong>")
+                    const strongElement = p.querySelector('strong');
+                    if (strongElement) {
+                        const qNum = parseInt(strongElement.textContent, 10);
+                        console.log(`📄 Summary paragraph clicked - qNum: ${qNum}, currentQuestion: ${currentQuestion}, paragraph:`, p);
+                        
+                        if (!isNaN(qNum) && currentQuestion !== qNum) {
+                            console.log(`🚀 Navigating from question ${currentQuestion} to question ${qNum} (summary paragraph)`);
+                            goToQuestion(qNum);
+                        } else if (!isNaN(qNum)) {
+                            console.log(`ℹ️ Already on question ${qNum}, no navigation needed (summary paragraph)`);
+                        }
+                    }
+                });
+            });
+
+            resizer.addEventListener('mousedown', initResize, false);
+            initializeContextMenu();
+        }
+
+        // --- CORE TEST LOGIC ---
+
+        function checkAnswers() {
+            // Disable all inputs to prevent changes
+            const allInputs = document.querySelectorAll('input, select, textarea');
+            allInputs.forEach(input => {
+                input.disabled = true;
+            });
+
+            // Disable all drag and drop functionality
+            document.querySelectorAll('.drag-item').forEach(item => {
+                item.setAttribute('draggable', 'false');
+                item.style.cursor = 'not-allowed';
+                item.style.pointerEvents = 'none';
+            });
+
+            document.querySelectorAll('.drop-zone').forEach(zone => {
+                zone.style.pointerEvents = 'none';
+                zone.classList.add('disabled');
+            });
+
+            // Disable submit button
+            deliverButton.disabled = true;
+            deliverButton.style.cursor = 'not-allowed';
+            
+            clearInterval(timerInterval);
+            let score = 0;
+            const totalQuestions = 40;
+            const resultsDetailsContainer = document.getElementById('results-details');
+            resultsDetailsContainer.innerHTML = '';
+
+            document.querySelectorAll('.correct, .incorrect, .correct-answer-highlight').forEach(el => {
+                el.classList.remove('correct', 'incorrect', 'correct-answer-highlight');
+            });
+            document.querySelectorAll('.correct-answer-display').forEach(el => el.remove());
+
+            for (let i = 1; i <= totalQuestions; i++) {
+                const questionKey = String(i);
+                const correctAnswer = correctAnswers[questionKey];
+                let userAnswer = '';
+                let isCorrect = false;
+                
+                let userAnswerDisplay = 'Not Answered';
+                const correctAnswerText = Array.isArray(correctAnswer) ? correctAnswer.join(' / ') : correctAnswer;
+
+                const textInput = document.getElementById(`q${i}`);
+                const radioGroup = document.querySelectorAll(`input[name="q${i}"][type="radio"]`);
+                
+                // Handle Text and Select Inputs
+                if (textInput && (textInput.tagName === 'INPUT' || textInput.tagName === 'SELECT')) {
+                    const element = textInput.closest('.matching-form-row') || textInput;
+                    userAnswer = textInput.value.trim();
+                    userAnswerDisplay = userAnswer || 'Not Answered';
+
+                    const normalize = (s) => (s || '')
+                        .toString()
+                        .toLowerCase()
+                        .replace(/[^a-z0-9\s]/g, '')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+
+                    if (textInput.tagName === 'SELECT') {
+                        isCorrect = userAnswer === correctAnswer;
+                    } else {
+                        const normUser = normalize(userAnswer);
+                        if (Array.isArray(correctAnswer)) {
+                            isCorrect = correctAnswer.some(ans => normalize(ans) === normUser);
+                        } else {
+                            isCorrect = normalize(correctAnswer) === normUser;
+                        }
+                    }
+                    
+                    if (isCorrect) {
+                        score++;
+                        element.classList.add('correct');
+                    } else {
+                        element.classList.add('incorrect');
+                        const correctAnswerSpan = document.createElement('span');
+                        correctAnswerSpan.className = 'correct-answer-display';
+                        correctAnswerSpan.innerHTML = `&nbsp;➜&nbsp;<span class="correct-answer-highlight">${correctAnswerText}</span>`;
+                        textInput.parentNode.insertBefore(correctAnswerSpan, textInput.nextSibling);
+                    }
+                }
+                // Handle drag and drop questions (any with a drop-zone for this question)
+                else if (document.querySelector(`.drop-zone[data-q-start="${i}"]`)) {
+                    console.log(`🔍 Checking drag-and-drop question ${i}`);
+                    const dropZone = document.querySelector(`.drop-zone[data-q-start="${i}"]`);
+                    const droppedItem = dropZone ? dropZone.querySelector('.drag-item') : null;
+                    
+                    console.log(`📍 Drop zone for question ${i}:`, dropZone);
+                    console.log(`📍 Dropped item for question ${i}:`, droppedItem);
+                    console.log(`📍 Correct answer for question ${i}:`, correctAnswer);
+                    
+                    if (droppedItem) {
+                        userAnswer = droppedItem.dataset.value;
+                        userAnswerDisplay = userAnswer;
+                        isCorrect = userAnswer === correctAnswer;
+                        
+                        console.log(`✅ User answer for question ${i}: "${userAnswer}", Correct: "${correctAnswer}", IsCorrect: ${isCorrect}`);
+                        
+                        // Mark the drop zone as correct or incorrect
+                        dropZone.classList.add(isCorrect ? 'correct' : 'incorrect');
+                        
+                        if (isCorrect) {
+                            score++;
+                            console.log(`🎉 Question ${i} is correct! Score: ${score}`);
+                        } else {
+                            console.log(`❌ Question ${i} is incorrect. Expected: "${correctAnswer}", Got: "${userAnswer}"`);
+                        }
+                        
+                        // Show correct answer if wrong
+                        if (!isCorrect && correctAnswer) {
+                            const correctAnswerSpan = document.createElement('span');
+                            correctAnswerSpan.className = 'correct-answer-display';
+                            correctAnswerSpan.innerHTML = `&nbsp;➜&nbsp;<span class="correct-answer-highlight">${correctAnswer}</span>`;
+                            dropZone.appendChild(correctAnswerSpan);
+                        }
+                    } else {
+                        // No answer provided - mark as incorrect
+                        console.log(`⚠️ No answer provided for question ${i}`);
+                        if (dropZone) {
+                            dropZone.classList.add('incorrect');
+                        }
+                        if (correctAnswer) {
+                            const correctAnswerSpan = document.createElement('span');
+                            correctAnswerSpan.className = 'correct-answer-display';
+                            correctAnswerSpan.innerHTML = `&nbsp;➜&nbsp;<span class="correct-answer-highlight">${correctAnswer}</span>`;
+                            dropZone.appendChild(correctAnswerSpan);
+                        }
+                    }
+                }
+                // Handle Radio Button Inputs (T/F, MCQs)
+                else if (radioGroup.length > 0) {
+                    const questionContainer = radioGroup[0]?.closest('.tf-question') || radioGroup[0]?.closest('.multi-choice-question');
+                    const checkedRadio = document.querySelector(`input[name="q${i}"]:checked`);
+
+                    if (checkedRadio) {
+                        userAnswer = checkedRadio.value;
+                        userAnswerDisplay = userAnswer;
+                        isCorrect = userAnswer === correctAnswer;
+
+                        const userLabel = checkedRadio.closest('.tf-option, .multi-choice-option');
+                        if (userLabel) {
+                            userLabel.classList.add(isCorrect ? 'correct' : 'incorrect');
+                        }
+                        
+                        // Handle table radio buttons
+                        if (checkedRadio.classList.contains('table-radio')) {
+                            const tableCell = checkedRadio.closest('td');
+                            if (tableCell) {
+                                tableCell.classList.add(isCorrect ? 'correct' : 'incorrect');
+                            }
+                        }
+                    }
+
+                    if (isCorrect) {
+                        score++;
+                    } else {
+                        if (questionContainer){
+                            const correctOptionEl = questionContainer.querySelector(`input[name="q${i}"][value="${correctAnswerText}"]`);
+                            if (correctOptionEl) {
+                                const correctLabel = correctOptionEl.closest('.tf-option, .multi-choice-option');
+                                if (correctLabel) {
+                                    correctLabel.classList.add('correct-answer-highlight');
+                                }
+                            }
+                        }
+                    }
+                }
+                // Handle clickable-cell matrix questions (generic for any i that has clickable cells)
+                else if (document.querySelector(`.clickable-cell[data-question="${i}"]`)) {
+                    console.log(`🔍 Checking clickable cell question ${i}`);
+                    const selectedCell = document.querySelector(`.clickable-cell[data-question="${i}"][data-selected="true"]`);
+                    console.log(`📍 Selected cell for question ${i}:`, selectedCell);
+                    console.log(`📍 Correct answer for question ${i}:`, correctAnswer);
+                    
+                    if (selectedCell) {
+                        userAnswer = selectedCell.dataset.answer;
+                        userAnswerDisplay = userAnswer;
+                        isCorrect = userAnswer === correctAnswer;
+                        
+                        console.log(`✅ User answer for question ${i}: "${userAnswer}", Correct: "${correctAnswer}", IsCorrect: ${isCorrect}`);
+                        
+                        selectedCell.classList.add(isCorrect ? 'correct' : 'incorrect');
+                        
+                        if (isCorrect) {
+                            score++;
+                            console.log(`🎉 Question ${i} is correct! Score: ${score}`);
+                        } else {
+                            console.log(`❌ Question ${i} is incorrect. Expected: "${correctAnswer}", Got: "${userAnswer}"`);
+                        }
+                    } else {
+                        console.log(`⚠️ No answer provided for question ${i}`);
+                        userAnswerDisplay = 'Not Answered';
+                    }
+                    
+                    // Handle highlighting correct answers for incorrect responses
+                    if (!isCorrect) {
+                        const correctCell = document.querySelector(`.clickable-cell[data-question="${i}"][data-value="${correctAnswerText}"]`);
+                        if (correctCell) {
+                            correctCell.classList.add('correct-answer-highlight');
+                            console.log(`✅ Highlighted correct answer for question ${i}:`, correctCell);
+                        } else {
+                            console.log(`⚠️ Could not find correct cell for question ${i} with value "${correctAnswerText}"`);
+                        }
+                    }
+                }
+                // Handle text input questions (33-39)
+                else if (i >= 33 && i <= 39) {
+                    console.log(`🔍 Checking text input question ${i}`);
+                    const textInput = document.getElementById(`q${i}`);
+                    
+                    if (textInput) {
+                        userAnswer = textInput.value.trim().toLowerCase();
+                        userAnswerDisplay = userAnswer || 'Not Answered';
+                        
+                        // Handle special case for question 33 which has two answers
+                        if (i === 33) {
+                            const answers = userAnswer.split('&').map(ans => ans.trim());
+                            isCorrect = answers.includes('breathing') && answers.includes('eating');
+                        } else {
+                            isCorrect = userAnswer === correctAnswer.toLowerCase();
+                        }
+                        
+                        console.log(`✅ User answer for question ${i}: "${userAnswer}", Correct: "${correctAnswer}", IsCorrect: ${isCorrect}`);
+                        
+                        if (isCorrect) {
+                            score++;
+                            textInput.classList.add('correct');
+                            console.log(`🎉 Question ${i} is correct! Score: ${score}`);
+                        } else {
+                            textInput.classList.add('incorrect');
+                            console.log(`❌ Question ${i} is incorrect. Expected: "${correctAnswer}", Got: "${userAnswer}"`);
+                        }
+                    } else {
+                        console.log(`⚠️ No answer provided for question ${i}`);
+                        userAnswerDisplay = 'Not Answered';
+                    }
+                }
+                // Handle question 40 (multiple choice)
+                else if (i === 40) {
+                    console.log(`🔍 Checking multiple choice question ${i}`);
+                    const checkedRadio = document.querySelector(`input[name="q${i}"]:checked`);
+                    
+                    if (checkedRadio) {
+                        userAnswer = checkedRadio.value;
+                        userAnswerDisplay = userAnswer;
+                        isCorrect = userAnswer === correctAnswer;
+                        
+                        console.log(`✅ User answer for question ${i}: "${userAnswer}", Correct: "${correctAnswer}", IsCorrect: ${isCorrect}`);
+                        
+                        const userLabel = checkedRadio.closest('.multi-choice-option');
+                        if (userLabel) {
+                            userLabel.classList.add(isCorrect ? 'correct' : 'incorrect');
+                        }
+                        
+                        if (isCorrect) {
+                            score++;
+                            console.log(`🎉 Question ${i} is correct! Score: ${score}`);
+                        } else {
+                            console.log(`❌ Question ${i} is incorrect. Expected: "${correctAnswer}", Got: "${userAnswer}"`);
+                            
+                            // Highlight correct answer
+                            const correctOptionEl = document.querySelector(`input[name="q${i}"][value="${correctAnswer}"]`);
+                            if (correctOptionEl) {
+                                const correctLabel = correctOptionEl.closest('.multi-choice-option');
+                                if (correctLabel) {
+                                    correctLabel.classList.add('correct-answer-highlight');
+                                }
+                            }
+                        }
+                    } else {
+                        console.log(`⚠️ No answer provided for question ${i}`);
+                        userAnswerDisplay = 'Not Answered';
+                    }
+                }
+                // Handle Checkbox Inputs (Multiple choice questions like 24-26)
+
+                 
+                // For showing results in the modal
+                 const resultRow = `
+                    <div class="result-row ${isCorrect ? '' : 'incorrect'}">
+                        <span class="q-num">${i}</span>
+                        <span class="user-ans">${userAnswerDisplay}</span>
+                        <span class="correct-ans">${correctAnswerText}</span>
+                    </div>`;
+                resultsDetailsContainer.innerHTML += resultRow;
+                
+                // Update nav button color
+                const navButton = document.querySelector(`.subQuestion[onclick="goToQuestion(${i})"]`);
+                if (navButton) {
+                    navButton.classList.remove('answered', 'active');
+                    navButton.classList.add(isCorrect ? 'correct' : 'incorrect');
+                }
+            }
+
+            document.getElementById('results-score').textContent = score;
+            document.getElementById('results-band').textContent = calculateBandScore(score);
+            document.body.classList.add('results-mode');
+            document.getElementById('results-modal').classList.remove('hidden');
+            
+            // Change button to "My Result" with green styling
+            deliverButton.innerHTML = `<span>My Result</span>`;
+            deliverButton.style.backgroundColor = '#4CAF50';
+            deliverButton.style.color = 'white';
+            deliverButton.style.borderColor = '#4CAF50';
+            deliverButton.disabled = false;
+            deliverButton.style.cursor = 'pointer';
+            deliverButton.removeEventListener('click', checkAnswers);
+            deliverButton.addEventListener('click', showResultsModal);
+            
+            // Highlight correct answers in the passage
+            highlightCorrectAnswersInPassage();
+        }
+
+        function calculateBandScore(score) {
+            if (score >= 39) return '9.0';
+            const mapping = {
+                40: 9.0, 39: 9.0, 38: 8.5, 37: 8.5, 36: 8.0, 35: 8.0, 34: 7.5,
+                33: 7.5, 32: 7.0, 31: 7.0, 30: 7.0, 29: 6.5, 28: 6.5, 27: 6.5,
+                26: 6.0, 25: 6.0, 24: 6.0, 23: 5.5, 22: 5.5, 21: 5.5, 20: 5.5,
+                19: 5.0, 18: 5.0, 17: 5.0, 16: 5.0, 15: 5.0, 14: 4.5, 13: 4.5,
+                12: 4.0, 11: 4.0, 10: 4.0, 9: 3.5, 8: 3.5, 7: 3.0, 6: 3.0,
+                5: 2.5, 4: 2.5
+            };
+            if (score <= 0) return 0.0;
+            if (score === 1) return 1.0;
+            if (score <= 3) return 2.0;
+            if (score <= 5) return 2.5;
+            return mapping[score] || 0.0;
+        }
+
+        function highlightCorrectAnswersInPassage() {
+            // Define the text passages and their corresponding question numbers for Part 1
+            const part1Highlights = [
+                { question: 1, text: "she discovered that chimp and human baby laughter follow broadly the same pattern", answer: "B" },
+                { question: 2, text: "the most compelling evidence for laughter beyond primates comes from research done by Jaak Panksepp", answer: "D" },
+                { question: 3, text: "laughter in response to tickling is a way for two individuals to signal and test their trust in one another", answer: "A" },
+                { question: 4, text: "Provine found that most laughter comes as a polite reaction to everyday remarks such as 'see you later', rather than anything particularly funny", answer: "C" },
+                { question: 5, text: "Humans and chimps share a common ancestor that lived perhaps 8 million years ago, but animals might have been laughing long before that", answer: "B" },
+                { question: 6, text: "Laughter evolved as a signal to others – it almost disappears when we are alone", answer: "C" },
+                { question: 7, text: "To find the origins of laughter, Provine believes we need to look at the play", answer: "I" },
+                { question: 8, text: "chimp and human baby laughter follow broadly the same pattern", answer: "C" },
+                { question: 9, text: "More distantly related primates, including gorillas, laugh", answer: "G" },
+                { question: 10, text: "laughter is a way for two individuals to signal and test their trust in one another", answer: "E" },
+                { question: 11, text: "Men tend to laugh longer and harder when they are with other men", answer: "NOT GIVEN" },
+                { question: 12, text: "While other animals pant, we alone can control our breath well enough to produce the sound of laughter", answer: "TRUE" },
+                { question: 13, text: "chimps laugh while at play", answer: "NOT GIVEN" }
+            ];
+
+            // Define the text passages and their corresponding question numbers for Part 2
+            const part2Highlights = [
+                { question: 14, text: "the other groups, known as the lower attines", answer: "B" },
+                { question: 15, text: "allows them to eat the otherwise poisoned harvest leaves are laden with terpenoids, alkaloids", answer: "A" },
+                { question: 16, text: "The leaf-cutters fungus was indeed descended from a single strain, propagated clonally", answer: "A" },
+                { question: 17, text: "isolated a species of Streptomyces bacterium potent poisoner of Escovopsis", answer: "C" },
+                { question: 18, text: "the lower attines feed their gardens with detritus like dead leaves, insects and faeces", answer: "B" },
+                { question: 19, text: "Textbooks describe how leaf-cutter ants scrupulously weed their gardens of all foreign organisms", answer: "A" },
+                { question: 20, text: "Escovopsis turns out to be a highly virulent pathogen that can devastate a fungus garden in a couple of days", answer: "F" },
+                { question: 21, text: "The pure strain resembled the monocultures of various human crops Monocultures are sitting ducks for parasites", answer: "H" },
+                { question: 22, text: "The leaf-cutters use fresh vegetation; the lower attines feed their gardens with detritus", answer: "C" },
+                { question: 23, text: "some Alexander Fleming of an ant discovered antibiotics millions of years before people did", answer: "J" },
+                { question: 24, text: "There is now a possible reason to explain why the lower attine species keep changing the variety of fungus", answer: "G" },
+                { question: 25, text: "But after three years of sifting through attine ant gardens, Mr Currie discovered they are far from free of infection", answer: "A" },
+                { question: 26, text: "isolated a species of Streptomyces bacterium the source of half the antibiotics used in medicine", answer: "C" }
+            ];
+
+            // Define the text passages and their corresponding question numbers for Part 3
+            const part3Highlights = [
+                { question: 27, text: "did not bode well", answer: "TRUE" },
+                { question: 28, text: "brought together scientists from across the world", answer: "NOT GIVEN" },
+                { question: 29, text: "In short, their message was: no risk, no gain", answer: "FALSE" },
+                { question: 30, text: "innately risky at their inception", answer: "NOT GIVEN" },
+                { question: 31, text: "Of course antibiotics were a priority. Of course, the risks", answer: "TRUE" },
+                { question: 32, text: "would have passed muster", answer: "NOT GIVEN" },
+                { question: 33, text: "A crucial issue is the consumer's choice", answer: "consumer's choice" },
+                { question: 34, text: "considered alongside considerations of risk and benefit", answer: "risk and benefit" },
+                { question: 35, text: "skiing is more dangerous than genetically modified tomatoes", answer: "Skiing" },
+                { question: 36, text: "Promoters of GM crops believe", answer: "GM crops" },
+                { question: 37, text: "The crops that really matter are wheat and rice", answer: "wheat and rice" },
+                { question: 38, text: "make production cheaper and hence more profitable", answer: "production" },
+                { question: 39, text: "continue to mistrust science", answer: "mistrust" },
+                { question: 40, text: "On such evidence as this, these doubts are fully justified", answer: "A" }
+            ];
+
+            // Function to apply highlights to a passage
+            function applyHighlights(passageElement, highlights) {
+                if (!passageElement) return;
+
+                // Clear any existing highlights
+                passageElement.querySelectorAll('.answer-highlight').forEach(el => {
+                    const parent = el.parentNode;
+                    parent.replaceChild(document.createTextNode(el.textContent), el);
+                    parent.normalize();
+                });
+
+                // Add highlights for each answer
+                highlights.forEach(item => {
+                    const paragraphs = passageElement.querySelectorAll('p');
+                    paragraphs.forEach(paragraph => {
+                        const html = paragraph.innerHTML;
+                        if (!html || typeof html !== 'string') return;
+                        if (html.includes(item.text)) {
+                            const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            const re = new RegExp(escapeRegExp(item.text));
+                            const replaced = html.replace(
+                                re,
+                                `<span class="answer-highlight" data-question="${item.question}" style="
+                                    background-color: #ffeb3b;
+                                    padding: 2px 4px;
+                                    border-radius: 3px;
+                                    font-weight: bold;
+                                    position: relative;
+                                ">${item.text}<span style="
+                                    position: absolute;
+                                    top: -8px;
+                                    right: -8px;
+                                    background-color: #2196f3;
+                                    color: white;
+                                    border-radius: 50%;
+                                    width: 20px;
+                                    height: 20px;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    font-size: 12px;
+                                    font-weight: bold;
+                                ">${item.question}</span></span>`
+                            );
+                            paragraph.innerHTML = replaced;
+                        }
+                    });
+                });
+            }
+
+            // Apply highlights to Part 1 (The Green Revolution in China)
+            const passageText1 = document.getElementById('passage-text-1');
+            applyHighlights(passageText1, part1Highlights);
+
+            // Apply highlights to Part 2 (Reclaiming the Night)
+            const passageText2 = document.getElementById('passage-text-2');
+            applyHighlights(passageText2, part2Highlights);
+
+            // Apply highlights to Part 3 (Paper or Computer?)
+            const passageText3 = document.getElementById('passage-text-3');
+            applyHighlights(passageText3, part3Highlights);
+        }
+
+        function getUserAnswer(qNum) {
+            const textInput = document.getElementById(`q${qNum}`);
+            const radioInput = document.querySelector(`input[name="q${qNum}"]:checked`);
+            const dropZone = document.querySelector(`.drop-zone[data-q-start="${qNum}"]`);
+
+            if (textInput) { // Handles <input type="text"> and <select>
+                return { value: textInput.value, text: textInput.value || 'N/A' };
+            }
+            if (radioInput) {
+                return { value: radioInput.value, text: radioInput.value };
+            }
+            if (dropZone) {
+                const droppedItem = dropZone.querySelector('.drag-item');
+                return { 
+                    value: droppedItem ? droppedItem.dataset.value : null, 
+                    text: droppedItem ? droppedItem.textContent.trim() : 'N/A' 
+                };
+            }
+            // Handle clickable cells for questions 23-26
+            if (qNum >= 23 && qNum <= 26) {
+                const selectedCell = document.querySelector(`.clickable-cell[data-question="${qNum}"][data-selected="true"]`);
+                if (selectedCell) {
+                    return { value: selectedCell.dataset.answer, text: selectedCell.dataset.answer };
+                }
+            }
+            return { value: null, text: 'N/A' };
+        }
+
+        function displayCorrectAnswer(qNum, correctAnswer) {
+            // Handle multi-choice group questions (e.g., 24-26, 38-40)
+            // No special checkbox groups used; fall through
+
+            // Handle radio button questions by highlighting the correct label
+            const correctRadioInput = document.querySelector(`input[name="q${qNum}"][value="${correctAnswer}"]`);
+            if (correctRadioInput) {
+                const parentOption = correctRadioInput.closest('.tf-option, .multi-choice-option');
+                if (parentOption) {
+                    parentOption.classList.add('correct-answer-highlight');
+                    return;
+                }
+            }
+
+            // Handle text inputs, select dropdowns, and others by showing the answer next to them
+            const inputEl = document.getElementById(`q${qNum}`);
+            if (inputEl) {
+                const displaySpan = document.createElement('span');
+                displaySpan.className = 'correct-answer-display';
+                displaySpan.textContent = ` ✓ ${correctAnswer}`;
+                inputEl.insertAdjacentElement('afterend', displaySpan);
+                return; // Done
+            }
+            
+            // Fallback for questions identified by a container (e.g., some T/F/NG questions)
+            const element = findQuestionElement(qNum);
+            if (element) {
+                const displaySpan = document.createElement('span');
+                displaySpan.className = 'correct-answer-display';
+                displaySpan.textContent = ` ✓ ${correctAnswer}`;
+                const itemContainer = element.querySelector('.tf-question-text');
+                if (itemContainer) {
+                     itemContainer.appendChild(displaySpan);
+                } else {
+                     element.appendChild(displaySpan);
+                }
+            }
+        }
+        
+        function findQuestionElement(qNum) {
+             return document.querySelector(`[data-q-start="${qNum}"]`);
+        }
+
+        function addResultToModal(qNum, userAnswer, correctAnswer, isCorrect) {
+            const resultsDetails = document.getElementById('results-details');
+            const row = document.createElement('div');
+            row.className = 'result-row';
+            if (!isCorrect) {
+                row.classList.add('incorrect');
+            }
+            row.innerHTML = `
+                <span class="q-num">${qNum}</span>
+                <span class="user-ans">${userAnswer}</span>
+                <span class="correct-ans">${correctAnswer}</span>
+            `;
+            resultsDetails.appendChild(row);
+        }
+
+        function showResultsModal() {
+            document.getElementById('results-modal').classList.remove('hidden');
+        }
+
+        window.closeResultsModal = function() {
+            document.getElementById('results-modal').classList.add('hidden');
+            document.body.classList.remove('results-mode');
+        }
+        
+        function disableInputs() {
+            deliverButton.innerHTML = `<span>Checked! View Results.</span>`;
+            deliverButton.removeEventListener('click', checkAnswers);
+            deliverButton.onclick = showResultsModal;
+
+            document.querySelectorAll('input, select').forEach(el => {
+                el.disabled = true;
+                 if (el.matches('input[type=radio], input[type=checkbox]')) {
+                     el.style.cursor = 'not-allowed';
+                     el.parentElement.style.cursor = 'not-allowed';
+                 }
+            });
+            document.querySelectorAll('.drag-item').forEach(el => {
+                el.setAttribute('draggable', 'false');
+                el.style.cursor = 'default';
+            });
+            document.querySelectorAll('.drop-zone').forEach(el => {
+                el.classList.add('disabled');
+            });
+        }
+
+        function checkValue(userValue, correctValue) {
+            if (userValue === null || userValue === undefined) return false;
+            const formattedUserValue = userValue.trim().toLowerCase();
+            if (Array.isArray(correctValue)) {
+                return correctValue.map(v => v.toLowerCase()).includes(formattedUserValue);
+            } else {
+                return formattedUserValue === String(correctValue).toLowerCase();
+            }
+        }
+
+        function markQuestion(qNum, isCorrect) {
+            const subQuestionBtn = document.querySelector(`.subQuestion[onclick="goToQuestion(${qNum})"]`);
+            subQuestionBtn?.classList.add(isCorrect ? 'correct' : 'incorrect');
+
+            const elementsToMark = [
+                document.querySelector(`.tf-question[data-q-start="${qNum}"]`),
+                document.querySelector(`.multi-choice-question[data-q-start="${qNum}"]`),
+                document.querySelector(`.matching-question-item[data-q-start="${qNum}"]`),
+                document.querySelector(`.drop-zone[data-q-start="${qNum}"]`),
+                document.getElementById(`q${qNum}`),
+                document.querySelector(`input[name="q${qNum}"]:checked`)?.closest('.tf-option'),
+                document.querySelector(`input[name="q${qNum}"]:checked`)?.closest('.multi-choice-option')
+            ];
+            
+            elementsToMark.forEach(el => {
+                if (el) el.classList.add(isCorrect ? 'correct' : 'incorrect');
+            });
+
+             if (qNum === 14 || qNum === 15) {
+                const multiChoiceContainer = document.querySelector('.multi-choice-question[data-q-start="14"]');
+                if (multiChoiceContainer) multiChoiceContainer.classList.add(isCorrect ? 'correct' : 'incorrect');
+             } else if (qNum >= 1 && qNum <= 5) {
+                const pMatchInput = document.getElementById(`q${qNum}`);
+                if (pMatchInput) pMatchInput.classList.add(isCorrect ? 'correct' : 'incorrect');
+            }
+        }
+
+        function switchToPart(partNumber) {
+            console.log(`🔀 switchToPart called with partNumber: ${partNumber}, currentPassage: ${currentPassage}`);
+            
+            currentPassage = partNumber;
+
+            // Hide all passages and questions
+            document.querySelectorAll('.reading-passage, .question-set, .part-header').forEach(el => {
+                el.classList.add('hidden');
+            });
+
+            // Show the correct passage, questions, and header
+            document.getElementById(`passage-text-${partNumber}`).classList.remove('hidden');
+            document.getElementById(`questions-${partNumber}`).classList.remove('hidden');
+            document.getElementById(`part-header-${partNumber}`).classList.remove('hidden');
+
+            // Update bottom navigation 'selected' state
+            document.querySelectorAll('.footer__questionWrapper___1tZ46').forEach((wrapper, index) => {
+                wrapper.classList.toggle('selected', (index + 1) === partNumber);
+            });
+
+            // Show/hide explanation buttons based on part
+            const explanationButton = document.getElementById('show-explanation-btn');
+            const explanationButtonPart3 = document.getElementById('show-explanation-btn-part3');
+            
+            if (explanationButton) {
+                if (partNumber === 2) {
+                    explanationButton.style.display = 'block';
+                } else {
+                    explanationButton.style.display = 'none';
+                    // Hide explanation section when switching away from part 2
+                    const explanationSection = document.getElementById('part-2-explanation');
+                    if (explanationSection) {
+                        explanationSection.classList.add('hidden');
+                        explanationButton.textContent = 'Show Explanation';
+                        explanationButton.style.backgroundColor = '#4a90e2';
+                    }
+                }
+            }
+            
+            if (explanationButtonPart3) {
+                if (partNumber === 3) {
+                    explanationButtonPart3.style.display = 'block';
+                } else {
+                    explanationButtonPart3.style.display = 'none';
+                    // Hide explanation section when switching away from part 3
+                    const explanationSection = document.getElementById('part-3-explanation');
+                    if (explanationSection) {
+                        explanationSection.classList.add('hidden');
+                        explanationButtonPart3.textContent = 'Show Explanation';
+                        explanationButtonPart3.style.backgroundColor = '#4a90e2';
+                    }
+                }
+            }
+
+            console.log(`✅ switchToPart completed - switched to part ${partNumber}`);
+            
+            // Only go to first question when switching parts, not when staying in same part
+            // This allows goToQuestion to work properly for specific question navigation
+            // const firstQuestionOfPart = {1: 1, 2: 14, 3: 27}[partNumber];
+            // goToQuestion(firstQuestionOfPart);
+        }
+        
+        function goToQuestion(questionNumber) {
+            console.log(`🎯 goToQuestion called with questionNumber: ${questionNumber}, currentQuestion: ${currentQuestion}, currentPassage: ${currentPassage}`);
+            
+            currentQuestion = questionNumber;
+
+            let passageNumber = 1;
+            if (questionNumber >= 14 && questionNumber <= 26) passageNumber = 2;
+            else if (questionNumber >= 27) passageNumber = 3;
+            
+            console.log(`📍 Calculated passageNumber: ${passageNumber} for question ${questionNumber}`);
+            
+            if (currentPassage !== passageNumber) {
+                console.log(`🔄 Switching from part ${currentPassage} to part ${passageNumber} for question ${questionNumber}`);
+                switchToPart(passageNumber);
+                return; 
+            }
+
+            console.log(`✅ Staying in same part (${currentPassage}) for question ${questionNumber}`);
+
+            if (activeQuestionElement) {
+                // Remove active style from previous block
+                activeQuestionElement.classList.remove('active-question', 'active-input');
+                // Also remove from the container block if we previously set it
+                const prevBlock = activeQuestionElement.closest('[data-q-start]');
+                if (prevBlock) prevBlock.classList.remove('active-question');
+            }
+
+            // First, try to find the specific input element for questions 33-36
+            let targetEl = document.getElementById(`q${questionNumber}`);
+            if (targetEl) {
+                activeQuestionElement = targetEl;
+                console.log(`✅ Found specific input element:`, targetEl);
+                targetEl.classList.add('active-input');
+                scrollIntoViewIfNeeded(targetEl);
+            } else {
+                // Fall back to looking for question containers
+                targetEl = document.querySelector(`[data-q-start="${questionNumber}"]`);
+                console.log(`🔍 Looking for target element with data-q-start="${questionNumber}":`, targetEl);
+
+                if (targetEl) {
+                    activeQuestionElement = targetEl;
+                    console.log(`✅ Found target element:`, targetEl);
+                    
+                    if (targetEl.matches('input[type="text"]') || targetEl.matches('select')) {
+                        targetEl.classList.add('active-input');
+                        console.log(`📝 Added active-input class to input/select element`);
+                    } else {
+                        targetEl.classList.add('active-question');
+                        console.log(`📋 Added active-question class to question element`);
+                    }
+                    scrollIntoViewIfNeeded(targetEl);
+                } else {
+                    console.log(`⚠️ Target element not found, looking for paragraph matching question`);
+                    const pMatch = document.querySelector(`.paragraph-matching-question select[id="q${questionNumber}"]`);
+                    if(pMatch) {
+                        activeQuestionElement = pMatch;
+                        pMatch.classList.add('active-input');
+                        scrollIntoViewIfNeeded(pMatch);
+                        console.log(`✅ Found paragraph matching question:`, pMatch);
+                    } else {
+                        console.log(`❌ No target element found for question ${questionNumber}`);
+                    }
+                }
+            }
+
+            updateNavigation();
+            console.log(`✅ goToQuestion completed for question ${questionNumber}`);
+        }
+        
+        // --- UI & NAVIGATION ---
+
+        function updateNavigation() {
+            console.log(`🔄 updateNavigation called for currentQuestion: ${currentQuestion}`);
+            
+            const navButtons = document.querySelectorAll('.subQuestion');
+            navButtons.forEach(btn => btn.classList.remove('active'));
+            const activeNav = document.querySelector(`.subQuestion[onclick="goToQuestion(${currentQuestion})"]`);
+            if (activeNav) {
+                activeNav.classList.add('active');
+                console.log(`✅ Updated navigation - active nav button:`, activeNav);
+            } else {
+                console.log(`⚠️ No active navigation button found for question ${currentQuestion}`);
+            }
+
+            const inputs = document.querySelectorAll('.answer-input, .drop-zone.filled, .summary-drop-zone.filled');
+            inputs.forEach(input => input.classList.remove('active-input'));
+            
+            const activeInput = document.getElementById(`q${currentQuestion}`);
+            if (activeInput) {
+                activeInput.classList.add('active-input');
+                if (typeof activeInput.focus === 'function') {
+                    activeInput.focus();
+                }
+                console.log(`✅ Focused on input element:`, activeInput);
+            } else {
+                console.log(`⚠️ No direct input found for question ${currentQuestion}, looking in question block`);
+                // Prefer the specific question element for styling (TF/MCQ), fallback to any data-q-start container
+                let activeQuestionBlock = document.querySelector(`.tf-question[data-q-start="${currentQuestion}"]`) 
+                    || document.querySelector(`.multi-choice-question[data-q-start="${currentQuestion}"]`) 
+                    || document.querySelector(`[data-q-start="${currentQuestion}"]`);
+                if (activeQuestionBlock) {
+                    // Add active-question class to style number badge
+                    activeQuestionBlock.classList.add('active-question');
+                    const firstInput = activeQuestionBlock.querySelector('input, select');
+                    if(firstInput) {
+                        firstInput.classList.add('active-input');
+                         if (typeof firstInput.focus === 'function') {
+                            firstInput.focus();
+                        }
+                        console.log(`✅ Focused on input in question block:`, firstInput);
+                    } else {
+                        console.log(`⚠️ No input found in question block for question ${currentQuestion}`);
+                    }
+                } else {
+                    console.log(`❌ No question block found for question ${currentQuestion}`);
+                }
+            }
+            
+            console.log(`✅ updateNavigation completed`);
+        }
+        
+        function selectDragItem(item) {
+            if (selectedDragItem) {
+                selectedDragItem.classList.remove('selected');
+            }
+            selectedDragItem = item;
+            if (selectedDragItem) {
+                selectedDragItem.classList.add('selected');
+            }
+        }
+        
+        window.nextQuestion = () => currentQuestion < 40 && goToQuestion(currentQuestion + 1);
+        window.previousQuestion = () => currentQuestion > 1 && goToQuestion(currentQuestion - 1);
+
+        function updateAllIndicators() {
+            updateAttemptedCount(1, 1, 13);
+            updateAttemptedCount(2, 14, 26);
+            updateAttemptedCount(3, 27, 40);
+            updateAnsweredNav();
+        }
+        
+        function updateAnsweredNav() {
+            const navButtons = document.querySelectorAll('.subQuestion');
+            navButtons.forEach(btn => {
+                const qNum = parseInt(btn.textContent, 10);
+                if (isQuestionAnswered(qNum)) {
+                    btn.classList.add('answered');
+                } else {
+                    btn.classList.remove('answered');
+                }
+            });
+        }
+        
+        function isQuestionAnswered(qNum) {
+            const textInput = document.getElementById(`q${qNum}`);
+            if (textInput && (textInput.value.trim() !== '' || (textInput.classList.contains('drop-zone') && textInput.children.length > 0))) {
+                return true;
+            }
+            const radio = document.querySelector(`input[name="q${qNum}"]:checked`);
+            if (radio) {
+                return true;
+            }
+            const checkbox = document.querySelector(`input[name="q${qNum}"]:checked`);
+            if (checkbox) {
+                return true;
+            }
+            // Handle drag & drop questions (e.g., 20-23)
+            const dz = document.querySelector(`.drop-zone[data-q-start="${qNum}"]`);
+            if (dz && dz.querySelector('.drag-item')) {
+                return true;
+            }
+            // Handle clickable-cell matrix questions (any question using clickable cells)
+                const selectedCell = document.querySelector(`.clickable-cell[data-question="${qNum}"][data-selected="true"]`);
+                if (selectedCell) {
+                    return true;
+            }
+            return false;
+        }
+
+        function scrollIntoViewIfNeeded(element) {
+            const panel = element.closest('.questions-panel, .passage-panel');
+            const panelRect = panel.getBoundingClientRect();
+            const elementRect = element.getBoundingClientRect();
+            if (elementRect.top < panelRect.top || elementRect.bottom > panelRect.bottom) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+        
+        // --- DRAG AND DROP ---
+        
+        function initializeDragAndDrop() {
+            document.querySelectorAll('.drag-item').forEach(item => {
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragend', handleDragEnd);
+                item.addEventListener('click', () => selectDragItem(item));
+            });
+            document.querySelectorAll('.drop-zone, .drag-options-container').forEach(zone => {
+                zone.addEventListener('dragover', handleDragOver);
+                zone.addEventListener('dragleave', handleDragLeave);
+                zone.addEventListener('drop', handleDrop);
+            });
+        }
+
+        function handleDragStart(e) {
+            draggedItem = e.target;
+            setTimeout(() => e.target.classList.add('dragging'), 0);
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+            draggedItem = null;
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            const targetZone = e.currentTarget;
+            if (draggedItem && draggedItem.dataset.dndGroup === targetZone.dataset.dndGroup) {
+                targetZone.classList.add('drag-over');
+            }
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const targetZone = e.currentTarget;
+            targetZone.classList.remove('drag-over');
+
+            if (!draggedItem || draggedItem.dataset.dndGroup !== targetZone.dataset.dndGroup) {
+                return;
+            }
+
+            const sourceZone = draggedItem.parentElement;
+            if (sourceZone === targetZone) return; // Prevent dropping on itself
+
+            const existingItemInTarget = targetZone.classList.contains('drop-zone') 
+                ? targetZone.querySelector('.drag-item') 
+                : null;
+
+            // First, clear the target drop-zone of any text (like question numbers) before adding the new item.
+            if (targetZone.classList.contains('drop-zone')) {
+                Array.from(targetZone.childNodes).forEach(node => {
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        node.remove();
+                    }
+                });
+            }
+
+            // Move the item that was in the target (if any) to the source zone.
+            if (existingItemInTarget) {
+                sourceZone.appendChild(existingItemInTarget);
+            }
+            
+            // Finally, move the dragged item to the target zone.
+            targetZone.appendChild(draggedItem);
+            targetZone.classList.add('filled');
+            // Lock the pill-like appearance for items dropped into zones
+            if (draggedItem) {
+                draggedItem.style.cursor = 'default';
+            }
+            // Hide placeholder text (question number) once filled
+            if (targetZone.textContent && /^\d+$/.test(targetZone.textContent.trim())) {
+                targetZone.textContent = '';
+            }
+
+            // After the move, clean up the source zone if it's a drop-zone and is now empty.
+            if (sourceZone.classList.contains('drop-zone') && !sourceZone.querySelector('.drag-item')) {
+                 sourceZone.classList.remove('filled');
+                 const qNum = sourceZone.dataset.qStart;
+                 sourceZone.innerText = qNum; // Restore the question number
+            }
+            
+            updateAllIndicators();
+        }
+        
+        // --- MISC HELPERS ---
+        
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval); // Ensure no multiple intervals
+            timerInterval = setInterval(() => {
+                timeInSeconds--;
+                const minutes = Math.floor(timeInSeconds / 60);
+                const seconds = timeInSeconds % 60;
+                timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                if (timeInSeconds <= 0) {
+                    clearInterval(timerInterval);
+                    timerDisplay.textContent = "Time's up!";
+                    // checkAnswers(); // Disabled to prevent modal from opening automatically.
+                }
+            }, 1000);
+            timerToggleButton.innerHTML = pauseIcon;
+        }
+
+        function pauseTimer() {
+            clearInterval(timerInterval);
+            timerToggleButton.innerHTML = playIcon;
+        }
+
+        function toggleTimer() {
+            // Check based on the icon currently displayed
+            if (timerToggleButton.innerHTML.includes('M6 19h4V5H6v14z')) { // Check for pause icon shape
+                pauseTimer();
+            } else {
+                startTimer();
+            }
+        }
+
+        function resetTimer() {
+            timeInSeconds = 3600;
+            const minutes = Math.floor(timeInSeconds / 60);
+            const seconds = timeInSeconds % 60;
+            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            startTimer();
+            timerToggleButton.innerHTML = pauseIcon;
+        }
+        
+        function setupCheckboxLimits() {
+            const checkboxGroups = [
+                { name: 'q38-40', limit: 3 }
+            ];
+            checkboxGroups.forEach(group => {
+                const checkboxes = document.querySelectorAll(`input[name="${group.name}"]`);
+                checkboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', () => {
+                        const checkedCount = document.querySelectorAll(`input[name="${group.name}"]:checked`).length;
+                        if (checkedCount > group.limit) checkbox.checked = false;
+                        updateAllIndicators();
+                    });
+                });
+            });
+        }
+
+        function setupExampleHeading() {
+            const exampleBox = document.querySelector('.example-box');
+            if(exampleBox){
+                const title = document.createElement('p');
+                title.style.fontWeight = 'bold';
+                title.textContent = 'List of Statements';
+                // exampleBox.insertBefore(title, exampleBox.firstChild);
+            }
+        }
+        
+        function initResize(e) {
+            e.preventDefault();
+            const startX = e.clientX;
+            const startWidth = passagePanel.offsetWidth;
+            
+            const doDrag = (e) => {
+                const newWidth = startWidth + e.clientX - startX;
+                if (newWidth > 200 && (document.body.clientWidth - newWidth - resizer.offsetWidth) > 200) {
+                    passagePanel.style.flex = `0 0 ${newWidth}px`;
+                }
+            };
+            const stopDrag = () => {
+                window.removeEventListener('mousemove', doDrag, false);
+                window.removeEventListener('mouseup', stopDrag, false);
+            };
+            
+            window.addEventListener('mousemove', doDrag, false);
+            window.addEventListener('mouseup', stopDrag, false);
+        }
+        
+        // --- CONTEXT MENU (Highlighting) ---
+        
+        function initializeContextMenu() {
+            const panels = [passagePanel, questionsPanel];
+            let targetElementForClear = null;
+
+            // This listener simply tracks the last valid text selection in either panel.
+            document.addEventListener('selectionchange', () => {
+                const selection = window.getSelection();
+                if (selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
+                    const range = selection.getRangeAt(0);
+                    if (panels.some(panel => panel.contains(range.commonAncestorContainer))) {
+                        selectedRange = range;
+                        targetElementForClear = null; // New selection overrides clearing a specific element
+                    }
+                }
+            });
+
+            const showContextMenu = (e) => {
+                const target = e.target;
+                const isClickOnHighlight = target.closest('.highlight, .comment-highlight');
+                const isSelectionActive = selectedRange && selectedRange.toString().trim().length > 0;
+                
+                let showMenu = false;
+
+                if (isClickOnHighlight) {
+                    document.getElementById('menu-highlight').style.display = 'none';
+                    document.getElementById('menu-note').style.display = 'none';
+                    document.getElementById('menu-clear').style.display = 'block';
+                    document.getElementById('menu-clear-all').style.display = 'block';
+                    contextMenu.targetElementForClear = isClickOnHighlight;
+                    showMenu = true;
+                } else if (isSelectionActive && panels.some(panel => panel.contains(selectedRange.commonAncestorContainer))) {
+                    document.getElementById('menu-highlight').style.display = 'flex';
+                    document.getElementById('menu-note').style.display = 'flex';
+                    document.getElementById('menu-clear').style.display = 'none';
+                    document.getElementById('menu-clear-all').style.display = 'block'; // Always show clear all
+                    showMenu = true;
+                }
+
+                if (showMenu) {
+                    e.preventDefault();
+                    contextMenu.style.display = 'block';
+                    const menuHeight = contextMenu.offsetHeight;
+                    const menuWidth = contextMenu.offsetWidth;
+                    let left = e.pageX;
+                    let top = e.pageY;
+                    if (left + menuWidth > window.innerWidth) left = window.innerWidth - menuWidth - 5;
+                    if (top + menuHeight > window.innerHeight) top = e.pageY - menuHeight - 5;
+                    else top = e.pageY - menuHeight - 5;
+                    
+                    contextMenu.style.left = `${left}px`;
+                    contextMenu.style.top = `${top}px`;
+                }
+            };
+
+            panels.forEach(panel => {
+                panel.addEventListener('contextmenu', showContextMenu);
+            });
+
+            document.addEventListener('click', (e) => {
+                if (contextMenu.style.display === 'block' && !contextMenu.contains(e.target)) {
+                    closeContextMenu();
+                }
+            });
+        }
+
+        function closeContextMenu() {
+            contextMenu.style.display = 'none';
+            selectedRange = null; // Clear range after menu closes
+        }
+
+        function unwrapElement(element) {
+            const parent = element.parentNode;
+            if (!parent) return;
+            while (element.firstChild) {
+                parent.insertBefore(element.firstChild, element);
+            }
+            parent.removeChild(element);
+            parent.normalize();
+        }
+
+        window.highlightText = () => {
+            if (selectedRange && !selectedRange.collapsed) {
+                const span = document.createElement('span');
+                span.className = 'highlight';
+                span.appendChild(selectedRange.extractContents());
+                selectedRange.insertNode(span);
+            }
+            closeContextMenu();
+            window.getSelection().removeAllRanges();
+        };
+
+        window.addNote = () => {
+            const note = prompt('Enter your note:');
+            if (note && selectedRange && !selectedRange.collapsed) {
+                const span = document.createElement('span');
+                span.className = 'comment-highlight';
+                const tooltip = document.createElement('span');
+                tooltip.className = 'comment-tooltip';
+                tooltip.textContent = note;
+                span.appendChild(selectedRange.extractContents());
+                span.appendChild(tooltip);
+                selectedRange.insertNode(span);
+            }
+            closeContextMenu();
+            window.getSelection().removeAllRanges();
+        };
+
+        window.clearHighlight = () => {
+             const elementToClear = contextMenu.targetElementForClear;
+             if (elementToClear) {
+                 unwrapElement(elementToClear);
+             }
+             closeContextMenu();
+             window.getSelection().removeAllRanges();
+        };
+        
+        window.clearAllHighlights = () => {
+            document.querySelectorAll('.highlight, .comment-highlight').forEach(unwrapElement);
+            closeContextMenu();
+            window.getSelection().removeAllRanges();
+        };
+
+        function updateAttemptedCount(part, startQ, endQ) {
+            let answeredCount = 0;
+            for (let i = startQ; i <= endQ; i++) {
+                if (isQuestionAnswered(i)) {
+                    answeredCount++;
+                }
+            }
+            const partHeader = document.querySelector(`.footer__questionNo___3WNct[onclick="switchToPart(${part})"]`);
+            if (partHeader) {
+                const countSpan = partHeader.querySelector('.attemptedCount');
+                if (countSpan) {
+                     countSpan.textContent = `${answeredCount} of ${endQ - startQ + 1}`;
+                }
+            }
+        }
+
+        // --- GLOBAL FUNCTION EXPOSURE ---
+        window.nextQuestion = nextQuestion;
+        window.previousQuestion = previousQuestion;
+        window.goToQuestion = goToQuestion;
+        window.switchToPart = switchToPart;
+        window.closeResultsModal = closeResultsModal;
+        window.highlightText = highlightText;
+        window.addNote = addNote;
+        window.clearHighlight = clearHighlight;
+        window.clearAllHighlights = clearAllHighlights;
+        
+        // Explanation toggle function for Part 2
+        window.toggleExplanation = function() {
+            const explanationSection = document.getElementById('part-2-explanation');
+            const button = document.getElementById('show-explanation-btn');
+            
+            if (explanationSection.classList.contains('hidden')) {
+                explanationSection.classList.remove('hidden');
+                button.textContent = 'Hide Explanation';
+                button.style.backgroundColor = '#dc3545';
+            } else {
+                explanationSection.classList.add('hidden');
+                button.textContent = 'Show Explanation';
+                button.style.backgroundColor = '#4a90e2';
+            }
+        };
+        
+        // Explanation toggle function for Part 3
+        window.toggleExplanationPart3 = function() {
+            const explanationSection = document.getElementById('part-3-explanation');
+            const button = document.getElementById('show-explanation-btn-part3');
+            
+            if (explanationSection.classList.contains('hidden')) {
+                explanationSection.classList.remove('hidden');
+                button.textContent = 'Hide Explanation';
+                button.style.backgroundColor = '#dc3545';
+            } else {
+                explanationSection.classList.add('hidden');
+                button.textContent = 'Show Explanation';
+                button.style.backgroundColor = '#4a90e2';
+            }
+        };
+
+        // --- START THE APP ---
+        initialize();
+
+        // Add event listeners for table radio buttons
+        document.addEventListener('DOMContentLoaded', function() {
+            const tableRadios = document.querySelectorAll('.table-radio');
+            tableRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    // Remove background color from all cells in the same row
+                    const row = this.closest('tr');
+                    const cells = row.querySelectorAll('td:not(.statement)');
+                    cells.forEach(cell => {
+                        cell.style.backgroundColor = '';
+                    });
+                    
+                    // Add background color to the selected cell
+                    if (this.checked) {
+                        this.closest('td').style.backgroundColor = '#e3f2fd';
+                    }
+                    
+                    updateAllIndicators();
+                });
+            });
+            
+
+        });
+
+        // Global function for selecting cells
+        window.selectCell = function(cell, questionNum, value) {
+            console.log('selectCell called:', questionNum, value);
+            
+            // Remove selected class from all cells in the same row
+            const row = cell.closest('tr');
+            const cellsInRow = row.querySelectorAll('.clickable-cell');
+            cellsInRow.forEach(c => {
+                c.classList.remove('selected');
+                c.removeAttribute('data-selected');
+                c.removeAttribute('data-answer');
+            });
+            
+            // Add selected class to clicked cell
+            cell.classList.add('selected');
+            cell.setAttribute('data-selected', 'true');
+            cell.setAttribute('data-answer', value);
+            
+            console.log('Cell selected:', questionNum, value);
+            updateAllIndicators();
+        };
+
+
+
+        // Note: switchToPart function is defined earlier in the code
+        // This duplicate function has been removed to prevent conflicts
+    });
+    </script>
+</body>
+</html>

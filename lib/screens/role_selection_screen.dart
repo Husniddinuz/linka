@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/api_constants.dart';
+import '../services/app_feature_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/app_notify.dart';
 import 'auth_screen.dart';
+
+const _telegramBlue = Color(0xFF229ED9);
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -13,7 +19,7 @@ class RoleSelectionScreen extends StatefulWidget {
 class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
   String? _selectedRole;
 
-  void _continue() {
+  void _loginWithPhone() {
     if (_selectedRole == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -22,8 +28,29 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
     );
   }
 
+  Future<void> _loginWithTelegram() async {
+    final role = _selectedRole;
+    if (role == null) return;
+    // The bot asks for the phone via a "share contact" button, then replies
+    // with a https://linkaapp.uz/tg-login deep link back into the app.
+    final uri = Uri.parse('https://t.me/$telegramBotUsername?start=$role');
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      AppNotify.show(context, message: 'Could not open Telegram');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Rebuild when remote feature flags refresh (e.g. telegram_login toggled).
+    return ValueListenableBuilder<int>(
+      valueListenable: AppFeatureService.notifier,
+      builder: (context, _, _) => _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
+    final telegramLoginEnabled = AppFeatureService.isEnabled('telegram_login');
     return Scaffold(
       backgroundColor: context.colors.background,
       body: SafeArea(
@@ -83,10 +110,54 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
               ),
 
               const Spacer(),
+              if (telegramLoginEnabled) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed:
+                        _selectedRole != null ? _loginWithTelegram : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _telegramBlue,
+                      disabledBackgroundColor: context.colors.border,
+                      foregroundColor: Colors.white,
+                      disabledForegroundColor: context.colors.textTertiary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SvgPicture.asset(
+                          'assets/images/icons/telegram.svg',
+                          height: 22,
+                          colorFilter: ColorFilter.mode(
+                            _selectedRole != null
+                                ? Colors.white
+                                : context.colors.textTertiary,
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Login via Telegram',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _selectedRole != null ? _continue : null,
+                  onPressed: _selectedRole != null ? _loginWithPhone : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: context.colors.brand,
                     disabledBackgroundColor: context.colors.border,
@@ -98,12 +169,25 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                     ),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Continue',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.phone_rounded,
+                        size: 20,
+                        color: _selectedRole != null
+                            ? Colors.white
+                            : context.colors.textTertiary,
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Login via Phone number',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

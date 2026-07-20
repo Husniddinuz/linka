@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter/services.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../services/user_service.dart';
 import '../theme/app_colors.dart';
@@ -77,7 +78,7 @@ class _TutorScheduleScreenState extends State<TutorScheduleScreen> {
     }
   }
 
-  Future<void> _openAddSheet() async {
+  Future<void> _openAddSheet({int initialDay = 0}) async {
     if (_tutorId == null) return;
     final added = await showModalBottomSheet<bool>(
       context: context,
@@ -88,7 +89,7 @@ class _TutorScheduleScreenState extends State<TutorScheduleScreen> {
       ),
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: _AddSlotSheet(tutorId: _tutorId!),
+        child: _AddSlotSheet(tutorId: _tutorId!, initialDay: initialDay),
       ),
     );
     if (added == true) await _load();
@@ -103,57 +104,60 @@ class _TutorScheduleScreenState extends State<TutorScheduleScreen> {
     return map;
   }
 
+  String get _subtitle {
+    if (_loading) return 'Loading…';
+    if (_slots.isEmpty) return 'Set your weekly availability';
+    final days = _grouped.keys.length;
+    final total = _slots.fold<int>(0, (sum, s) {
+      final d = _SlotTime.of(s).durationMinutes;
+      return sum + (d ?? 0);
+    });
+    final hours = _fmtMinutes(total);
+    return hours == null
+        ? '${_slots.length} slot${_slots.length == 1 ? '' : 's'} · '
+            '$days day${days == 1 ? '' : 's'}'
+        : '$hours per week · $days day${days == 1 ? '' : 's'}';
+  }
+
+  static String? _fmtMinutes(int minutes) {
+    if (minutes <= 0) return null;
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    if (h == 0) return '${m}m';
+    if (m == 0) return '${h}h';
+    return '${h}h ${m}m';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.colors.surfaceAlt,
-      body: SafeArea(
-        child: Column(
+    final colors = context.colors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final canvas = isDark ? colors.background : colors.surfaceAlt;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: canvas,
+        floatingActionButton: (_loading || _error != null)
+            ? null
+            : FloatingActionButton.extended(
+                onPressed: () => _openAddSheet(
+                    initialDay: DateTime.now().weekday - 1),
+                backgroundColor: colors.brand,
+                foregroundColor: colors.onBrand,
+                elevation: 2,
+                icon: const Icon(Symbols.add_rounded, weight: 600),
+                label: const Text(
+                  'Add slot',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+        body: Column(
           children: [
-            _buildHeader(),
+            _Hero(subtitle: _subtitle),
             Expanded(child: _body()),
           ],
         ),
-      ),
-      floatingActionButton: (_loading || _error != null || _slots.isEmpty)
-          ? null
-          : FloatingActionButton(
-              onPressed: _openAddSheet,
-              backgroundColor: context.colors.brand,
-              foregroundColor: Colors.white,
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: const Icon(Icons.add_rounded, size: 28),
-            ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      color: context.colors.surface,
-      padding: const EdgeInsets.fromLTRB(8, 12, 16, 12),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Icon(Icons.chevron_left_rounded, size: 28, color: context.colors.textPrimary),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              'My Schedule',
-              style: TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: context.colors.textPrimary,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -161,24 +165,37 @@ class _TutorScheduleScreenState extends State<TutorScheduleScreen> {
   Widget _body() {
     if (_loading) return const _LoadingSkeleton();
     if (_error != null) return _ErrorState(message: _error!, onRetry: _init);
-    if (_slots.isEmpty) return _EmptyState(onAdd: _openAddSheet);
 
     final grouped = _grouped;
-    final sortedDays = grouped.keys.toList()..sort();
+    final today = DateTime.now().weekday - 1;
 
     return RefreshIndicator(
-      color: context.colors.textPrimary,
+      color: Colors.white,
+      backgroundColor: context.colors.brand,
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         children: [
-          for (final day in sortedDays) ...[
-            _DaySection(
-              dayName: _days[day.clamp(0, 6)],
-              slots: grouped[day]!,
-              onDelete: (id) => _deleteSlot(id),
+          if (_slots.isEmpty) ...[
+            const _FirstRunHint(),
+            const SizedBox(height: 14),
+          ],
+          for (int day = 0; day < 7; day++) ...[
+            _DayCard(
+              dayName: _days[day],
+              isToday: day == today,
+              slots: grouped[day] ?? const [],
+              totalLabel: _fmtMinutes(
+                (grouped[day] ?? const []).fold<int>(
+                  0,
+                  (sum, s) => sum + (_SlotTime.of(s).durationMinutes ?? 0),
+                ),
+              ),
+              onAdd: () => _openAddSheet(initialDay: day),
+              onDelete: _deleteSlot,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
           ],
         ],
       ),
@@ -186,85 +203,150 @@ class _TutorScheduleScreenState extends State<TutorScheduleScreen> {
   }
 }
 
-// ─── Day section ─────────────────────────────────────────────────────────────
+// ─── Hero header ────────────────────────────────────────────────────────────
 
-class _DaySection extends StatelessWidget {
-  final String dayName;
-  final List<Map<String, dynamic>> slots;
-  final void Function(int id) onDelete;
-
-  const _DaySection({
-    required this.dayName,
-    required this.slots,
-    required this.onDelete,
-  });
+class _Hero extends StatelessWidget {
+  final String subtitle;
+  const _Hero({required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              dayName,
-              style: TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: context.colors.textPrimary,
-                letterSpacing: 0.2,
+    final colors = context.colors;
+    final gradientEnd = Color.lerp(colors.brand, Colors.black, 0.35)!;
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [colors.brand, gradientEnd],
+        ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned(
+            right: -20,
+            bottom: -26,
+            child: Icon(
+              Symbols.calendar_month_rounded,
+              size: 110,
+              fill: 1,
+              color: Colors.white.withValues(alpha: 0.06),
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.14),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Symbols.arrow_back_ios_new_rounded,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'My schedule',
+                          style: TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              '· ${slots.length} slot${slots.length == 1 ? '' : 's'}',
-              style: TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 13,
-                fontWeight: FontWeight.w400,
-                color: context.colors.textTertiary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: context.colors.surface,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
           ),
-          child: Column(
-            children: [
-              for (int i = 0; i < slots.length; i++) ...[
-                _SlotRow(
-                  slot: slots[i],
-                  onDelete: () => onDelete((slots[i]['id'] as num).toInt()),
-                ),
-                if (i < slots.length - 1)
-                  Divider(height: 1, indent: 16, endIndent: 16, color: context.colors.border),
-              ],
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-// ─── Slot row ─────────────────────────────────────────────────────────────────
+// ─── First-run hint ─────────────────────────────────────────────────────────
 
-class _SlotRow extends StatelessWidget {
-  final Map<String, dynamic> slot;
-  final VoidCallback onDelete;
-  const _SlotRow({required this.slot, required this.onDelete});
+class _FirstRunHint extends StatelessWidget {
+  const _FirstRunHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.accentYellow.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colors.accentYellow.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Symbols.lightbulb_rounded,
+            size: 20,
+            fill: 1,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? colors.accentYellow
+                : const Color(0xFFB8860B),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Add your available windows so students know when to book you. '
+              'Tap + on any day to get started.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                fontWeight: FontWeight.w500,
+                color: colors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Slot time parsing ──────────────────────────────────────────────────────
+
+class _SlotTime {
+  final String from;
+  final String? until;
+  const _SlotTime(this.from, this.until);
 
   static String _trimSecs(String t) {
     final parts = t.split(':');
@@ -272,98 +354,255 @@ class _SlotRow extends StatelessWidget {
     return t;
   }
 
-  static (String from, String? until) _parse(String raw) {
+  factory _SlotTime.of(Map<String, dynamic> slot) {
+    final raw = slot['available_time'] as String? ?? '';
+    final rawEnd = slot['available_time_end'] as String?;
+    if (rawEnd != null && rawEnd.isNotEmpty) {
+      return _SlotTime(_trimSecs(raw), _trimSecs(rawEnd));
+    }
+    // Legacy rows encode "HH:MM-HH:MM" in a single field.
     final idx = raw.indexOf('-');
     if (idx > 0) {
-      return (_trimSecs(raw.substring(0, idx)), _trimSecs(raw.substring(idx + 1)));
+      return _SlotTime(
+        _trimSecs(raw.substring(0, idx)),
+        _trimSecs(raw.substring(idx + 1)),
+      );
     }
-    return (_trimSecs(raw), null);
+    return _SlotTime(_trimSecs(raw), null);
   }
+
+  static int? _toMinutes(String? t) {
+    if (t == null) return null;
+    final parts = t.split(':');
+    if (parts.length < 2) return null;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null) return null;
+    return h * 60 + m;
+  }
+
+  int? get durationMinutes {
+    final start = _toMinutes(from);
+    final end = _toMinutes(until);
+    if (start == null || end == null || end <= start) return null;
+    return end - start;
+  }
+
+  String? get durationLabel {
+    final d = durationMinutes;
+    if (d == null) return null;
+    final h = d ~/ 60;
+    final m = d % 60;
+    if (h == 0) return '${m}m';
+    if (m == 0) return '${h}h';
+    return '${h}h ${m}m';
+  }
+}
+
+// ─── Day card ───────────────────────────────────────────────────────────────
+
+class _DayCard extends StatelessWidget {
+  final String dayName;
+  final bool isToday;
+  final List<Map<String, dynamic>> slots;
+  final String? totalLabel;
+  final VoidCallback onAdd;
+  final void Function(int id) onDelete;
+
+  const _DayCard({
+    required this.dayName,
+    required this.isToday,
+    required this.slots,
+    required this.totalLabel,
+    required this.onAdd,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final raw = slot['available_time'] as String? ?? '';
-    final rawEnd = slot['available_time_end'] as String?;
-    final String from;
-    final String? until;
-    if (rawEnd != null && rawEnd.isNotEmpty) {
-      from = _trimSecs(raw);
-      until = _trimSecs(rawEnd);
-    } else {
-      final parsed = _parse(raw);
-      from = parsed.$1;
-      until = parsed.$2;
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      child: Row(
-        children: [
-          Icon(
-            Icons.access_time_rounded,
-            color: context.colors.textTertiary,
-            size: 18,
+    final colors = context.colors;
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.border),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        ],
+      ),
+      child: Column(
+        children: [
+          // Day header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Text(
-                      from,
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: context.colors.textPrimary,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Container(
-                        width: 20,
-                        height: 2,
-                        decoration: BoxDecoration(
-                          color: context.colors.textTertiary,
-                          borderRadius: BorderRadius.circular(1),
-                        ),
-                      ),
-                    ),
-                    Text(
-                      until ?? '—',
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: until != null ? context.colors.textPrimary : context.colors.textTertiary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
                 Text(
-                  'From  ·  Until',
+                  dayName,
                   style: TextStyle(
-                    fontFamily: 'SF Pro',
-                    fontSize: 11,
-                    color: context.colors.textTertiary,
-                    letterSpacing: 0.3,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                if (isToday) ...[
+                  const SizedBox(width: 7),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: colors.accentYellow,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: const Text(
+                      'TODAY',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        // Fixed navy for contrast on gold in both themes.
+                        color: Color(0xFF272942),
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                if (totalLabel != null) ...[
+                  Text(
+                    totalLabel!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: colors.textTertiary,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                GestureDetector(
+                  onTap: onAdd,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: colors.surfaceAlt,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Symbols.add_rounded,
+                      size: 18,
+                      weight: 600,
+                      color: colors.textPrimary,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
+
+          if (slots.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Not available',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colors.textTertiary,
+                  ),
+                ),
+              ),
+            )
+          else ...[
+            Divider(height: 1, color: colors.border),
+            for (int i = 0; i < slots.length; i++) ...[
+              _SlotRow(
+                slot: slots[i],
+                onDelete: () => onDelete((slots[i]['id'] as num).toInt()),
+              ),
+              if (i < slots.length - 1)
+                Divider(
+                    height: 1,
+                    indent: 14,
+                    endIndent: 14,
+                    color: colors.border),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Slot row ───────────────────────────────────────────────────────────────
+
+class _SlotRow extends StatelessWidget {
+  final Map<String, dynamic> slot;
+  final VoidCallback onDelete;
+  const _SlotRow({required this.slot, required this.onDelete});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final time = _SlotTime.of(slot);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      child: Row(
+        children: [
+          Icon(
+            Symbols.schedule_rounded,
+            color: colors.textTertiary,
+            size: 16,
+            opticalSize: 20,
+          ),
+          const SizedBox(width: 10),
+          Text(
+            time.until != null ? '${time.from} – ${time.until}' : time.from,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: colors.textPrimary,
+              letterSpacing: 0.2,
+            ),
+          ),
+          if (time.durationLabel != null) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: colors.surfaceAlt,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                time.durationLabel!,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: colors.textSecondary,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+          const Spacer(),
           GestureDetector(
             onTap: () => _confirmDelete(context),
             behavior: HitTestBehavior.opaque,
             child: Padding(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(6),
               child: Icon(
-                Icons.delete_outline_rounded,
-                color: context.colors.textTertiary,
-                size: 20,
+                Symbols.delete_rounded,
+                color: colors.textTertiary,
+                size: 18,
+                opticalSize: 20,
               ),
             ),
           ),
@@ -376,10 +615,14 @@ class _SlotRow extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: ctx.colors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Remove slot?',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: ctx.colors.textPrimary),
+          style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: ctx.colors.textPrimary),
         ),
         content: Text(
           'Remove this availability window?',
@@ -388,7 +631,8 @@ class _SlotRow extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: TextStyle(color: ctx.colors.textSecondary)),
+            child: Text('Cancel',
+                style: TextStyle(color: ctx.colors.textSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -405,22 +649,22 @@ class _SlotRow extends StatelessWidget {
 
 class _AddSlotSheet extends StatefulWidget {
   final int tutorId;
-  const _AddSlotSheet({required this.tutorId});
+  final int initialDay;
+  const _AddSlotSheet({required this.tutorId, this.initialDay = 0});
 
   @override
   State<_AddSlotSheet> createState() => _AddSlotSheetState();
 }
 
 class _AddSlotSheetState extends State<_AddSlotSheet> {
-  static const _days = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
-  ];
   static const _dayAbbr = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
   static final _hours = List.generate(24, (i) => i.toString().padLeft(2, '0'));
-  static final _minutes = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
+  static final _minutes = [
+    '00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55',
+  ];
 
-  int _selectedDay = 0;
+  late int _selectedDay = widget.initialDay.clamp(0, 6);
   int _startHour = 9;
   int _startMinuteIdx = 0;
   int _endHour = 12;
@@ -453,10 +697,25 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
   String _fmtTime(int hour, int minuteIdx) =>
       '${hour.toString().padLeft(2, '0')}:${_minutes[minuteIdx]}:00';
 
-  bool get _valid {
+  int get _durationMins {
     final startMins = _startHour * 60 + int.parse(_minutes[_startMinuteIdx]);
     final endMins = _endHour * 60 + int.parse(_minutes[_endMinuteIdx]);
-    return endMins > startMins;
+    return endMins - startMins;
+  }
+
+  bool get _valid => _durationMins > 0;
+
+  String get _durationLabel {
+    final d = _durationMins;
+    if (d <= 0) return 'End time must be after start time';
+    final h = d ~/ 60;
+    final m = d % 60;
+    final label = h == 0
+        ? '${m}m'
+        : m == 0
+            ? '${h}h'
+            : '${h}h ${m}m';
+    return 'Duration: $label';
   }
 
   Future<void> _save() async {
@@ -472,7 +731,7 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
         'available_time': _fmtTime(_startHour, _startMinuteIdx),
         'available_time_end': _fmtTime(_endHour, _endMinuteIdx),
       };
-      final result = await ApiService.post('/tutor/availability/', body);
+      await ApiService.post('/tutor/availability/', body);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
@@ -485,6 +744,7 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return SafeArea(
       top: false,
       child: Padding(
@@ -496,9 +756,10 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
             // drag handle
             Center(
               child: Container(
-                width: 36, height: 4,
+                width: 36,
+                height: 4,
                 decoration: BoxDecoration(
-                  color: context.colors.border,
+                  color: colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -507,19 +768,17 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
             Text(
               'Add availability',
               style: TextStyle(
-                fontFamily: 'SF Pro',
                 fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: context.colors.textPrimary,
+                fontWeight: FontWeight.w800,
+                color: colors.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               'Set when you\'re available for lessons',
               style: TextStyle(
-                fontFamily: 'SF Pro',
                 fontSize: 13,
-                color: context.colors.textTertiary,
+                color: colors.textTertiary,
               ),
             ),
             const SizedBox(height: 24),
@@ -528,11 +787,10 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
             Text(
               'DAY OF WEEK',
               style: TextStyle(
-                fontFamily: 'SF Pro',
                 fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: context.colors.textTertiary,
-                letterSpacing: 0.8,
+                fontWeight: FontWeight.w700,
+                color: colors.textTertiary,
+                letterSpacing: 1.0,
               ),
             ),
             const SizedBox(height: 10),
@@ -540,7 +798,7 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
               height: 44,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: _days.length,
+                itemCount: _dayAbbr.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 8),
                 itemBuilder: (_, i) {
                   final selected = _selectedDay == i;
@@ -551,19 +809,20 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: selected ? context.colors.brand : context.colors.surfaceAlt,
+                        color: selected ? colors.brand : colors.surfaceAlt,
                         borderRadius: BorderRadius.circular(22),
                         border: selected
                             ? null
-                            : Border.all(color: context.colors.border),
+                            : Border.all(color: colors.border),
                       ),
                       child: Text(
                         _dayAbbr[i],
                         style: TextStyle(
-                          fontFamily: 'SF Pro',
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: selected ? Colors.white : context.colors.textSecondary,
+                          color: selected
+                              ? colors.onBrand
+                              : colors.textSecondary,
                           letterSpacing: 0.3,
                         ),
                       ),
@@ -578,20 +837,19 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
             Text(
               'TIME RANGE',
               style: TextStyle(
-                fontFamily: 'SF Pro',
                 fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: context.colors.textTertiary,
-                letterSpacing: 0.8,
+                fontWeight: FontWeight.w700,
+                color: colors.textTertiary,
+                letterSpacing: 1.0,
               ),
             ),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               decoration: BoxDecoration(
-                color: context.colors.surfaceAlt,
+                color: colors.surfaceAlt,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: context.colors.border),
+                border: Border.all(color: colors.border),
               ),
               child: Row(
                 children: [
@@ -601,11 +859,10 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                         Text(
                           'FROM',
                           style: TextStyle(
-                            fontFamily: 'SF Pro',
                             fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: context.colors.textTertiary,
-                            letterSpacing: 0.8,
+                            fontWeight: FontWeight.w700,
+                            color: colors.textTertiary,
+                            letterSpacing: 1.0,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -615,23 +872,26 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                             _DrumPicker(
                               items: _hours,
                               controller: _startHourCtrl,
-                              onChanged: (i) => setState(() => _startHour = i),
+                              onChanged: (i) =>
+                                  setState(() => _startHour = i),
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 4),
                               child: Text(
                                 ':',
                                 style: TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.w700,
-                                  color: context.colors.textPrimary,
+                                  color: colors.textPrimary,
                                 ),
                               ),
                             ),
                             _DrumPicker(
                               items: _minutes,
                               controller: _startMinCtrl,
-                              onChanged: (i) => setState(() => _startMinuteIdx = i),
+                              onChanged: (i) =>
+                                  setState(() => _startMinuteIdx = i),
                             ),
                           ],
                         ),
@@ -646,7 +906,7 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                         height: 2,
                         margin: const EdgeInsets.symmetric(horizontal: 8),
                         decoration: BoxDecoration(
-                          color: context.colors.border,
+                          color: colors.border,
                           borderRadius: BorderRadius.circular(1),
                         ),
                       ),
@@ -658,11 +918,10 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                         Text(
                           'UNTIL',
                           style: TextStyle(
-                            fontFamily: 'SF Pro',
                             fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: context.colors.textTertiary,
-                            letterSpacing: 0.8,
+                            fontWeight: FontWeight.w700,
+                            color: colors.textTertiary,
+                            letterSpacing: 1.0,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -675,20 +934,22 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                               onChanged: (i) => setState(() => _endHour = i),
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 4),
                               child: Text(
                                 ':',
                                 style: TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.w700,
-                                  color: context.colors.textPrimary,
+                                  color: colors.textPrimary,
                                 ),
                               ),
                             ),
                             _DrumPicker(
                               items: _minutes,
                               controller: _endMinCtrl,
-                              onChanged: (i) => setState(() => _endMinuteIdx = i),
+                              onChanged: (i) =>
+                                  setState(() => _endMinuteIdx = i),
                             ),
                           ],
                         ),
@@ -698,7 +959,29 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                 ],
               ),
             ),
-            const SizedBox(height: 28),
+
+            // Live duration preview
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _valid ? Symbols.timelapse_rounded : Symbols.error_rounded,
+                  size: 14,
+                  color: _valid ? colors.textTertiary : colors.error,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  _durationLabel,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: _valid ? colors.textSecondary : colors.error,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
 
             // Save button
             GestureDetector(
@@ -708,21 +991,23 @@ class _AddSlotSheetState extends State<_AddSlotSheet> {
                 height: 54,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _valid ? context.colors.brand : context.colors.border,
+                  color: _valid ? colors.brand : colors.border,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: _saving
                     ? const SizedBox(
-                        width: 22, height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.5, color: Colors.white),
                       )
-                    : const Text(
+                    : Text(
                         'Save slot',
                         style: TextStyle(
-                          fontFamily: 'SF Pro',
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                          color:
+                              _valid ? colors.onBrand : colors.textSecondary,
                         ),
                       ),
               ),
@@ -749,6 +1034,7 @@ class _DrumPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return SizedBox(
       width: 52,
       height: 120,
@@ -758,11 +1044,11 @@ class _DrumPicker extends StatelessWidget {
             child: Container(
               height: 40,
               decoration: BoxDecoration(
-                color: context.colors.surface,
+                color: colors.surface,
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: colors.shadow.withValues(alpha: 0.05),
                     blurRadius: 4,
                     offset: const Offset(0, 1),
                   ),
@@ -783,10 +1069,9 @@ class _DrumPicker extends StatelessWidget {
                 child: Text(
                   items[i],
                   style: TextStyle(
-                    fontFamily: 'SF Pro',
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
-                    color: context.colors.textPrimary,
+                    color: colors.textPrimary,
                   ),
                 ),
               ),
@@ -805,128 +1090,24 @@ class _LoadingSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-      children: List.generate(3, (_) => Padding(
-        padding: const EdgeInsets.only(bottom: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Skeleton(height: 28, width: 100, borderRadius: 20),
-            const SizedBox(height: 10),
-            Container(
-              decoration: BoxDecoration(
-                color: context.colors.surface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: List.generate(2, (j) => Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  child: Row(
-                    children: [
-                      const Skeleton(height: 40, width: 40, borderRadius: 12),
-                      const SizedBox(width: 14),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Skeleton(height: 20, width: 120, borderRadius: 6),
-                          SizedBox(height: 6),
-                          Skeleton(height: 11, width: 70, borderRadius: 4),
-                        ],
-                      ),
-                    ],
-                  ),
-                )),
-              ),
-            ),
-          ],
+    final colors = context.colors;
+    return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      itemCount: 5,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (_, _) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colors.border),
         ),
-      )),
-    );
-  }
-}
-
-// ─── Empty state ──────────────────────────────────────────────────────────────
-
-class _EmptyState extends StatelessWidget {
-  final VoidCallback onAdd;
-  const _EmptyState({required this.onAdd});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: const Row(
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: context.colors.surfaceAlt,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: SvgPicture.asset(
-                  'assets/images/icons/calendar_outline_20.svg',
-                  width: 36,
-                  height: 36,
-                  colorFilter: ColorFilter.mode(
-                    context.colors.textTertiary,
-                    BlendMode.srcIn,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'No slots yet',
-              style: TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: context.colors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Add your available windows so students know when to book you.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 14,
-                color: context.colors.textTertiary,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 28),
-            GestureDetector(
-              onTap: onAdd,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                decoration: BoxDecoration(
-                  color: context.colors.brand,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.add_rounded, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Add first slot',
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            Skeleton(height: 15, width: 90, borderRadius: 6),
+            Spacer(),
+            Skeleton(height: 30, width: 30, borderRadius: 10),
           ],
         ),
       ),
@@ -943,6 +1124,7 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -950,22 +1132,24 @@ class _ErrorState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 64,
-              height: 64,
+              width: 72,
+              height: 72,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: context.colors.surfaceAlt,
+                color: colors.surface,
                 shape: BoxShape.circle,
+                border: Border.all(color: colors.border),
               ),
-              child: Icon(Icons.wifi_off_rounded, color: context.colors.textTertiary, size: 28),
+              child: Icon(Symbols.wifi_off_rounded,
+                  color: colors.textTertiary, size: 30),
             ),
             const SizedBox(height: 16),
             Text(
               message,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontFamily: 'SF Pro',
                 fontSize: 14,
-                color: context.colors.textSecondary,
+                color: colors.textSecondary,
                 height: 1.4,
               ),
             ),
@@ -973,18 +1157,18 @@ class _ErrorState extends StatelessWidget {
             GestureDetector(
               onTap: onRetry,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 decoration: BoxDecoration(
-                  color: context.colors.brand,
+                  color: colors.brand,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text(
+                child: Text(
                   'Retry',
                   style: TextStyle(
-                    fontFamily: 'SF Pro',
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: colors.onBrand,
                   ),
                 ),
               ),

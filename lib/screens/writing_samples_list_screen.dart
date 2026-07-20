@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/mock_test_service.dart';
@@ -6,7 +5,7 @@ import '../widgets/mock_test_styles.dart';
 import 'plus_subscription_screen.dart';
 import 'writing_sample_screen.dart';
 
-const int _freeSamplesPerTask = 2;
+const int _freeSamplesPerTask = 3;
 const double _cardWidth = 172;
 const double _cardHeight = 220;
 const Color _task1Accent = Color(0xFF2F6FED);
@@ -15,10 +14,10 @@ const Color _tutorAccent = MockTestColors.green;
 
 /// Tutors with at least one published Writing sample — read-only reference
 /// content, no submission/grading. Tapping a tutor drills into their
-/// submitted topics (see [WritingSampleTutorTopicsScreen]), shown as
-/// swipeable, photo-led Task 1/2 carousels. Non-Plus users see the first
-/// [_freeSamplesPerTask] samples of each task normally; the rest sit behind
-/// a blurred teaser card.
+/// submitted topics (see [WritingSampleTutorTopicsScreen]), shown as plain
+/// Task 1/2 topic lists. Non-Plus users can open only the first
+/// [_freeSamplesPerTask] samples of each task; the rest stay visible but
+/// locked, and tapping one opens the Plus subscription screen.
 class WritingSamplesListScreen extends StatefulWidget {
   const WritingSamplesListScreen({super.key});
 
@@ -102,8 +101,8 @@ class _WritingSamplesListScreenState extends State<WritingSamplesListScreen> {
   }
 }
 
-/// One tutor's submitted Writing topics — same Task 1/2 carousel + Plus
-/// paywall presentation as the old flat list, just scoped to a single tutor.
+/// One tutor's submitted Writing topics — a simple Task 1/2 list with the
+/// same Plus paywall rules, scoped to a single tutor.
 class WritingSampleTutorTopicsScreen extends StatefulWidget {
   const WritingSampleTutorTopicsScreen({
     super.key,
@@ -142,8 +141,8 @@ class _WritingSampleTutorTopicsScreenState extends State<WritingSampleTutorTopic
   }
 }
 
-/// Shared Task 1/2 carousel body (with the Plus paywall gate) for one
-/// tutor's Writing samples — fed by whichever [future] the caller resolves
+/// Shared Task 1/2 list body (with the Plus paywall gate) for one tutor's
+/// Writing samples — fed by whichever [future] the caller resolves
 /// (currently always a single tutor's topics via [WritingSampleTutorTopicsScreen]).
 class _TutorWritingSamplesBody extends StatefulWidget {
   const _TutorWritingSamplesBody({required this.future});
@@ -192,32 +191,28 @@ class _TutorWritingSamplesBodyState extends State<_TutorWritingSamplesBody> {
         final task1 = samples.where((s) => s['task_number'] == 1).toList();
         final task2 = samples.where((s) => s['task_number'] == 2).toList();
         return ListView(
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Study real, examiner-scored essays — tap a card, then tap a highlight for the tutor\'s note.',
-                style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, height: 1.4, color: MockTestColors.grey),
-              ),
+            const Text(
+              'Study real, examiner-scored essays — tap a topic, then tap a highlight for the tutor\'s note.',
+              style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, height: 1.4, color: MockTestColors.grey),
             ),
             const SizedBox(height: 20),
-            _TaskCarousel(
+            _TaskSection(
               label: 'TASK 1',
               icon: Icons.bar_chart_rounded,
               accent: _task1Accent,
               samples: task1,
               isLocked: _isLocked,
             ),
-            const SizedBox(height: 26),
-            _TaskCarousel(
+            const SizedBox(height: 24),
+            _TaskSection(
               label: 'TASK 2',
               icon: Icons.edit_note_rounded,
               accent: _task2Accent,
               samples: task2,
               isLocked: _isLocked,
             ),
-            const SizedBox(height: 8),
           ],
         );
       },
@@ -318,8 +313,11 @@ class _TutorCard extends StatelessWidget {
   }
 }
 
-class _TaskCarousel extends StatelessWidget {
-  const _TaskCarousel({
+/// One task's topics as a plain vertical list: section header, then a simple
+/// row per sample. For non-Plus users, rows beyond [_freeSamplesPerTask]
+/// render locked and route to the Plus subscription screen on tap.
+class _TaskSection extends StatelessWidget {
+  const _TaskSection({
     required this.label,
     required this.icon,
     required this.accent,
@@ -335,156 +333,140 @@ class _TaskCarousel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final locked = isLocked && samples.length > _freeSamplesPerTask;
-    final visible = locked ? samples.sublist(0, _freeSamplesPerTask) : samples;
-    final hidden = locked ? samples.sublist(_freeSamplesPerTask) : const <Map<String, dynamic>>[];
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Icon(icon, color: accent, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontFamily: 'SF Pro',
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: MockTestColors.greyLight,
-                  letterSpacing: 0.8,
-                ),
+        Row(
+          children: [
+            Icon(icon, color: accent, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: MockTestColors.greyLight,
+                letterSpacing: 0.8,
               ),
-              const SizedBox(width: 8),
-              Text(
-                '${samples.length} essays',
-                style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: MockTestColors.greyLight),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${samples.length} essays',
+              style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: MockTestColors.greyLight),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: _cardHeight,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: visible.length + (locked ? 1 : 0),
-            itemBuilder: (context, i) {
-              final isLast = i == visible.length;
-              return Padding(
-                padding: EdgeInsets.only(right: isLast ? 0 : 12),
-                child: isLast
-                    ? _LockedCard(accent: accent, hiddenCount: hidden.length, previewImageUrl: hidden.first['tutor_image_url'] as String?)
-                    : _EssayCard(sample: visible[i], accent: accent),
-              );
-            },
+        // The backend is the source of truth ('locked' items arrive with
+        // their essay/annotations stripped); the index check is a fallback
+        // for backends that predate server-side gating.
+        for (var i = 0; i < samples.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _EssayRow(
+              sample: samples[i],
+              accent: accent,
+              icon: icon,
+              locked: samples[i]['locked'] == true || (isLocked && i >= _freeSamplesPerTask),
+            ),
           ),
-        ),
       ],
     );
   }
 }
 
-class _EssayCard extends StatelessWidget {
-  const _EssayCard({required this.sample, required this.accent});
+/// Simple list row for one submitted topic: tinted task icon, title,
+/// highlight count, band pill — no tutor photo (the tutor was already
+/// chosen on the previous screen). When [locked], the row dims, shows a
+/// lock instead of a chevron, and tapping it opens the Plus subscription
+/// screen instead of the sample.
+class _EssayRow extends StatelessWidget {
+  const _EssayRow({required this.sample, required this.accent, required this.icon, required this.locked});
   final Map<String, dynamic> sample;
   final Color accent;
+  final IconData icon;
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
     final title = sample['title']?.toString() ?? '';
-    final tutorName = sample['tutor_name']?.toString() ?? '';
-    final tutorImageUrl = sample['tutor_image_url'] as String?;
     final band = sample['band_score']?.toString();
     final highlightCount = ((sample['annotations'] as List?) ?? const []).length;
 
     return _Pressable(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => WritingSampleScreen(sample: sample)),
+        MaterialPageRoute(
+          builder: (_) =>
+              locked ? const PlusSubscriptionScreen() : WritingSampleScreen(sample: sample),
+        ),
       ),
-      child: SizedBox(
-        width: _cardWidth,
-        height: _cardHeight,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            fit: StackFit.expand,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: mtSoftCard(),
+        child: Opacity(
+          opacity: locked ? 0.55 : 1,
+          child: Row(
             children: [
-              if (tutorImageUrl != null && tutorImageUrl.isNotEmpty)
-                Image.network(
-                  tutorImageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => _CardPlaceholder(accent: accent),
-                )
-              else
-                _CardPlaceholder(accent: accent),
-              DecoratedBox(
+              Container(
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: const [0.4, 1],
-                    colors: [Colors.transparent, Colors.black.withValues(alpha: 0.8)],
-                  ),
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: Icon(icon, color: accent, size: 22),
               ),
-              if (band != null)
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: MtPill(
-                    background: MockTestColors.yellow,
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                    child: Text(
-                      'Band $band',
-                      style: const TextStyle(fontFamily: 'SF Pro', fontSize: 11, fontWeight: FontWeight.w800, color: MockTestColors.navy),
-                    ),
-                  ),
-                ),
-              Positioned(
-                left: 12,
-                right: 12,
-                bottom: 12,
+              const SizedBox(width: 12),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      title,
+                      title.isNotEmpty ? title : 'Writing sample',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontFamily: 'SF Pro', fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white, height: 1.25),
-                    ),
-                    if (tutorName.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        tutorName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontFamily: 'SF Pro', fontSize: 11.5, color: Colors.white70),
+                      style: const TextStyle(
+                        fontFamily: 'SF Pro',
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                        color: MockTestColors.navy,
+                        height: 1.25,
                       ),
-                    ],
-                    if (highlightCount > 0) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.lightbulb_rounded, color: Colors.white70, size: 12),
-                          const SizedBox(width: 4),
-                          Text(
-                            '$highlightCount highlight${highlightCount == 1 ? '' : 's'}',
-                            style: const TextStyle(fontFamily: 'SF Pro', fontSize: 11, color: Colors.white70),
-                          ),
-                        ],
+                    ),
+                    if (locked) ...[
+                      const SizedBox(height: 3),
+                      const Text(
+                        'Linka Plus',
+                        style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: MockTestColors.grey),
+                      ),
+                    ] else if (highlightCount > 0) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        '$highlightCount highlight${highlightCount == 1 ? '' : 's'}',
+                        style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: MockTestColors.grey),
                       ),
                     ],
                   ],
                 ),
+              ),
+              if (band != null) ...[
+                const SizedBox(width: 8),
+                MtPill(
+                  background: MockTestColors.yellow,
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  child: Text(
+                    'Band $band',
+                    style: const TextStyle(fontFamily: 'SF Pro', fontSize: 11, fontWeight: FontWeight.w800, color: MockTestColors.navy),
+                  ),
+                ),
+              ],
+              const SizedBox(width: 4),
+              Icon(
+                locked ? Icons.lock_rounded : Icons.chevron_right_rounded,
+                color: MockTestColors.greyLight,
+                size: locked ? 18 : 22,
               ),
             ],
           ),
@@ -515,71 +497,8 @@ class _CardPlaceholder extends StatelessWidget {
   }
 }
 
-class _LockedCard extends StatelessWidget {
-  const _LockedCard({required this.accent, required this.hiddenCount, required this.previewImageUrl});
-  final Color accent;
-  final int hiddenCount;
-  final String? previewImageUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    return _Pressable(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const PlusSubscriptionScreen()),
-      ),
-      child: SizedBox(
-        width: _cardWidth,
-        height: _cardHeight,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (previewImageUrl != null && previewImageUrl!.isNotEmpty)
-                Image.network(
-                  previewImageUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => _CardPlaceholder(accent: accent),
-                )
-              else
-                _CardPlaceholder(accent: accent),
-              BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                child: Container(color: Colors.black.withValues(alpha: 0.45)),
-              ),
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.workspace_premium_rounded, color: MockTestColors.yellow, size: 26),
-                    const SizedBox(height: 8),
-                    Text(
-                      '+$hiddenCount more',
-                      style: const TextStyle(fontFamily: 'SF Pro', fontSize: 14.5, fontWeight: FontWeight.w700, color: Colors.white),
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                      decoration: BoxDecoration(color: MockTestColors.yellow, borderRadius: BorderRadius.circular(20)),
-                      child: const Text(
-                        'Get Plus',
-                        style: TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, fontWeight: FontWeight.w700, color: MockTestColors.navy),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Wraps [child] with a light tactile press animation (scale down + haptic
-/// tick on tap) so the carousel feels responsive to touch, not just tappable.
+/// tick on tap) so the list feels responsive to touch, not just tappable.
 class _Pressable extends StatefulWidget {
   const _Pressable({required this.child, required this.onTap});
   final Widget child;

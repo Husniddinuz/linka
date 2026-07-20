@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter/services.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/cached_avatar.dart';
 import '../widgets/plus_member_card.dart';
@@ -29,6 +30,7 @@ import 'blocked_users_screen.dart';
 import 'tutor_schedule_screen.dart';
 import 'tutor_speaking_samples_screen.dart';
 import 'tutor_writing_samples_screen.dart';
+import 'tutor_my_courses_screen.dart';
 
 class MyProfileScreen extends StatefulWidget {
   final VoidCallback? onNavigateToLessons;
@@ -95,6 +97,19 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
     if (tutorId == null) return;
     final name = '${_profile?['first_name'] ?? ''} ${_profile?['last_name'] ?? ''}'.trim();
     ShareService.shareTutorProfile(tutorId: tutorId, tutorName: name);
+  }
+
+  void _openEditProfile() {
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => ProfileSetupScreen(
+              role: _isTeacher ? 'tutor' : 'student',
+              profile: _profile,
+            ),
+          ),
+        )
+        .then((_) => _loadProfile());
   }
 
   Future<void> _openPlusSubscription() async {
@@ -176,260 +191,465 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.colors.background,
-      body: Column(
-        children: [
-          // White safe area for status bar
-          SafeArea(bottom: false, child: const SizedBox.shrink()),
-          // Scrollable content on gray background
-          Expanded(
-            child: Container(
-              color: context.colors.surfaceAlt,
-              child: RefreshIndicator(
-                color: context.colors.textPrimary,
-                onRefresh: _loadProfile,
-                child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  children: [
-                    // White section: header + profile card
-                    Container(
-                      decoration: BoxDecoration(
-                        color: context.colors.surface,
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(24),
-                          bottomRight: Radius.circular(24),
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 12,
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Center(
-                                    child: Text(
-                                      'My profile',
-                                      style: TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w600,
-                                        color: context.colors.textPrimary,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.of(context)
-                                        .push(
-                                          MaterialPageRoute(
-                                            builder: (_) => ProfileSetupScreen(
-                                              role: _isTeacher
-                                                  ? 'tutor'
-                                                  : 'student',
-                                              profile: _profile,
-                                            ),
-                                          ),
-                                        )
-                                        .then((_) => _loadProfile());
-                                  },
-                                  child: SvgPicture.asset(
-                                    'assets/images/buttons/profile-edit.svg',
-                                    width: 24,
-                                    height: 24,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          _ProfileCard(profile: _profile, loading: _loading),
-                          const SizedBox(height: 20),
-                        ],
-                      ),
-                    ),
+    final colors = context.colors;
+    final showPlus = !_isTeacher &&
+        !_isExemptFromPlus &&
+        AppFeatureService.isEnabled('plus');
 
-                    // Gray section: rest of content
-                    const SizedBox(height: 16),
-                    if (!_isTeacher) ...[
-                      if (!_isExemptFromPlus &&
-                          AppFeatureService.isEnabled('plus')) ...[
-                        if (_plusStatus?.isActive == true)
-                          PlusMemberCard(
-                            plan: _plusPlanLabel(_plusStatus),
-                            memberSince: _formatDate(_plusStatus?.since),
-                            nextRenewal: _formatDate(_plusStatus?.plusUntil),
-                            priceLabel: _plusPriceLabel(_plusStatus),
-                            onTap: null,
-                          )
-                        else
-                          _JoinPlusBanner(onTap: _openPlusSubscription),
-                        const SizedBox(height: 16),
-                      ],
-                      _CardGroup(children: [_BalanceRow()]),
-                      const SizedBox(height: 16),
-                    ],
-                    _CardGroup(
-                      children: [
-                        if (!_isTeacher) ...[
-                          _MenuRow(
-                            icon: 'assets/images/buttons/my-lessons.svg',
-                            label: 'My lessons',
-                            onTap: () => widget.onNavigateToLessons?.call(),
-                          ),
-                          const _Divider(),
-                        ],
-                        if (_isTeacher) ...[
-                          _MenuRow(
-                            icon: 'assets/images/icons/calendar_outline_20.svg',
-                            label: 'My schedule',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) => const TutorScheduleScreen()),
-                            ),
-                          ),
-                          const _Divider(),
-                          _MenuRow(
-                            iconWidget: Icon(
-                              Icons.ios_share_rounded,
-                              size: 22,
-                              color: context.colors.textPrimary,
-                            ),
-                            label: 'Share profile',
-                            onTap: _shareMyProfile,
-                          ),
-                          const _Divider(),
-                          _MenuRow(
-                            iconWidget: Icon(
-                              Icons.mic_rounded,
-                              size: 22,
-                              color: context.colors.textPrimary,
-                            ),
-                            label: 'My speaking samples',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) =>
-                                      const TutorSpeakingSamplesScreen()),
-                            ),
-                          ),
-                          const _Divider(),
-                          _MenuRow(
-                            iconWidget: Icon(
-                              Icons.article_outlined,
-                              size: 22,
-                              color: context.colors.textPrimary,
-                            ),
-                            label: 'My writing samples',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) =>
-                                      const TutorWritingSamplesScreen()),
-                            ),
-                          ),
-                          const _Divider(),
-                        ],
-                        _MenuRow(
-                          icon: 'assets/images/buttons/my-reviews.svg',
-                          label: 'My reviews',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => MyReviewsScreen(
-                                isTutor: _isTeacher,
-                                tutorProfileId: UserService.current?.tutorProfileId,
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (!_isTeacher) ...[
-                          const _Divider(),
-                          _MenuRow(
-                            icon: 'assets/images/buttons/saved-tutors.svg',
-                            label: 'Saved tutors',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) => const SavedTutorsScreen()),
-                            ),
-                          ),
-                          const _Divider(),
-                          _MenuRow(
-                            icon: 'assets/images/buttons/saved-articles.svg',
-                            label: 'Saved articles',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) => const SavedArticlesScreen()),
-                            ),
-                          ),
-                        ],
-                      ],
+    // The hero stays navy in both themes, so status bar icons must be light.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: colors.background,
+        body: RefreshIndicator(
+          color: Colors.white,
+          backgroundColor: colors.brand,
+          onRefresh: _loadProfile,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              children: [
+                _buildHero(context),
+                const SizedBox(height: 20),
+                if (showPlus) ...[
+                  if (_plusStatus?.isActive == true)
+                    PlusMemberCard(
+                      plan: _plusPlanLabel(_plusStatus),
+                      memberSince: _formatDate(_plusStatus?.since),
+                      nextRenewal: _formatDate(_plusStatus?.plusUntil),
+                      priceLabel: _plusPriceLabel(_plusStatus),
+                      onTap: null,
+                    )
+                  else
+                    _JoinPlusBanner(onTap: _openPlusSubscription),
+                  const SizedBox(height: 20),
+                ],
+                _SectionLabel(_isTeacher ? 'My teaching' : 'My learning'),
+                _CardGroup(children: _accountRows(context)),
+                const SizedBox(height: 20),
+                const _SectionLabel('Preferences'),
+                _CardGroup(
+                  children: [
+                    const _AppearanceRow(),
+                    _MenuRow(
+                      icon: Symbols.notifications_rounded,
+                      label: 'Notifications',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const NotificationsScreen()),
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    _CardGroup(
-                      children: [
-                        const _ThemeToggleRow(),
-                        _MenuRow(
-                          icon: 'assets/images/buttons/notifications.svg',
-                          label: 'Notifications',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                          ),
-                        ),
-                        const _Divider(),
-                        _MenuRow(
-                          icon: 'assets/images/buttons/faqs.svg',
-                          label: 'Blocked users',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const BlockedUsersScreen()),
-                          ),
-                        ),
-                        const _Divider(),
-                        // _MenuRow(
-                        //   icon: 'assets/images/buttons/help_outline_20.svg',
-                        //   label: 'Help center',
-                        //   onTap: () {},
-                        // ),
-                        // const _Divider(),
-                        _MenuRow(
-                          icon: 'assets/images/buttons/faqs.svg',
-                          label: 'FAQs',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const FaqScreen()),
-                          ),
-                        ),
-                        if (AppFeatureService.isEnabled('support')) ...[
-                          const _Divider(),
-                          _MenuRow(
-                            icon: 'assets/images/buttons/help_outline_20.svg',
-                            label: 'Support',
-                            onTap: _openSupport,
-                          ),
-                        ],
-                        const _Divider(),
-                        _MenuRow(
-                          icon: 'assets/images/buttons/public-offer.svg',
-                          label: 'Public offer',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                                builder: (_) => const PublicOfferScreen()),
-                          ),
-                        ),
-                      ],
+                    const _RowDivider(),
+                    _MenuRow(
+                      icon: Symbols.person_off_rounded,
+                      label: 'Blocked users',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const BlockedUsersScreen()),
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    const _LogoutCard(),
-                    const SizedBox(height: 24),
-                    _DeleteAccountCard(
-                      phoneNumber: _profile?['phone_number'] as String?,
-                    ),
-                    const SizedBox(height: 32),
                   ],
                 ),
+                const SizedBox(height: 20),
+                const _SectionLabel('Help & about'),
+                _CardGroup(
+                  children: [
+                    _MenuRow(
+                      icon: Symbols.live_help_rounded,
+                      label: 'FAQs',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const FaqScreen()),
+                      ),
+                    ),
+                    if (AppFeatureService.isEnabled('support')) ...[
+                      const _RowDivider(),
+                      _MenuRow(
+                        icon: Symbols.support_agent_rounded,
+                        label: 'Support',
+                        onTap: _openSupport,
+                      ),
+                    ],
+                    const _RowDivider(),
+                    _MenuRow(
+                      icon: Symbols.description_rounded,
+                      label: 'Public offer',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const PublicOfferScreen()),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const _LogoutCard(),
+                const SizedBox(height: 28),
+                _DeleteAccountCard(
+                  phoneNumber: _profile?['phone_number'] as String?,
+                ),
+                const SizedBox(height: 36),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _accountRows(BuildContext context) {
+    if (_isTeacher) {
+      return [
+        _MenuRow(
+          icon: Symbols.calendar_month_rounded,
+          label: 'My schedule',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const TutorScheduleScreen()),
+          ),
+        ),
+        const _RowDivider(),
+        _MenuRow(
+          icon: Symbols.ios_share_rounded,
+          label: 'Share profile',
+          onTap: _shareMyProfile,
+        ),
+        const _RowDivider(),
+        _MenuRow(
+          icon: Symbols.mic_rounded,
+          label: 'My speaking samples',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+                builder: (_) => const TutorSpeakingSamplesScreen()),
+          ),
+        ),
+        const _RowDivider(),
+        _MenuRow(
+          icon: Symbols.edit_note_rounded,
+          label: 'My writing samples',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+                builder: (_) => const TutorWritingSamplesScreen()),
+          ),
+        ),
+        if (AppFeatureService.isEnabled('courses')) ...[
+          const _RowDivider(),
+          _MenuRow(
+            icon: Symbols.menu_book_rounded,
+            label: 'My courses',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const TutorMyCoursesScreen()),
+            ),
+          ),
+        ],
+        const _RowDivider(),
+        _MenuRow(
+          icon: Symbols.reviews_rounded,
+          label: 'My reviews',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => MyReviewsScreen(
+                isTutor: _isTeacher,
+                tutorProfileId: UserService.current?.tutorProfileId,
               ),
-              ),
+            ),
+          ),
+        ),
+      ];
+    }
+    return [
+      _MenuRow(
+        icon: Symbols.school_rounded,
+        label: 'My lessons',
+        onTap: () => widget.onNavigateToLessons?.call(),
+      ),
+      const _RowDivider(),
+      _MenuRow(
+        icon: Symbols.reviews_rounded,
+        label: 'My reviews',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => MyReviewsScreen(
+              isTutor: _isTeacher,
+              tutorProfileId: UserService.current?.tutorProfileId,
+            ),
+          ),
+        ),
+      ),
+      const _RowDivider(),
+      _MenuRow(
+        icon: Symbols.favorite_rounded,
+        label: 'Saved tutors',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SavedTutorsScreen()),
+        ),
+      ),
+      const _RowDivider(),
+      _MenuRow(
+        icon: Symbols.bookmarks_rounded,
+        label: 'Saved articles',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SavedArticlesScreen()),
+        ),
+      ),
+    ];
+  }
+
+  // ─── Hero header ──────────────────────────────────────────────────────────
+
+  Widget _buildHero(BuildContext context) {
+    final colors = context.colors;
+    final hero = _HeroPanel(
+      profile: _profile,
+      loading: _loading,
+      isTeacher: _isTeacher,
+      // Students get extra bottom room for the overlapping balance card.
+      bottomPadding: _isTeacher ? 28.0 : 56.0,
+      onEdit: _openEditProfile,
+    );
+    if (_isTeacher) return hero;
+
+    // Balance card overlaps the hero's bottom edge. The trailing SizedBox
+    // keeps the card inside the Stack's bounds so its taps still register.
+    return Stack(
+      children: [
+        Column(children: [hero, const SizedBox(height: 40)]),
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 0,
+          child: _BalanceCard(brandColor: colors.brand),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Hero panel ───────────────────────────────────────────────────────────────
+
+class _HeroPanel extends StatelessWidget {
+  final Map<String, dynamic>? profile;
+  final bool loading;
+  final bool isTeacher;
+  final double bottomPadding;
+  final VoidCallback onEdit;
+
+  const _HeroPanel({
+    required this.profile,
+    required this.loading,
+    required this.isTeacher,
+    required this.bottomPadding,
+    required this.onEdit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final firstName = profile?['first_name'] ?? '';
+    final lastName = profile?['last_name'] ?? '';
+    final displayName = '$firstName $lastName'.trim();
+    final phone = profile?['phone_number'] as String? ?? '';
+    final imageUrl = profile?['profile_image'] as String?;
+    final gradientEnd = Color.lerp(colors.brand, Colors.black, 0.35)!;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [colors.brand, gradientEnd],
+        ),
+        borderRadius:
+            const BorderRadius.vertical(bottom: Radius.circular(32)),
+      ),
+      child: ClipRRect(
+        borderRadius:
+            const BorderRadius.vertical(bottom: Radius.circular(32)),
+        child: Stack(
+          children: [
+            // Decorative glows that keep the panel from feeling flat.
+            Positioned(
+              top: -50,
+              right: -30,
+              child: _GlowCircle(
+                  size: 180, color: Colors.white.withValues(alpha: 0.05)),
+            ),
+            Positioned(
+              bottom: -60,
+              left: -40,
+              child: _GlowCircle(
+                  size: 200, color: Colors.white.withValues(alpha: 0.04)),
+            ),
+            Column(
+              children: [
+                const SafeArea(bottom: false, child: SizedBox.shrink()),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 16, 4),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 40),
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            'My profile',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white.withValues(alpha: 0.92),
+                            ),
+                          ),
+                        ),
+                      ),
+                      _FrostedIconButton(
+                        icon: Symbols.edit_rounded,
+                        onTap: onEdit,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Avatar with a subtle ring.
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.transparent,
+                    ),
+                    child: loading
+                        ? Container(
+                            width: 84,
+                            height: 84,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withValues(alpha: 0.15),
+                            ),
+                            child: Icon(
+                              Symbols.person_rounded,
+                              color: Colors.white.withValues(alpha: 0.5),
+                              size: 36,
+                            ),
+                          )
+                        : CachedAvatar(imageUrl: imageUrl, size: 84),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (loading)
+                  Container(
+                    width: 150,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Text(
+                      displayName.isEmpty ? '—' : displayName,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _RoleChip(isTeacher: isTeacher),
+                    if (phone.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      _PhoneChip(phone: phone),
+                    ],
+                  ],
+                ),
+                SizedBox(height: bottomPadding),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GlowCircle extends StatelessWidget {
+  final double size;
+  final Color color;
+  const _GlowCircle({required this.size, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+    );
+  }
+}
+
+class _FrostedIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _FrostedIconButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withValues(alpha: 0.14),
+        ),
+        child: Icon(icon, color: Colors.white, size: 20),
+      ),
+    );
+  }
+}
+
+class _RoleChip extends StatelessWidget {
+  final bool isTeacher;
+  const _RoleChip({required this.isTeacher});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isTeacher ? Symbols.school_rounded : Symbols.local_library_rounded,
+            size: 13,
+            fill: 1,
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            isTeacher ? 'Tutor' : 'Student',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withValues(alpha: 0.85),
             ),
           ),
         ],
@@ -438,277 +658,53 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
   }
 }
 
-// ─── Profile card ───────────────────────────────────────────────────────────
-
-class _ProfileCard extends StatelessWidget {
-  final Map<String, dynamic>? profile;
-  final bool loading;
-
-  const _ProfileCard({this.profile, this.loading = true});
+class _PhoneChip extends StatelessWidget {
+  final String phone;
+  const _PhoneChip({required this.phone});
 
   @override
   Widget build(BuildContext context) {
-    final firstName = profile?['first_name'] ?? '';
-    final lastName = profile?['last_name'] ?? '';
-    final imageUrl = profile?['profile_image'] as String?;
-    final displayName = loading ? '...' : '$firstName\n$lastName'.trim();
-
-    final avatarImage = CachedAvatar(imageUrl: imageUrl, size: 64);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: context.colors.surfaceAlt,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            // Avatar with ring matching the surrounding card
-            Container(
-              width: 84,
-              height: 84,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: context.colors.surface,
-                border: Border.all(color: context.colors.surface, width: 2),
-              ),
-              padding: const EdgeInsets.all(6),
-              child: loading
-                  ? const Skeleton(height: 64, width: 64, circle: true)
-                  : avatarImage,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Symbols.call_rounded,
+            size: 13,
+            fill: 1,
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            phone,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.white.withValues(alpha: 0.85),
             ),
-            const SizedBox(width: 12),
-            // Name & phone on card surface
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: context.colors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: loading
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Skeleton(height: 18, width: 120, borderRadius: 6),
-                          SizedBox(height: 6),
-                          Skeleton(height: 18, width: 100, borderRadius: 6),
-                          SizedBox(height: 10),
-                          Skeleton(height: 14, width: 150, borderRadius: 6),
-                        ],
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            displayName,
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: context.colors.textPrimary,
-                              height: 1.25,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            profile?['phone_number'] as String? ?? '',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w400,
-                              color: context.colors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ─── Join PLUS banner ───────────────────────────────────────────────────────
+// ─── Balance card (overlaps hero) ─────────────────────────────────────────────
 
-class _JoinPlusBanner extends StatelessWidget {
-  final VoidCallback onTap;
-  const _JoinPlusBanner({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Image.asset(
-          'assets/images/branding/profile-join-plus.png',
-          width: double.infinity,
-          fit: BoxFit.fitWidth,
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Card group ─────────────────────────────────────────────────────────────
-
-class _CardGroup extends StatelessWidget {
-  final List<Widget> children;
-  const _CardGroup({required this.children});
+class _BalanceCard extends StatefulWidget {
+  final Color brandColor;
+  const _BalanceCard({required this.brandColor});
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.colors.surface,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(children: children),
-      ),
-    );
-  }
+  State<_BalanceCard> createState() => _BalanceCardState();
 }
 
-// ─── Divider ────────────────────────────────────────────────────────────────
-
-class _Divider extends StatelessWidget {
-  const _Divider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 52),
-      child: Container(height: 0.5, color: context.colors.border),
-    );
-  }
-}
-
-// ─── Menu row ───────────────────────────────────────────────────────────────
-
-class _MenuRow extends StatelessWidget {
-  final String? icon;
-  final Widget? iconWidget;
-  final String label;
-  final VoidCallback onTap;
-
-  const _MenuRow({
-    this.icon,
-    this.iconWidget,
-    required this.label,
-    required this.onTap,
-  }) : assert(icon != null || iconWidget != null);
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            iconWidget ?? SvgPicture.asset(icon!, width: 22, height: 22),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: context.colors.textPrimary,
-                ),
-              ),
-            ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: context.colors.textTertiary,
-              size: 22,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Dark mode toggle ───────────────────────────────────────────────────────
-
-class _ThemeToggleRow extends StatelessWidget {
-  const _ThemeToggleRow();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return AnimatedBuilder(
-      animation: Listenable.merge([
-        ThemeService.isDarkNotifier,
-        AppFeatureService.notifier,
-      ]),
-      builder: (context, _) {
-        // Admin has locked the app to a single theme (via the light_mode /
-        // dark_mode flags) — nothing left for the user to choose.
-        final lightAllowed = AppFeatureService.isEnabled('light_mode');
-        final darkAllowed = AppFeatureService.isEnabled('dark_mode');
-        if (!lightAllowed || !darkAllowed) {
-          return const SizedBox.shrink();
-        }
-
-        final isDark = ThemeService.isDark;
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Row(
-                children: [
-                  Icon(
-                    isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                    size: 22,
-                    color: colors.textPrimary,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      'Dark mode',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  Switch.adaptive(
-                    value: isDark,
-                    activeThumbColor: colors.brand,
-                    onChanged: (value) => ThemeService.setDark(value),
-                  ),
-                ],
-              ),
-            ),
-            const _Divider(),
-          ],
-        );
-      },
-    );
-  }
-}
-
-// ─── Balance row ────────────────────────────────────────────────────────────
-
-class _BalanceRow extends StatefulWidget {
-  @override
-  State<_BalanceRow> createState() => _BalanceRowState();
-}
-
-class _BalanceRowState extends State<_BalanceRow> {
+class _BalanceCardState extends State<_BalanceCard> {
   int? _balance;
   bool _loading = true;
 
@@ -747,67 +743,6 @@ class _BalanceRowState extends State<_BalanceRow> {
     return buffer.toString();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Balance',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400,
-                  color: context.colors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              if (_loading)
-                const Skeleton(height: 22, width: 90, borderRadius: 6)
-              else
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: '${_formatAmount(_balance ?? 0)} ',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: context.colors.success,
-                        ),
-                      ),
-                      TextSpan(
-                        text: 'UZS',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: context.colors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          const Spacer(),
-          // Plus icon for top-up
-          GestureDetector(
-            onTap: _onTopUp,
-            behavior: HitTestBehavior.opaque,
-            child: SvgPicture.asset(
-              'assets/images/buttons/top-up.svg',
-              width: 28,
-              height: 28,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _onTopUp() async {
     final result = await Navigator.of(context).push<int>(
       MaterialPageRoute(builder: (_) => const PaymentTopUpScreen()),
@@ -816,6 +751,553 @@ class _BalanceRowState extends State<_BalanceRow> {
       // Re-fetch wallet balance from server after a successful top-up
       await _loadBalance();
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.border),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: colors.surfaceAlt,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              Symbols.account_balance_wallet_rounded,
+              color: colors.textPrimary,
+              size: 24,
+              opticalSize: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Balance',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: colors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                if (_loading)
+                  const Skeleton(height: 20, width: 90, borderRadius: 6)
+                else
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '${_formatAmount(_balance ?? 0)} ',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: colors.success,
+                          ),
+                        ),
+                        TextSpan(
+                          text: 'UZS',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: colors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: _onTopUp,
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: widget.brandColor,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Symbols.add_rounded,
+                      size: 18, color: colors.onBrand, weight: 700),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Top up',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: colors.onBrand,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Join PLUS banner ───────────────────────────────────────────────────────
+
+class _JoinPlusBanner extends StatelessWidget {
+  final VoidCallback onTap;
+  const _JoinPlusBanner({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final gradientEnd = Color.lerp(colors.brand, Colors.black, 0.35)!;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [colors.brand, gradientEnd],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: colors.shadow.withValues(alpha: 0.12),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              Positioned(
+                top: -30,
+                right: -20,
+                child: _GlowCircle(
+                    size: 120, color: Colors.white.withValues(alpha: 0.05)),
+              ),
+              // Oversized watermark glyph anchored to the right edge.
+              Positioned(
+                right: -14,
+                bottom: -22,
+                child: Icon(
+                  Symbols.workspace_premium_rounded,
+                  size: 110,
+                  color: Colors.white.withValues(alpha: 0.06),
+                  fill: 1,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Symbols.workspace_premium_rounded,
+                                size: 18,
+                                fill: 1,
+                                color: colors.accentYellow,
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Linka PLUS',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'Unlimited chat, webinars & debates,\npriority support',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              height: 1.35,
+                              color: Colors.white.withValues(alpha: 0.75),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Join',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: colors.brand,
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          Icon(
+                            Symbols.arrow_forward_rounded,
+                            size: 15,
+                            weight: 700,
+                            color: colors.brand,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Section label ──────────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 0, 28, 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          text.toUpperCase(),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+            color: context.colors.textTertiary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Card group ─────────────────────────────────────────────────────────────
+
+class _CardGroup extends StatelessWidget {
+  final List<Widget> children;
+  const _CardGroup({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: colors.border),
+          boxShadow: [
+            BoxShadow(
+              color: colors.shadow.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Material(
+            color: Colors.transparent,
+            child: Column(children: children),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Divider ────────────────────────────────────────────────────────────────
+
+class _RowDivider extends StatelessWidget {
+  const _RowDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 66),
+      child: Container(height: 0.5, color: context.colors.border),
+    );
+  }
+}
+
+// ─── Menu row ───────────────────────────────────────────────────────────────
+
+class _MenuRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool destructive;
+  final VoidCallback onTap;
+
+  const _MenuRow({
+    required this.icon,
+    required this.label,
+    this.destructive = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final foreground = destructive ? colors.error : colors.textPrimary;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: destructive
+                    ? colors.error.withValues(alpha: 0.1)
+                    : colors.surfaceAlt,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                opticalSize: 20,
+                color: foreground,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: foreground,
+                ),
+              ),
+            ),
+            Icon(
+              Symbols.chevron_right_rounded,
+              color: colors.textTertiary,
+              size: 22,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Appearance row with light/dark segmented pill ──────────────────────────
+
+class _AppearanceRow extends StatelessWidget {
+  const _AppearanceRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return AnimatedBuilder(
+      animation: AppFeatureService.notifier,
+      builder: (context, _) {
+        // Admin has locked the app to a single theme (via the light_mode /
+        // dark_mode flags) — nothing left for the user to choose.
+        final lightAllowed = AppFeatureService.isEnabled('light_mode');
+        final darkAllowed = AppFeatureService.isEnabled('dark_mode');
+        if (!lightAllowed || !darkAllowed) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          children: [
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: colors.surfaceAlt,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Symbols.routine_rounded,
+                      size: 20,
+                      opticalSize: 20,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Appearance',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  const _ThemeModePill(),
+                ],
+              ),
+            ),
+            const _RowDivider(),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Compact animated segmented control: [ ☀ | ☾ ] with a sliding thumb.
+class _ThemeModePill extends StatelessWidget {
+  const _ThemeModePill();
+
+  void _select(bool dark) {
+    if (ThemeService.isDark == dark) return;
+    HapticFeedback.selectionClick();
+    ThemeService.setDark(dark);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return ValueListenableBuilder<bool>(
+      valueListenable: ThemeService.isDarkNotifier,
+      builder: (context, isDark, _) {
+        final thumbColor = isDark ? colors.brand : Colors.white;
+        return Container(
+          width: 92,
+          height: 36,
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: colors.surfaceAlt,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: colors.border),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Thumb is exactly half the track, so it always shares a
+              // center with the icon segment it covers.
+              final half = constraints.maxWidth / 2;
+              return Stack(
+                children: [
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 240),
+                    curve: Curves.easeOutCubic,
+                    left: isDark ? half : 0,
+                    top: 0,
+                    bottom: 0,
+                    width: half,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: thumbColor,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colors.shadow.withValues(alpha: 0.15),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _select(false),
+                          behavior: HitTestBehavior.opaque,
+                          child: Center(
+                            child: Icon(
+                              Symbols.light_mode_rounded,
+                              size: 16,
+                              opticalSize: 20,
+                              fill: isDark ? 0 : 1,
+                              color: isDark
+                                  ? colors.textTertiary
+                                  : colors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _select(true),
+                          behavior: HitTestBehavior.opaque,
+                          child: Center(
+                            child: Icon(
+                              Symbols.dark_mode_rounded,
+                              size: 16,
+                              opticalSize: 20,
+                              fill: isDark ? 1 : 0,
+                              color: isDark
+                                  ? Colors.white
+                                  : colors.textTertiary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -826,46 +1308,15 @@ class _LogoutCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.colors.surface,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: GestureDetector(
+    return _CardGroup(
+      children: [
+        _MenuRow(
+          icon: Symbols.logout_rounded,
+          label: 'Log out',
+          destructive: true,
           onTap: () => _handleLogout(context),
-          behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                SvgPicture.asset(
-                  'assets/images/buttons/logout.svg',
-                  width: 22,
-                  height: 22,
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    'Log out',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: context.colors.error,
-                    ),
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: context.colors.textTertiary,
-                  size: 22,
-                ),
-              ],
-            ),
-          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -912,6 +1363,7 @@ class _LogoutConfirmSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return SafeArea(
       top: false,
       child: Padding(
@@ -925,16 +1377,26 @@ class _LogoutConfirmSheet extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: context.colors.border,
+                  color: colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            SvgPicture.asset(
-              'assets/images/buttons/logout.svg',
-              width: 40,
-              height: 40,
+            Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: colors.errorBg,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Symbols.logout_rounded,
+                  color: colors.error,
+                  size: 26,
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             Text(
@@ -943,7 +1405,7 @@ class _LogoutConfirmSheet extends StatelessWidget {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: context.colors.textPrimary,
+                color: colors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
@@ -953,7 +1415,7 @@ class _LogoutConfirmSheet extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
-                color: context.colors.textSecondary,
+                color: colors.textSecondary,
                 height: 1.4,
               ),
             ),
@@ -963,8 +1425,8 @@ class _LogoutConfirmSheet extends StatelessWidget {
                 Expanded(
                   child: _SheetButton(
                     label: 'Cancel',
-                    background: context.colors.surfaceAlt,
-                    textColor: context.colors.textPrimary,
+                    background: colors.surfaceAlt,
+                    textColor: colors.textPrimary,
                     onTap: () => Navigator.pop(context, false),
                   ),
                 ),
@@ -972,7 +1434,7 @@ class _LogoutConfirmSheet extends StatelessWidget {
                 Expanded(
                   child: _SheetButton(
                     label: 'Log out',
-                    background: context.colors.error,
+                    background: colors.error,
                     textColor: Colors.white,
                     onTap: () => Navigator.pop(context, true),
                   ),
@@ -1108,7 +1570,7 @@ class _DeleteAccountCardState extends State<_DeleteAccountCard> {
               )
             else
               Icon(
-                Icons.delete_outline_rounded,
+                Symbols.delete_forever_rounded,
                 color: context.colors.error,
                 size: 16,
               ),
@@ -1187,9 +1649,10 @@ class _DeleteAccountConfirmSheetState
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.warning_amber_rounded,
+                  Symbols.warning_rounded,
                   color: context.colors.error,
-                  size: 34,
+                  size: 32,
+                  fill: 1,
                 ),
               ),
             ),

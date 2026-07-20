@@ -712,6 +712,30 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             label: 'Upload intro video',
                             icon: Icons.videocam_outlined,
                           ),
+
+                        const SizedBox(height: 8),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.screen_rotation_outlined,
+                              size: 14,
+                              color: context.colors.textTertiary,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Record in landscape (hold your phone sideways) '
+                                'so the video fills the screen properly.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.35,
+                                  color: context.colors.textTertiary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ] else ...[
                         const SizedBox(height: 12),
                         _DropdownField(

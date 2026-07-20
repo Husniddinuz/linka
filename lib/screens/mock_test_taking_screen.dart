@@ -44,7 +44,11 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
   final Map<String, dynamic> _answers = {};
 
   Timer? _timer;
-  Duration _remaining = Duration.zero;
+
+  /// Ticks once a second; a ValueNotifier (not setState) so the countdown
+  /// doesn't rebuild the whole question tree every second — a per-second
+  /// rebuild resets in-progress text edits and dismisses the paste toolbar.
+  final ValueNotifier<Duration> _remaining = ValueNotifier(Duration.zero);
   bool _submitting = false;
 
   Color _passageBackground = kPassageBackgroundOptions.first;
@@ -72,6 +76,7 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _remaining.dispose();
     if (_isListening) {
       PodcastPlaybackService.instance.stop();
     }
@@ -82,10 +87,10 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
     try {
       final data = await MockTestService.fetchTestDetail(widget.testId);
       if (!mounted) return;
+      _remaining.value = Duration(seconds: data.durationSeconds);
       setState(() {
         _test = data;
         _loading = false;
-        _remaining = Duration(seconds: data.durationSeconds);
       });
       _startTimer();
       if (_isListening) {
@@ -110,12 +115,12 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
-      if (_remaining.inSeconds <= 0) {
+      if (_remaining.value.inSeconds <= 0) {
         t.cancel();
         _confirmSubmit(auto: true);
         return;
       }
-      setState(() => _remaining -= const Duration(seconds: 1));
+      _remaining.value -= const Duration(seconds: 1);
     });
   }
 
@@ -407,34 +412,40 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Center(
-              child: MtPill(
-                background: _remaining.inMinutes < 5
-                    ? MockTestColors.redBg
-                    : MockTestColors.chipBg,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.timer_outlined,
-                      size: 15,
-                      color: _remaining.inMinutes < 5
-                          ? MockTestColors.red
-                          : MockTestColors.navy,
+              child: ValueListenableBuilder<Duration>(
+                valueListenable: _remaining,
+                builder: (context, remaining, _) {
+                  final urgent = remaining.inMinutes < 5;
+                  return MtPill(
+                    background: urgent
+                        ? MockTestColors.redBg
+                        : MockTestColors.chipBg,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 15,
+                          color: urgent
+                              ? MockTestColors.red
+                              : MockTestColors.navy,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          _formatDuration(remaining),
+                          style: TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12.5,
+                            color: urgent
+                                ? MockTestColors.red
+                                : MockTestColors.navy,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 5),
-                    Text(
-                      _formatDuration(_remaining),
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12.5,
-                        color: _remaining.inMinutes < 5
-                            ? MockTestColors.red
-                            : MockTestColors.navy,
-                      ),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ),
@@ -454,47 +465,49 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
           ),
         ),
       ),
-      body: Listener(
-        // A plain GestureDetector's onTap can lose the tap-gesture arena to
-        // descendants that install their own recognizers (e.g. the passage's
-        // SelectionArea), so it never fires. Listener sees every pointer
-        // down regardless of who ends up winning the arena.
-        behavior: HitTestBehavior.translucent,
-        onPointerDown: (_) => FocusScope.of(context).unfocus(),
-        child: Column(
-          children: [
-            if (_isListening) const _AudioBar(),
-            Expanded(
-              child: section == null
-                  ? const Center(
-                      child: Text(
-                        'No content',
-                        style: TextStyle(fontFamily: 'SF Pro'),
-                      ),
-                    )
-                  : _isListening
-                  ? _QuestionsView(
-                      section: section,
-                      answers: _answers,
-                      onAnswer: (id, val) => setState(() => _answers[id] = val),
-                    )
-                  : _ReadingSplitView(
-                      passage: _PassageView(
+      body: Column(
+        children: [
+          if (_isListening) const _AudioBar(),
+          Expanded(
+            child: section == null
+                ? const Center(
+                    child: Text(
+                      'No content',
+                      style: TextStyle(fontFamily: 'SF Pro'),
+                    ),
+                  )
+                : _isListening
+                ? _QuestionsView(
+                    section: section,
+                    answers: _answers,
+                    onAnswer: (id, val) => setState(() => _answers[id] = val),
+                  )
+                : _ReadingSplitView(
+                    // Keyboard dismissal is scoped to the passage pane only:
+                    // a Listener over the whole body also fired for taps and
+                    // long-presses inside the answer fields themselves, so
+                    // every touch in the questions pane bounced the keyboard
+                    // (and broke paste). A Listener (not GestureDetector) so
+                    // the passage's SelectionArea can't swallow the event.
+                    passage: Listener(
+                      behavior: HitTestBehavior.translucent,
+                      onPointerDown: (_) => FocusScope.of(context).unfocus(),
+                      child: _PassageView(
                         passageKey: '${widget.testId}_$_sectionIndex',
                         bodyHtml: section.bodyHtml,
                         background: _passageBackground,
                         fontScale: _passageFontScale,
                       ),
-                      questions: _QuestionsView(
-                        section: section,
-                        answers: _answers,
-                        onAnswer: (id, val) =>
-                            setState(() => _answers[id] = val),
-                      ),
                     ),
-            ),
-          ],
-        ),
+                    questions: _QuestionsView(
+                      section: section,
+                      answers: _answers,
+                      onAnswer: (id, val) =>
+                          setState(() => _answers[id] = val),
+                    ),
+                  ),
+          ),
+        ],
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
@@ -908,22 +921,18 @@ class _QuestionsView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (instruction.isNotEmpty)
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 14),
-                    padding: const EdgeInsets.all(12),
-                    decoration: mtSoftCard(
-                      color: MockTestColors.chipBg,
-                      radius: 10,
-                    ),
-                    child: Text(
-                      instruction,
-                      style: const TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13.5,
-                        color: MockTestColors.navy,
-                        height: 1.4,
+                  GroupInstructionCard(instruction: instruction),
+                if (group.imageUrl.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        group.imageUrl,
+                        width: double.infinity,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const SizedBox.shrink(),
                       ),
                     ),
                   ),

@@ -18,6 +18,7 @@ import '../services/chat_service.dart';
 import '../services/podcast_playback_service.dart';
 import '../services/user_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/skeleton.dart';
 import 'chats_screen.dart';
 import 'tutor_profile_screen.dart';
 
@@ -627,7 +628,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1578,7 +1579,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
     final canPost = _currentUserIsTutor || widget.channel.studentCanPost;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: _buildAppBar(),
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
@@ -1670,9 +1671,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
 
   Widget _buildMessageList() {
     if (_loadingInitial) {
-      return Center(
-        child: CircularProgressIndicator(color: context.colors.accentBlue),
-      );
+      return _ChatSkeleton(hideIdentity: _isTutorOnlyChannel);
     }
 
     // Index 0 is the loading-more indicator (hidden when not loading)
@@ -1710,7 +1709,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
           key: ValueKey(msg.id),
           duration: const Duration(milliseconds: 300),
           color: _highlightedId == msg.id
-              ? const Color(0xFFFFA500).withValues(alpha: 0.12)
+              ? context.colors.accentYellow.withValues(alpha: 0.15)
               : Colors.transparent,
           child: Column(
             children: [
@@ -1764,13 +1763,13 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       elevation: 0,
       scrolledUnderElevation: 0,
       leadingWidth: 48,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-        color: const Color(0xFF272942),
+        color: context.colors.textPrimary,
         onPressed: () => Navigator.pop(context),
       ),
       title: Column(
@@ -1847,6 +1846,88 @@ class _DateDivider extends StatelessWidget {
             ),
           ),
           Expanded(child: Divider(color: context.colors.border)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Loading skeleton ───────────────────────────────────────────────────────────
+
+class _ChatSkeleton extends StatelessWidget {
+  // Tutor-only channels hide per-message identity (avatar + name), so the
+  // skeleton mirrors that by omitting the avatar/name placeholders.
+  final bool hideIdentity;
+  const _ChatSkeleton({required this.hideIdentity});
+
+  // Mirrors the real message list: alternating incoming/outgoing bubbles with
+  // varied widths and a couple of two-line bubbles so the placeholder reads as
+  // a conversation rather than a block of identical bars.
+  static const _rows = [
+    (isMine: false, widthFactor: 0.58, lines: 2),
+    (isMine: false, widthFactor: 0.42, lines: 1),
+    (isMine: true, widthFactor: 0.50, lines: 1),
+    (isMine: false, widthFactor: 0.66, lines: 2),
+    (isMine: true, widthFactor: 0.34, lines: 1),
+    (isMine: false, widthFactor: 0.46, lines: 1),
+    (isMine: true, widthFactor: 0.60, lines: 2),
+    (isMine: false, widthFactor: 0.38, lines: 1),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final maxWidth = MediaQuery.of(context).size.width;
+    return IgnorePointer(
+      child: ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        children: [
+          for (final row in _rows)
+            _row(
+              context,
+              isMine: row.isMine,
+              width: maxWidth * row.widthFactor,
+              lines: row.lines,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(
+    BuildContext context, {
+    required bool isMine,
+    required double width,
+    required int lines,
+  }) {
+    final showAvatar = !isMine && !hideIdentity;
+    // 44 ≈ one line of text with bubble padding; second line adds ~19.
+    final bubbleHeight = lines == 2 ? 63.0 : 44.0;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(isMine ? 64 : 16, 5, isMine ? 16 : 64, 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment:
+            isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          if (showAvatar) ...[
+            const Skeleton(width: 32, height: 32, circle: true),
+            const SizedBox(width: 8),
+          ],
+          Column(
+            crossAxisAlignment:
+                isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: [
+              if (showAvatar) ...[
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 4),
+                  child: Skeleton(width: 72, height: 11, borderRadius: 4),
+                ),
+              ],
+              Skeleton(width: width, height: bubbleHeight, borderRadius: 16),
+            ],
+          ),
         ],
       ),
     );
@@ -2109,7 +2190,7 @@ class _MessageBubble extends StatelessWidget {
     } else {
       bubbleContent = Container(
         decoration: BoxDecoration(
-          color: isMine ? const Color(0xFF272942) : const Color(0xFFF5F5F5),
+          color: isMine ? context.colors.brand : context.colors.surfaceAlt,
           borderRadius: radius,
         ),
         child: Column(
@@ -2238,7 +2319,7 @@ class _ReplyBlock extends StatelessWidget {
         isMine ? Colors.white.withValues(alpha: 0.55) : context.colors.accentBlue;
     final textColor = isMine
         ? Colors.white.withValues(alpha: 0.75)
-        : const Color(0xFF555577);
+        : context.colors.textSecondary;
     final bgColor = isMine
         ? Colors.white.withValues(alpha: 0.12)
         : context.colors.accentBlue.withValues(alpha: 0.08);
@@ -2551,7 +2632,7 @@ class _TextBubble extends StatelessWidget {
           fontFamily: 'SF Pro',
           fontSize: 15,
           fontWeight: FontWeight.w400,
-          color: isMine ? Colors.white : const Color(0xFF272942),
+          color: isMine ? context.colors.onBrand : context.colors.textPrimary,
           height: 1.45,
         ),
       ),
@@ -2598,7 +2679,7 @@ class _ImageBubble extends StatelessWidget {
       onTap: () => _openFullScreen(context),
       child: Container(
         decoration: BoxDecoration(
-          color: isMine ? const Color(0xFF272942) : const Color(0xFFF5F5F5),
+          color: isMine ? context.colors.brand : context.colors.surfaceAlt,
           borderRadius: radius,
         ),
         child: Column(
@@ -2779,11 +2860,13 @@ class _VoiceBubbleState extends State<_VoiceBubble> {
   Widget build(BuildContext context) {
     final isMine = widget.isMine;
     final isPlaying = widget.isPlaying;
-    final fg = isMine ? Colors.white : const Color(0xFF272942);
+    final fg =
+        isMine ? context.colors.onBrand : context.colors.textPrimary;
     final waveBase = isMine
         ? Colors.white.withValues(alpha: 0.35)
-        : const Color(0xFF272942).withValues(alpha: 0.2);
-    final waveActive = isMine ? Colors.white : const Color(0xFF272942);
+        : context.colors.textPrimary.withValues(alpha: 0.2);
+    final waveActive =
+        isMine ? context.colors.onBrand : context.colors.textPrimary;
 
     final total = _total;
     final dragFraction = _dragFraction;
@@ -2798,7 +2881,8 @@ class _VoiceBubbleState extends State<_VoiceBubble> {
         ? _fmt(elapsedMs ~/ 1000)
         : _fmt(total);
     final downloading = widget.downloadProgress != null;
-    final ringColor = isMine ? Colors.white : const Color(0xFF5B5EA6);
+    final ringColor =
+        isMine ? Colors.white : context.colors.accentBlue;
     final canSeek = widget.onSeek != null && total > 0;
 
     return Padding(
@@ -2820,7 +2904,8 @@ class _VoiceBubbleState extends State<_VoiceBubble> {
                     decoration: BoxDecoration(
                       color: isMine
                           ? Colors.white.withValues(alpha: 0.18)
-                          : const Color(0xFF272942).withValues(alpha: 0.08),
+                          : context.colors.textPrimary
+                              .withValues(alpha: 0.08),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -2974,10 +3059,10 @@ class _TextInputBar extends StatelessWidget {
                     vertical: 10,
                   ),
                 ),
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'SF Pro',
                   fontSize: 15,
-                  color: Color(0xFF272942),
+                  color: context.colors.textPrimary,
                 ),
                 maxLines: 4,
                 minLines: 1,
@@ -2992,13 +3077,13 @@ class _TextInputBar extends StatelessWidget {
             child: Container(
               width: 42,
               height: 42,
-              decoration: const BoxDecoration(
-                color: Color(0xFF272942),
+              decoration: BoxDecoration(
+                color: context.colors.brand,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.send_rounded,
-                color: Colors.white,
+                color: context.colors.onBrand,
                 size: 18,
               ),
             ),
@@ -3130,13 +3215,13 @@ class _VoiceInputBar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isRecording
                     ? context.colors.error
-                    : const Color(0xFF272942),
+                    : context.colors.brand,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
                     color: (isRecording
                             ? context.colors.error
-                            : const Color(0xFF272942))
+                            : context.colors.brand)
                         .withValues(alpha: 0.28),
                     blurRadius: isRecording ? 20 : 8,
                     offset: const Offset(0, 4),
@@ -3205,7 +3290,7 @@ class _VoiceInputBar extends StatelessWidget {
                 iconColor: Colors.white,
                 bg: previewPlaying
                     ? context.colors.accentBlue
-                    : const Color(0xFF272942),
+                    : context.colors.brand,
                 size: 64,
                 label: previewPlaying ? 'pause' : 'listen',
                 onTap: onPlayPreview,
@@ -3215,7 +3300,7 @@ class _VoiceInputBar extends StatelessWidget {
               _PreviewBtn(
                 icon: Icons.send_rounded,
                 iconColor: Colors.white,
-                bg: const Color(0xFF272942),
+                bg: context.colors.brand,
                 size: 50,
                 label: 'send',
                 onTap: onSendRecord,
@@ -3298,25 +3383,28 @@ class _TutorBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final gold = Theme.of(context).brightness == Brightness.dark
+        ? context.colors.accentYellow
+        : const Color(0xFFB8860B);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5C542).withValues(alpha: 0.12),
+        color: context.colors.accentYellow.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: const Color(0xFFF5C542).withValues(alpha: 0.45),
+          color: context.colors.accentYellow.withValues(alpha: 0.45),
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
+          Text(
             'TUTOR',
             style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 9,
               fontWeight: FontWeight.w700,
-              color: Color(0xFFB8860B),
+              color: gold,
               letterSpacing: 0.5,
             ),
           ),
@@ -3325,15 +3413,15 @@ class _TutorBadge extends StatelessWidget {
               width: 1,
               height: 9,
               margin: const EdgeInsets.symmetric(horizontal: 5),
-              color: const Color(0xFFB8860B).withValues(alpha: 0.35),
+              color: gold.withValues(alpha: 0.35),
             ),
             Text(
               'IELTS ${ieltsScore!.toStringAsFixed(1)}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 9,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFFB8860B),
+                color: gold,
                 letterSpacing: 0.5,
               ),
             ),
@@ -3968,7 +4056,7 @@ class _CreateQuizSheetState extends State<_CreateQuizSheet> {
               child: ElevatedButton(
                 onPressed: _canSubmit ? _submit : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF272942),
+                  backgroundColor: context.colors.brand,
                   disabledBackgroundColor: context.colors.border,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -4269,10 +4357,10 @@ class _ReportSheetState extends State<_ReportSheet> {
                 contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14, vertical: 10),
               ),
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 14,
-                color: Color(0xFF272942),
+                color: context.colors.textPrimary,
               ),
             ),
           ),
@@ -4286,7 +4374,7 @@ class _ReportSheetState extends State<_ReportSheet> {
                     ? _submit
                     : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF272942),
+                  backgroundColor: context.colors.brand,
                   disabledBackgroundColor: context.colors.border,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -4333,7 +4421,7 @@ class _ReplyBadge extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFF272942),
+          color: context.colors.brand,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -4397,7 +4485,7 @@ class _ScrollToBottomFab extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFF272942),
+                color: context.colors.brand,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(

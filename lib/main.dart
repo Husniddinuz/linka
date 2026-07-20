@@ -4,12 +4,16 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'screens/home_screen.dart';
+import 'screens/profile_setup_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/role_selection_screen.dart';
 import 'screens/tutor_profile_screen.dart';
 import 'services/api_service.dart';
 import 'services/app_feature_service.dart';
+import 'services/auth_service.dart';
 import 'services/facebook_events_service.dart';
+import 'services/notification_service.dart';
 import 'services/theme_service.dart';
 import 'services/token_service.dart';
 import 'services/update_service.dart';
@@ -25,6 +29,10 @@ void main() async {
     androidNotificationChannelName: 'Linka Podcasts',
     androidNotificationOngoing: true,
     androidStopForegroundOnPause: true,
+    // Downsample podcast artwork before decoding; full-size covers can be
+    // multi-megapixel and the notification/lock screen never needs more.
+    artDownscaleWidth: 384,
+    artDownscaleHeight: 384,
   );
   await Firebase.initializeApp();
   await FacebookEventsService.init();
@@ -115,19 +123,105 @@ class _LinkaAppState extends State<LinkaApp> with WidgetsBindingObserver {
     }
   }
 
+  /// Telegram login deep link: https://linkaapp.uz/tg-login?token=... (universal
+  /// link) or linka://tg-login?token=... (custom-scheme fallback from the
+  /// landing page).
+  bool _isTelegramLoginLink(Uri uri) {
+    final isWeb = (uri.scheme == 'https' || uri.scheme == 'http') &&
+        (uri.host == 'linkaapp.uz' || uri.host == 'www.linkaapp.uz') &&
+        uri.path == '/tg-login';
+    final isScheme = uri.scheme == 'linka' && uri.host == 'tg-login';
+    return isWeb || isScheme;
+  }
+
+  bool _telegramLoginInProgress = false;
+
+  Future<void> _handleTelegramLogin(String token) async {
+    if (_telegramLoginInProgress) return;
+    _telegramLoginInProgress = true;
+    try {
+      final result = await AuthService.exchangeTelegramToken(token);
+
+      await TokenService.saveTokens(
+        access: result['accessToken'] as String,
+        refresh: result['refreshToken'] as String,
+      );
+
+      NotificationService.registerDevice();
+      NotificationService.listenTokenRefresh();
+
+      // On cold start the link can arrive before the first frame; wait for
+      // the navigator so the redirect isn't lost.
+      for (var i = 0; i < 40 && navigatorKey.currentState == null; i++) {
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+
+      final user = result['user'] as Map<String, dynamic>;
+      final isProfileComplete = user['isProfileComplete'] as bool? ?? false;
+      final role = user['role'] as String? ?? 'student';
+
+      final context = navigatorKey.currentContext;
+      if (context != null && context.mounted) {
+        AppNotify.show(
+          context,
+          message: 'Login successful',
+          type: NotifyType.success,
+        );
+      }
+
+      navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => isProfileComplete
+              ? const HomeScreen()
+              : ProfileSetupScreen(role: role),
+        ),
+        (route) => false,
+      );
+    } on AuthException catch (e) {
+      final context = navigatorKey.currentContext;
+      if (context != null && context.mounted) {
+        AppNotify.show(context, message: e.message, type: NotifyType.error);
+      }
+    } finally {
+      _telegramLoginInProgress = false;
+    }
+  }
+
+  void _openTutorProfile(int tutorId) {
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(builder: (_) => TutorProfileScreen(tutorId: tutorId)),
+    );
+  }
+
   void _handleDeepLink(Uri uri) {
+    if (_isTelegramLoginLink(uri)) {
+      final token = uri.queryParameters['token'];
+      if (token != null && token.isNotEmpty) {
+        _handleTelegramLogin(token);
+      }
+      return;
+    }
+
     final host = uri.host;
     final segments = uri.pathSegments;
 
+    // Universal links: https://linkaapp.uz/tutor/<id>, ...
+    if ((uri.scheme == 'https' || uri.scheme == 'http') &&
+        (host == 'linkaapp.uz' || host == 'www.linkaapp.uz')) {
+      if (segments.length >= 2 && segments[0] == 'tutor') {
+        final tutorId = int.tryParse(segments[1]);
+        if (tutorId != null) _openTutorProfile(tutorId);
+      }
+      // Unknown site paths: do nothing (the page opens in the browser).
+      return;
+    }
+
+    // Custom scheme: linka://tutor/<id>, ...
     switch (host) {
       case 'tutor':
         if (segments.isNotEmpty) {
           final tutorId = int.tryParse(segments[0]);
-          if (tutorId != null) {
-            navigatorKey.currentState?.push(
-              MaterialPageRoute(builder: (_) => TutorProfileScreen(tutorId: tutorId)),
-            );
-          }
+          if (tutorId != null) _openTutorProfile(tutorId);
         }
         break;
       default:

@@ -33,7 +33,7 @@ class WritingSampleScreen extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
-            decoration: mtSoftCard(color: MockTestColors.chipBg, radius: 14),
+            decoration: mtSoftCard(color: MockTestColors.greenBg, radius: 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -76,6 +76,7 @@ class WritingSampleScreen extends StatelessWidget {
                     fontFamily: 'SF Pro',
                     fontSize: 14,
                     height: 1.5,
+                    fontWeight: FontWeight.w700,
                     color: MockTestColors.navy,
                   ),
                 ),

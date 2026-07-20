@@ -7,7 +7,9 @@ class ShareService {
     required int tutorId,
     String? tutorName,
   }) async {
-    final link = 'linka://tutor/$tutorId';
+    // Universal link: opens the app when installed, otherwise a web page on
+    // linkaapp.uz with store links (works for people without the app too).
+    final link = 'https://linkaapp.uz/tutor/$tutorId';
     final name = (tutorName ?? '').trim();
     final text = name.isEmpty
         ? 'Check out this tutor on Linka: $link'

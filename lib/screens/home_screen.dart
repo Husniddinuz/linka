@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../widgets/cached_avatar.dart';
 import '../widgets/lesson_card.dart';
 import '../widgets/mini_player_bar.dart';
@@ -37,6 +38,9 @@ import 'ielts_booking_screen.dart';
 import 'mock_exams_screen.dart';
 import 'speaking_samples_list_screen.dart';
 import 'writing_samples_list_screen.dart';
+import 'courses_list_screen.dart';
+import '../models/course.dart';
+import '../services/course_service.dart';
 
 // ─── Data models ───────────────────────────────────────────────────────────────
 
@@ -227,6 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadTodaysLessons();
     _loadPodcasts();
     _loadArticles();
+    _loadCourses();
     _loadSavedArticles();
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
     NotificationService.registerDevice().catchError((_) {});
@@ -381,6 +386,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _loadCourses() async {
+    try {
+      final list = await CourseService.fetchCourses();
+      if (!mounted) return;
+      setState(() => _courses = list);
+    } catch (_) {
+      // Leave the list empty so the section stays hidden on failure.
+    }
+  }
+
   Future<void> _loadSavedArticles() async {
     try {
       final response = await ApiService.get('/student/saved-articles/');
@@ -452,6 +467,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadTodaysLessons(),
       _loadPodcasts(),
       _loadArticles(),
+      _loadCourses(),
       _loadSavedArticles(),
       _loadProfile(),
       // The webinar/debate blocks manage their own state, so explicitly ask
@@ -578,6 +594,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<_Article> _articles = [];
 
+  List<Course> _courses = [];
+
   Widget _buildStudentHomeBody() {
     return SafeArea(
       child: Column(
@@ -691,6 +709,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
                               const SizedBox(height: 32),
 
+                              if (AppFeatureService.isEnabled('ielts') ||
+                                  AppFeatureService.isEnabled(
+                                      'mock_tests')) ...[
+                                const _IeltsSection(),
+                                const SizedBox(height: 28),
+                              ],
+
+                              if (AppFeatureService.isEnabled('courses') &&
+                                  _courses.isNotEmpty) ...[
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                  ),
+                                  child: _CoursesPromoBanner(
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const CoursesListScreen(),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 28),
+                              ],
+
                               _SectionHeader(
                                 title: 'PODCASTS',
                                 onSeeAll: () => Navigator.push(
@@ -724,11 +767,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                 savedArticleIds: _savedArticleIds,
                                 onToggleBookmark: _toggleArticleBookmark,
                               ),
-
-                              if (AppFeatureService.isEnabled('ielts')) ...[
-                                const SizedBox(height: 28),
-                                const _IeltsSection(),
-                              ],
 
                               const SizedBox(height: 28),
 
@@ -859,65 +897,45 @@ class _HomeScreenState extends State<HomeScreen> {
 // ─── Bottom nav tab configs ───────────────────────────────────────────────────
 
 const _studentNavItems = <_NavItem>[
-  _NavItem(
-    activeIcon: 'assets/images/icons/home_active.svg',
-    inactiveIcon: 'assets/images/icons/home_inactive.svg',
-    label: 'Home',
-  ),
-  _NavItem(
-    activeIcon: 'assets/images/icons/chat_active.svg',
-    inactiveIcon: 'assets/images/icons/chat_inactive.svg',
-    label: 'Chats',
-  ),
-  _NavItem(
-    activeIcon: 'assets/images/icons/tutors_active.svg',
-    inactiveIcon: 'assets/images/icons/tutors_inactive.svg',
-    label: 'Tutors',
-  ),
-  _NavItem(
-    activeIcon: 'assets/images/icons/profile_active.svg',
-    inactiveIcon: 'assets/images/icons/profile_inactive.svg',
-    label: 'Profile',
-  ),
+  _NavItem(icon: Symbols.home_rounded, label: 'Home'),
+  _NavItem(icon: Symbols.forum_rounded, label: 'Chats'),
+  _NavItem(icon: Symbols.group_rounded, label: 'Tutors'),
+  _NavItem(icon: Symbols.person_rounded, label: 'Profile'),
 ];
 
 const _tutorNavItems = <_NavItem>[
-  _NavItem(
-    activeIcon: 'assets/images/icons/home_active.svg',
-    inactiveIcon: 'assets/images/icons/home_inactive.svg',
-    label: 'Home',
-  ),
-  _NavItem(
-    activeIcon: 'assets/images/icons/chat_active.svg',
-    inactiveIcon: 'assets/images/icons/chat_inactive.svg',
-    label: 'Chats',
-  ),
-  _NavItem(
-    activeIcon: 'assets/images/icons/story_active.svg',
-    inactiveIcon: 'assets/images/icons/story_inactive.svg',
-    label: 'Stories',
-  ),
-  _NavItem(
-    activeIcon: 'assets/images/icons/earnings_inactive.svg',
-    inactiveIcon: 'assets/images/icons/earnings_inactive.svg',
-    label: 'Earnings',
-  ),
-  _NavItem(
-    activeIcon: 'assets/images/icons/profile_active.svg',
-    inactiveIcon: 'assets/images/icons/profile_inactive.svg',
-    label: 'Profile',
-  ),
+  _NavItem(icon: Symbols.home_rounded, label: 'Home'),
+  _NavItem(icon: Symbols.forum_rounded, label: 'Chats'),
+  _NavItem(icon: Symbols.web_stories_rounded, label: 'Stories'),
+  _NavItem(icon: Symbols.payments_rounded, label: 'Earnings'),
+  _NavItem(icon: Symbols.person_rounded, label: 'Profile'),
 ];
 
 class _NavItem {
-  final String activeIcon;
-  final String inactiveIcon;
+  final IconData icon;
   final String label;
-  const _NavItem({
-    required this.activeIcon,
-    required this.inactiveIcon,
-    required this.label,
-  });
+  const _NavItem({required this.icon, required this.label});
+}
+
+/// Nav icon that fills in and re-tints when selected. Uses theme tokens so
+/// it re-skins in dark mode (the old SVG assets had baked-in colors).
+class _NavIcon extends StatelessWidget {
+  final IconData icon;
+  final bool selected;
+  const _NavIcon({required this.icon, required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Icon(
+      icon,
+      size: 24,
+      opticalSize: 24,
+      fill: selected ? 1 : 0,
+      weight: selected ? 500 : 400,
+      color: selected ? colors.textPrimary : colors.textTertiary,
+    );
+  }
 }
 
 // ─── Header ────────────────────────────────────────────────────────────────────
@@ -980,7 +998,9 @@ class _HeaderState extends State<_Header> {
               child: GestureDetector(
                 onLongPress: widget.onLogoLongPress,
                 child: SvgPicture.asset(
-                  'assets/images/branding/header-logo.svg',
+                  Theme.of(context).brightness == Brightness.dark
+                      ? 'assets/images/branding/header-logo-dark.svg'
+                      : 'assets/images/branding/header-logo.svg',
                   height: 26,
                 ),
               ),
@@ -996,9 +1016,10 @@ class _HeaderState extends State<_Header> {
               child: Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: Icon(
-                  Icons.add_circle_outline_rounded,
+                  Symbols.add_circle_rounded,
                   color: context.colors.textPrimary,
-                  size: 28,
+                  size: 26,
+                  opticalSize: 24,
                 ),
               ),
             ),
@@ -1007,12 +1028,33 @@ class _HeaderState extends State<_Header> {
           GestureDetector(
             onTap: _openInbox,
             behavior: HitTestBehavior.opaque,
-            child: SvgPicture.asset(
-              _hasNew
-                  ? 'assets/images/icons/notification.svg'
-                  : 'assets/images/icons/notification_empty.svg',
-              width: 30,
-              height: 27,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  Symbols.notifications_rounded,
+                  size: 26,
+                  opticalSize: 24,
+                  color: context.colors.textPrimary,
+                ),
+                if (_hasNew)
+                  Positioned(
+                    top: 1,
+                    right: 2,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: context.colors.error,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: context.colors.surface,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -1509,6 +1551,154 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
+// ─── Courses promo banner ──────────────────────────────────────────────────────
+
+/// A single generic hero on the home feed that opens the courses catalogue.
+/// It doesn't render specific courses — tapping it opens the full list.
+class _CoursesPromoBanner extends StatelessWidget {
+  final VoidCallback onTap;
+  const _CoursesPromoBanner({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: SizedBox(
+          height: 132,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF5B3FD4),
+                        Color(0xFF7A4BE0),
+                        Color(0xFF9B5DE5),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: -28,
+                top: -28,
+                child: Container(
+                  width: 130,
+                  height: 130,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.12),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 44,
+                bottom: -38,
+                child: Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'LIVE COURSES',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 1.1,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Learn live with top tutors',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Join a cohort — seats are limited',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withValues(alpha: 0.85),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 9,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Browse',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF6C3FD4),
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            color: Color(0xFF6C3FD4),
+                            size: 14,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Coming soon banner ────────────────────────────────────────────────────────
 
 class _ComingSoonBanner extends StatelessWidget {
@@ -1716,10 +1906,15 @@ class _IeltsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Independently toggleable: 'ielts' = registration banner (IDP flow),
+    // 'mock_tests' = mock exams + writing/speaking samples grid.
+    final registrationEnabled = AppFeatureService.isEnabled('ielts');
+    final mockTestsEnabled = AppFeatureService.isEnabled('mock_tests');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Registration banner
+        if (registrationEnabled)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: GestureDetector(
@@ -1853,9 +2048,11 @@ class _IeltsSection extends StatelessWidget {
           ),
         ),
 
-        const SizedBox(height: 10),
+        if (registrationEnabled && mockTestsEnabled)
+          const SizedBox(height: 10),
 
         // 3-button grid
+        if (mockTestsEnabled)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
@@ -3006,11 +3203,7 @@ class _SideNav extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SvgPicture.asset(
-                        selected ? item.activeIcon : item.inactiveIcon,
-                        width: 26,
-                        height: 26,
-                      ),
+                      _NavIcon(icon: item.icon, selected: selected),
                       const SizedBox(height: 4),
                       Text(
                         item.label,
@@ -3069,11 +3262,7 @@ class _BottomNav extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    SvgPicture.asset(
-                      selected ? item.activeIcon : item.inactiveIcon,
-                      width: 26,
-                      height: 26,
-                    ),
+                    _NavIcon(icon: item.icon, selected: selected),
                     const SizedBox(height: 4),
                     Text(
                       item.label,

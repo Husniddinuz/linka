@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../services/chat_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/skeleton.dart';
 import 'channel_chat_screen.dart';
 
 // ─── Models ────────────────────────────────────────────────────────────────────
@@ -279,9 +280,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
 
   Widget _buildBody() {
     if (_loading) {
-      return Center(
-        child: CircularProgressIndicator(color: context.colors.accentBlue),
-      );
+      return const _ChannelListSkeleton();
     }
     if (_error != null) {
       return Center(
@@ -377,6 +376,69 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
           ],
         ],
       ),
+    );
+  }
+}
+
+// ─── Loading skeleton ─────────────────────────────────────────────────────────
+
+class _ChannelListSkeleton extends StatelessWidget {
+  const _ChannelListSkeleton();
+
+  // Varied preview-line widths so the placeholder rows don't look identical.
+  static const _previewFactors = [0.62, 0.48, 0.70, 0.40, 0.56, 0.66, 0.44, 0.60];
+
+  @override
+  Widget build(BuildContext context) {
+    final maxWidth = MediaQuery.of(context).size.width;
+    return IgnorePointer(
+      child: ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          for (var i = 0; i < _previewFactors.length; i++)
+            _tile(
+              context,
+              previewWidth: maxWidth * _previewFactors[i],
+              showDivider: i < _previewFactors.length - 1,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tile(
+    BuildContext context, {
+    required double previewWidth,
+    required bool showDivider,
+  }) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Skeleton(width: 54, height: 54, borderRadius: 16),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Skeleton(width: 150, height: 15, borderRadius: 4),
+                    const SizedBox(height: 8),
+                    Skeleton(width: previewWidth, height: 13, borderRadius: 4),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (showDivider)
+          Padding(
+            padding: const EdgeInsets.only(left: 82),
+            child: Divider(height: 1, color: context.colors.border),
+          ),
+      ],
     );
   }
 }

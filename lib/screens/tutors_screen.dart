@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter/services.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/skeleton.dart';
 import 'tutor_profile_screen.dart';
 
 // ─── Data model ─────────────────────────────────────────────────────────────────
@@ -41,6 +45,15 @@ class _TutorCard {
       isBookmarked: json['is_bookmarked'] as bool? ?? false,
     );
   }
+
+  _TutorCard copyWith({bool? isBookmarked}) => _TutorCard(
+        id: id,
+        name: name,
+        image: image,
+        experience: experience,
+        score: score,
+        isBookmarked: isBookmarked ?? this.isBookmarked,
+      );
 }
 
 class _TutorFilters {
@@ -58,6 +71,32 @@ class _TutorFilters {
     this.search,
   });
 
+  _TutorFilters copyWith({
+    String? Function()? gender,
+    List<String>? ieltsScores,
+    int? Function()? experienceMin,
+    int? Function()? experienceMax,
+    String? Function()? search,
+  }) {
+    return _TutorFilters(
+      gender: gender != null ? gender() : this.gender,
+      ieltsScores: ieltsScores ?? this.ieltsScores,
+      experienceMin:
+          experienceMin != null ? experienceMin() : this.experienceMin,
+      experienceMax:
+          experienceMax != null ? experienceMax() : this.experienceMax,
+      search: search != null ? search() : this.search,
+    );
+  }
+
+  /// Number of active non-search filters — shown on the filter button badge.
+  int get activeCount =>
+      (gender != null ? 1 : 0) +
+      ieltsScores.length +
+      (experienceMin != null ? 1 : 0);
+
+  bool get hasAny => activeCount > 0 || (search?.isNotEmpty ?? false);
+
   String toQueryString() {
     final parts = <String>[];
     if (gender != null) parts.add('gender=${Uri.encodeComponent(gender!)}');
@@ -74,6 +113,9 @@ class _TutorFilters {
   }
 }
 
+/// The one-tap quick filters students reach for most.
+const _highScoreSet = {'8.0', '8.5', '9.0'};
+
 // ─── Screen ─────────────────────────────────────────────────────────────────────
 
 class TutorsScreen extends StatefulWidget {
@@ -89,14 +131,9 @@ class TutorsScreen extends StatefulWidget {
 }
 
 class _TutorsScreenState extends State<TutorsScreen> {
-  bool _showSearch = false;
   bool _showSaved = false;
   final _searchController = TextEditingController();
-  final _recentSearches = [
-    'Sardor Qodirov',
-    'Nigora Mamatova',
-    'Bekzod Tursunov',
-  ];
+  Timer? _searchDebounce;
 
   List<_TutorCard> _tutors = [];
   List<_TutorCard> _savedTutors = [];
@@ -113,6 +150,13 @@ class _TutorsScreenState extends State<TutorsScreen> {
     _loadTutors();
   }
 
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadTutors({bool showSpinner = true}) async {
     setState(() {
       // On pull-to-refresh keep the current grid visible and let the
@@ -124,7 +168,8 @@ class _TutorsScreenState extends State<TutorsScreen> {
       // Fetch tutors and saved tutors in parallel
       final results = await Future.wait([
         ApiService.getList('/tutors/${_filters.toQueryString()}'),
-        ApiService.get('/student/saved-tutors/').catchError((_) => <String, dynamic>{}),
+        ApiService.get('/student/saved-tutors/')
+            .catchError((_) => <String, dynamic>{}),
       ]);
       if (!mounted) return;
       final list = results[0] as List<dynamic>;
@@ -135,20 +180,13 @@ class _TutorsScreenState extends State<TutorsScreen> {
           .toSet();
 
       var tutors = list.map((e) {
-        final json = e as Map<String, dynamic>;
-        final card = _TutorCard.fromJson(json);
-        return _TutorCard(
-          id: card.id,
-          name: card.name,
-          image: card.image,
-          experience: card.experience,
-          score: card.score,
-          isBookmarked: _savedTutorIds.contains(card.id),
-        );
+        final card = _TutorCard.fromJson(e as Map<String, dynamic>);
+        return card.copyWith(isBookmarked: _savedTutorIds.contains(card.id));
       }).toList();
       if (_filters.search != null && _filters.search!.isNotEmpty) {
         final q = _filters.search!.toLowerCase();
-        tutors = tutors.where((t) => t.name.toLowerCase().contains(q)).toList();
+        tutors =
+            tutors.where((t) => t.name.toLowerCase().contains(q)).toList();
       }
       setState(() {
         _tutors = tutors;
@@ -172,6 +210,7 @@ class _TutorsScreenState extends State<TutorsScreen> {
       setState(() {
         _savedTutors = list
             .map((e) => _TutorCard.fromJson(e as Map<String, dynamic>))
+            .map((t) => t.copyWith(isBookmarked: true))
             .toList();
         _loadingSaved = false;
       });
@@ -195,39 +234,15 @@ class _TutorsScreenState extends State<TutorsScreen> {
         } else {
           _savedTutorIds.add(tutor.id);
         }
-        _tutors = _tutors.map((t) {
-          if (t.id == tutor.id) {
-            return _TutorCard(
-              id: t.id,
-              name: t.name,
-              image: t.image,
-              experience: t.experience,
-              score: t.score,
-              isBookmarked: !t.isBookmarked,
-            );
-          }
-          return t;
-        }).toList();
+        _tutors = _tutors
+            .map((t) =>
+                t.id == tutor.id ? t.copyWith(isBookmarked: !t.isBookmarked) : t)
+            .toList();
       });
       // Refresh saved list if showing
       if (_showSaved) _loadSavedTutors();
     } catch (e) {
-    }
-  }
-
-  void _showFilterSheet(BuildContext context) async {
-    final result = await showModalBottomSheet<_TutorFilters>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: context.colors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _FilterSheet(filters: _filters),
-    );
-    if (result != null) {
-      _filters = result;
-      _loadTutors();
+      // Bookmark toggle is best-effort; the next refresh reconciles state.
     }
   }
 
@@ -236,76 +251,160 @@ class _TutorsScreenState extends State<TutorsScreen> {
     _loadTutors();
   }
 
-  List<Widget> _buildActiveFilterChips(BuildContext context) {
-    final chips = <Widget>[];
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 450), () {
+      final query = value.trim();
+      if ((_filters.search ?? '') == query) return;
+      _applyFilters(_filters.copyWith(search: () => query.isEmpty ? null : query));
+    });
+  }
 
-    if (_filters.search != null && _filters.search!.isNotEmpty) {
-      chips.add(
-        _activeFilterChip(
-          context,
-          '"${_filters.search!}"',
-          () => _applyFilters(
-            _TutorFilters(
-              gender: _filters.gender,
-              ieltsScores: _filters.ieltsScores,
-              experienceMin: _filters.experienceMin,
-              experienceMax: _filters.experienceMax,
-            ),
-          ),
-        ),
-      );
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    if (_filters.search != null) {
+      _applyFilters(_filters.copyWith(search: () => null));
     }
+  }
 
-    if (_filters.gender != null) {
-      chips.add(
-        _activeFilterChip(
-          context,
-          _filters.gender!,
-          () => _applyFilters(
-            _TutorFilters(
-              ieltsScores: _filters.ieltsScores,
-              experienceMin: _filters.experienceMin,
-              experienceMax: _filters.experienceMax,
-              search: _filters.search,
-            ),
-          ),
-        ),
-      );
+  void _clearAll() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    _applyFilters(const _TutorFilters());
+  }
+
+  void _showFilterSheet(BuildContext context) async {
+    final result = await showModalBottomSheet<_TutorFilters>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _FilterSheet(filters: _filters),
+    );
+    if (result != null) {
+      // The sheet edits everything except search — carry it over.
+      _applyFilters(result.copyWith(search: () => _filters.search));
     }
+  }
 
+  // ─── Quick filters ────────────────────────────────────────────────────────
+
+  bool get _highScoreActive =>
+      _filters.ieltsScores.toSet().containsAll(_highScoreSet);
+
+  void _toggleHighScore() {
+    final scores = _filters.ieltsScores.toSet();
+    if (_highScoreActive) {
+      scores.removeAll(_highScoreSet);
+    } else {
+      scores.addAll(_highScoreSet);
+    }
+    _applyFilters(_filters.copyWith(ieltsScores: scores.toList()..sort()));
+  }
+
+  bool get _experiencedActive =>
+      _filters.experienceMin == 5 && _filters.experienceMax == null;
+
+  void _toggleExperienced() {
+    if (_experiencedActive) {
+      _applyFilters(_filters.copyWith(
+        experienceMin: () => null,
+        experienceMax: () => null,
+      ));
+    } else {
+      _applyFilters(_filters.copyWith(
+        experienceMin: () => 5,
+        experienceMax: () => null,
+      ));
+    }
+  }
+
+  void _toggleGender(String gender) {
+    _applyFilters(_filters.copyWith(
+      gender: () => _filters.gender == gender ? null : gender,
+    ));
+  }
+
+  List<Widget> _buildFilterChips(BuildContext context) {
+    final chips = <Widget>[
+      _QuickChip(
+        label: 'IELTS 8+',
+        icon: Symbols.military_tech_rounded,
+        selected: _highScoreActive,
+        onTap: _toggleHighScore,
+      ),
+      _QuickChip(
+        label: '5+ yrs exp',
+        icon: Symbols.work_rounded,
+        selected: _experiencedActive,
+        onTap: _toggleExperienced,
+      ),
+      _QuickChip(
+        label: 'Female',
+        selected: _filters.gender == 'Female',
+        onTap: () => _toggleGender('Female'),
+      ),
+      _QuickChip(
+        label: 'Male',
+        selected: _filters.gender == 'Male',
+        onTap: () => _toggleGender('Male'),
+      ),
+    ];
+
+    // Sheet-set filters the quick chips can't express show as removable chips.
     for (final score in _filters.ieltsScores) {
+      if (_highScoreActive && _highScoreSet.contains(score)) continue;
       chips.add(
-        _activeFilterChip(
-          context,
-          'IELTS $score',
-          () => _applyFilters(
-            _TutorFilters(
-              gender: _filters.gender,
-              ieltsScores: _filters.ieltsScores
-                  .where((s) => s != score)
-                  .toList(),
-              experienceMin: _filters.experienceMin,
-              experienceMax: _filters.experienceMax,
-              search: _filters.search,
+        _RemovableChip(
+          label: 'IELTS $score',
+          onRemove: () => _applyFilters(
+            _filters.copyWith(
+              ieltsScores:
+                  _filters.ieltsScores.where((s) => s != score).toList(),
             ),
           ),
         ),
       );
     }
 
-    if (_filters.experienceMin != null) {
+    if (_filters.experienceMin != null && !_experiencedActive) {
       final label = _filters.experienceMax != null
           ? '${_filters.experienceMin}-${_filters.experienceMax} yrs'
           : '${_filters.experienceMin}+ yrs';
       chips.add(
-        _activeFilterChip(
-          context,
-          label,
-          () => _applyFilters(
-            _TutorFilters(
-              gender: _filters.gender,
-              ieltsScores: _filters.ieltsScores,
-              search: _filters.search,
+        _RemovableChip(
+          label: label,
+          onRemove: () => _applyFilters(
+            _filters.copyWith(
+              experienceMin: () => null,
+              experienceMax: () => null,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_filters.hasAny) {
+      chips.add(
+        GestureDetector(
+          onTap: _clearAll,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Center(
+              child: Text(
+                'Clear all',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: context.colors.textSecondary,
+                  decoration: TextDecoration.underline,
+                  height: 1.0,
+                ),
+              ),
             ),
           ),
         ),
@@ -315,69 +414,9 @@ class _TutorsScreenState extends State<TutorsScreen> {
     return chips;
   }
 
-  Widget _activeFilterChip(BuildContext context, String label, VoidCallback onRemove) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 7, 8, 7),
-      decoration: BoxDecoration(
-        color: context.colors.brand,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontFamily: 'SF Pro',
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: Colors.white,
-              height: 1.0,
-            ),
-          ),
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: onRemove,
-            behavior: HitTestBehavior.opaque,
-            child: const Icon(
-              Icons.close,
-              size: 16,
-              color: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (_showSearch) {
-      return _SearchView(
-        controller: _searchController,
-        recentSearches: _recentSearches,
-        onClose: () => setState(() {
-          _showSearch = false;
-          _searchController.clear();
-        }),
-        onRemove: (i) => setState(() => _recentSearches.removeAt(i)),
-        onSearch: (query) {
-          if (!_recentSearches.contains(query)) {
-            setState(() => _recentSearches.insert(0, query));
-          }
-          _filters = _TutorFilters(
-            gender: _filters.gender,
-            ieltsScores: _filters.ieltsScores,
-            experienceMin: _filters.experienceMin,
-            experienceMax: _filters.experienceMax,
-            search: query,
-          );
-          setState(() => _showSearch = false);
-          _searchController.clear();
-          _loadTutors();
-        },
-      );
-    }
+    final colors = context.colors;
 
     if (_showSaved) {
       return _SavedTutorsView(
@@ -391,236 +430,373 @@ class _TutorsScreenState extends State<TutorsScreen> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: context.colors.background,
-      body: SafeArea(
-        child: Column(
+    final chips = _buildFilterChips(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Grey canvas in light mode so the white cards read as cards.
+    final canvas = isDark ? colors.background : colors.surfaceAlt;
+
+    // The hero stays navy in both themes, so status bar icons must be light.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: canvas,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 12),
+            _buildHeader(context),
 
-            // Search bar + filter + bookmark
+            // Filter chips
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  if (widget.showBackButton) ...[
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Icon(Icons.chevron_left_rounded, color: context.colors.textPrimary, size: 30),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  // Search field
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _showSearch = true),
-                      child: Container(
-                        height: 44,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: context.colors.surfaceAlt,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            SvgPicture.asset(
-                              'assets/images/icons/search_20.svg',
-                              width: 24,
-                              height: 24,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Search for a tutor',
-                                style: TextStyle(
-                                  fontFamily: 'SF Pro',
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w400,
-                                  color: context.colors.textTertiary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(width: 12),
-
-                  // Filter button
-                  GestureDetector(
-                    onTap: () => _showFilterSheet(context),
-                    child: SvgPicture.asset(
-                      'assets/images/icons/sliders_outline_20.svg',
-                      width: 28,
-                      height: 28,
-                    ),
-                  ),
-
-                  const SizedBox(width: 12),
-
-                  // Bookmark button — open saved tutors
-                  GestureDetector(
-                    onTap: () {
-                      _loadSavedTutors();
-                      setState(() => _showSaved = true);
-                    },
-                    child: SvgPicture.asset(
-                      'assets/images/icons/bookmark_outline_16.svg',
-                      width: 26,
-                      height: 26,
-                    ),
-                  ),
-                ],
+              padding: const EdgeInsets.fromLTRB(0, 14, 0, 4),
+              child: SizedBox(
+                height: 34,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: chips.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) => chips[i],
+                ),
               ),
-            ),
-
-            // Active filter chips
-            Builder(
-              builder: (context) {
-                final chips = _buildActiveFilterChips(context);
-                if (chips.isEmpty) return const SizedBox(height: 16);
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                  child: SizedBox(
-                    height: 32,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: chips.length + 1,
-                      separatorBuilder: (_, _) => const SizedBox(width: 8),
-                      itemBuilder: (_, i) {
-                        if (i < chips.length) return chips[i];
-                        return GestureDetector(
-                          onTap: () => _applyFilters(const _TutorFilters()),
-                          behavior: HitTestBehavior.opaque,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: Center(
-                              child: Text(
-                                'Clear all',
-                                style: TextStyle(
-                                  fontFamily: 'SF Pro',
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: context.colors.textPrimary,
-                                  decoration: TextDecoration.underline,
-                                  height: 1.0,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                );
-              },
             ),
 
             // Tutors grid
             Expanded(
               child: RefreshIndicator(
-                color: context.colors.textPrimary,
+                color: Colors.white,
+                backgroundColor: colors.brand,
                 onRefresh: () => _loadTutors(showSpinner: false),
-                child: _loading
-                  ? ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      children: [
-                        const SizedBox(height: 200),
-                        Center(
-                          child: CircularProgressIndicator(
-                            color: context.colors.textPrimary,
+                child: _buildGridArea(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Navy hero header with overlapping search bar ─────────────────────────
+
+  Widget _buildHeader(BuildContext context) {
+    final colors = context.colors;
+    final gradientEnd = Color.lerp(colors.brand, Colors.black, 0.35)!;
+
+    final hero = Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [colors.brand, gradientEnd],
+        ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 42),
+          child: Row(
+            children: [
+              if (widget.showBackButton) ...[
+                _FrostedIconButton(
+                  icon: Symbols.arrow_back_ios_new_rounded,
+                  onTap: () => Navigator.pop(context),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Find your tutor',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _loading
+                          ? 'Finding IELTS experts…'
+                          : '${_tutors.length} ${_tutors.length == 1 ? 'tutor' : 'tutors'} available',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _FrostedIconButton(
+                icon: Symbols.bookmarks_rounded,
+                onTap: () {
+                  _loadSavedTutors();
+                  setState(() => _showSaved = true);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    // Search bar overlaps the hero's bottom edge. The trailing SizedBox
+    // keeps it inside the Stack's bounds so its taps still register.
+    return Stack(
+      children: [
+        Column(children: [hero, const SizedBox(height: 26)]),
+        Positioned(
+          left: 20,
+          right: 20,
+          bottom: 0,
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 48,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: colors.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colors.shadow.withValues(alpha: 0.1),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Symbols.search_rounded,
+                        size: 20,
+                        color: colors.textTertiary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: _onSearchChanged,
+                          textInputAction: TextInputAction.search,
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: colors.textPrimary,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Search by name',
+                            hintStyle: TextStyle(
+                              fontSize: 15,
+                              color: colors.textTertiary,
+                            ),
+                            border: InputBorder.none,
+                            isDense: true,
                           ),
                         ),
-                      ],
-                    )
-                  : _tutors.isEmpty
-                  ? ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      children: [Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _error != null
-                                ? 'Failed to load tutors'
-                                : 'No tutors found',
-                            style: TextStyle(
-                              color: context.colors.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          if (_error != null) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              _error!,
-                              style: TextStyle(
-                                color: context.colors.textTertiary,
-                                fontSize: 13,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            GestureDetector(
-                              onTap: _loadTutors,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: context.colors.brand,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Text(
-                                  'Retry',
-                                  style: TextStyle(
-                                    fontFamily: 'SF Pro',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
                       ),
-                    )],
-                    )
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        final isTablet = MediaQuery.of(context).size.width >= 600;
-                        final cols = isTablet ? 3 : 2;
-                        final cardWidth = (constraints.maxWidth - 40 - (cols - 1) * 12) / cols;
-                        final imageHeight = cardWidth * 2 / 3;
-                        return GridView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: cols,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: cardWidth / (imageHeight + 116),
+                      if (_searchController.text.isNotEmpty)
+                        GestureDetector(
+                          onTap: _clearSearch,
+                          behavior: HitTestBehavior.opaque,
+                          child: Icon(
+                            Symbols.close_rounded,
+                            size: 18,
+                            color: colors.textTertiary,
                           ),
-                          itemCount: _tutors.length,
-                          itemBuilder: (_, i) => GestureDetector(
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    TutorProfileScreen(tutorId: _tutors[i].id),
-                              ),
-                            ),
-                            child: _TutorGridCard(
-                              tutor: _tutors[i],
-                              onBookmark: () => _toggleBookmark(_tutors[i]),
-                            ),
-                          ),
-                        );
-                      },
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              _FilterButton(
+                activeCount: _filters.activeCount,
+                onTap: () => _showFilterSheet(context),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGridArea(BuildContext context) {
+    if (_loading) return const _TutorGridSkeleton();
+
+    if (_tutors.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          const SizedBox(height: 90),
+          _EmptyState(
+            isError: _error != null,
+            hasFilters: _filters.hasAny,
+            onRetry: _loadTutors,
+            onClearFilters: _clearAll,
+          ),
+        ],
+      );
+    }
+
+    return _TutorGrid(
+      tutors: _tutors,
+      onTutorTap: (id) => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => TutorProfileScreen(tutorId: id)),
+      ),
+      onToggleBookmark: _toggleBookmark,
+    );
+  }
+}
+
+// ─── Frosted icon button (for the navy hero) ────────────────────────────────────
+
+class _FrostedIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _FrostedIconButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.14),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, size: 18, opticalSize: 20, color: Colors.white),
+      ),
+    );
+  }
+}
+
+// ─── Filter button with badge ───────────────────────────────────────────────────
+
+class _FilterButton extends StatelessWidget {
+  final int activeCount;
+  final VoidCallback onTap;
+  const _FilterButton({required this.activeCount, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final active = activeCount > 0;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 48,
+        height: 48,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: active ? colors.brand : colors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: active ? colors.brand : colors.border),
+          boxShadow: [
+            BoxShadow(
+              color: colors.shadow.withValues(alpha: 0.1),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              Symbols.tune_rounded,
+              size: 20,
+              opticalSize: 20,
+              color: active ? colors.onBrand : colors.textPrimary,
+            ),
+            if (active)
+              Positioned(
+                top: -6,
+                right: -8,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: colors.accentYellow,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$activeCount',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      // Fixed navy for contrast on gold in both themes.
+                      color: Color(0xFF272942),
+                      height: 1.2,
                     ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Chips ──────────────────────────────────────────────────────────────────────
+
+class _QuickChip extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final bool selected;
+  final VoidCallback onTap;
+  const _QuickChip({
+    required this.label,
+    this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: selected ? colors.brand : colors.surface,
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(
+            color: selected ? colors.brand : colors.border,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 15,
+                opticalSize: 20,
+                fill: selected ? 1 : 0,
+                color: selected ? colors.onBrand : colors.textSecondary,
+              ),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected ? colors.onBrand : colors.textPrimary,
+                height: 1.0,
               ),
             ),
           ],
@@ -630,136 +806,40 @@ class _TutorsScreenState extends State<TutorsScreen> {
   }
 }
 
-// ─── Tutor grid card ────────────────────────────────────────────────────────────
-
-class _TutorGridCard extends StatelessWidget {
-  final _TutorCard tutor;
-  final VoidCallback? onBookmark;
-  const _TutorGridCard({required this.tutor, this.onBookmark});
+class _RemovableChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onRemove;
+  const _RemovableChip({required this.label, required this.onRemove});
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Container(
+      padding: const EdgeInsets.only(left: 12, right: 8),
       decoration: BoxDecoration(
-        color: context.colors.surfaceAlt,
-        borderRadius: BorderRadius.circular(14),
+        color: colors.brand,
+        borderRadius: BorderRadius.circular(17),
       ),
-      clipBehavior: Clip.hardEdge,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Tutor image
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-            child: AspectRatio(
-              aspectRatio: 3 / 2,
-              child: tutor.image != null
-                  ? Image.network(
-                      tutor.image!,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.center,
-                      errorBuilder: (_, _, _) => Container(
-                        color: context.colors.border,
-                        child: Icon(
-                          Icons.person,
-                          size: 40,
-                          color: context.colors.textTertiary,
-                        ),
-                      ),
-                    )
-                  : Container(
-                      color: context.colors.border,
-                      child: Icon(
-                        Icons.person,
-                        size: 40,
-                        color: context.colors.textTertiary,
-                      ),
-                    ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: colors.onBrand,
+              height: 1.0,
             ),
           ),
-
-          // Info section
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.all(6),
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-            decoration: BoxDecoration(
-              color: context.colors.surface,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Name
-                Text(
-                  tutor.name,
-                  style: TextStyle(
-                    fontFamily: 'SF Pro',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: context.colors.textPrimary,
-                    height: 1.0,
-                  ),
-                ),
-
-                const SizedBox(height: 6),
-
-                // Experience
-                Text(
-                  'Experience: +${tutor.experience} yrs',
-                  style: TextStyle(
-                    fontFamily: 'SF Pro',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: context.colors.textSecondary,
-                    height: 1.0,
-                  ),
-                ),
-
-                const SizedBox(height: 10),
-
-                // IELTS score + bookmark
-                Row(
-                  children: [
-                    // IELTS badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: context.colors.surfaceAlt,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'IELTS ${tutor.score % 1 == 0 ? tutor.score.toInt() : tutor.score}',
-                        style: TextStyle(
-                          fontFamily: 'SF Pro',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: context.colors.error,
-                          height: 1.0,
-                        ),
-                      ),
-                    ),
-
-                    const Spacer(),
-
-                    // Bookmark icon
-                    GestureDetector(
-                      onTap: onBookmark,
-                      child: SvgPicture.asset(
-                        tutor.isBookmarked
-                            ? 'assets/images/icons/bookmarked.svg'
-                            : 'assets/images/icons/bookmark_on_card.svg',
-                        width: 18,
-                        height: 20,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          const SizedBox(width: 5),
+          GestureDetector(
+            onTap: onRemove,
+            behavior: HitTestBehavior.opaque,
+            child: Icon(
+              Symbols.close_rounded,
+              size: 15,
+              color: colors.onBrand,
             ),
           ),
         ],
@@ -768,134 +848,167 @@ class _TutorGridCard extends StatelessWidget {
   }
 }
 
-// ─── Search view ────────────────────────────────────────────────────────────────
+// ─── Tutor grid ─────────────────────────────────────────────────────────────────
 
-class _SearchView extends StatelessWidget {
-  final TextEditingController controller;
-  final List<String> recentSearches;
-  final VoidCallback onClose;
-  final void Function(int) onRemove;
-  final void Function(String) onSearch;
+class _TutorGrid extends StatelessWidget {
+  final List<_TutorCard> tutors;
+  final void Function(int) onTutorTap;
+  final void Function(_TutorCard) onToggleBookmark;
 
-  const _SearchView({
-    required this.controller,
-    required this.recentSearches,
-    required this.onClose,
-    required this.onRemove,
-    required this.onSearch,
+  const _TutorGrid({
+    required this.tutors,
+    required this.onTutorTap,
+    required this.onToggleBookmark,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.colors.background,
-      body: SafeArea(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTablet = MediaQuery.of(context).size.width >= 600;
+        final cols = isTablet ? 3 : 2;
+        final cardWidth =
+            (constraints.maxWidth - 40 - (cols - 1) * 12) / cols;
+        final imageHeight = cardWidth * 2 / 3;
+        return GridView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          physics: const AlwaysScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: cardWidth / (imageHeight + 96),
+          ),
+          itemCount: tutors.length,
+          itemBuilder: (_, i) => _TutorGridCard(
+            tutor: tutors[i],
+            onTap: () => onTutorTap(tutors[i].id),
+            onBookmark: () => onToggleBookmark(tutors[i]),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─── Tutor grid card ────────────────────────────────────────────────────────────
+
+class _TutorGridCard extends StatelessWidget {
+  final _TutorCard tutor;
+  final VoidCallback onTap;
+  final VoidCallback? onBookmark;
+  const _TutorGridCard({
+    required this.tutor,
+    required this.onTap,
+    this.onBookmark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final gold = Theme.of(context).brightness == Brightness.dark
+        ? colors.accentYellow
+        : const Color(0xFFB8860B);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colors.border),
+        ),
+        clipBehavior: Clip.hardEdge,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 12),
-
-            // Search bar with close
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  SvgPicture.asset(
-                    'assets/images/icons/search_20.svg',
-                    width: 24,
-                    height: 24,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      autofocus: true,
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: (value) {
-                        if (value.trim().isNotEmpty) onSearch(value.trim());
-                      },
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 15,
-                        color: context.colors.textPrimary,
+            // Photo with bookmark overlay
+            Stack(
+              children: [
+                AspectRatio(
+                  aspectRatio: 3 / 2,
+                  child: tutor.image != null
+                      ? Image.network(
+                          tutor.image!,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          alignment: Alignment.center,
+                          errorBuilder: (_, _, _) =>
+                              _ImageFallback(colors: colors),
+                        )
+                      : _ImageFallback(colors: colors),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: onBookmark,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        shape: BoxShape.circle,
                       ),
-                      decoration: InputDecoration(
-                        hintText: 'Search for a tutor',
-                        hintStyle: TextStyle(
-                          fontFamily: 'SF Pro',
-                          fontSize: 15,
-                          color: context.colors.textTertiary,
-                        ),
-                        border: InputBorder.none,
+                      child: Icon(
+                        Symbols.bookmark_rounded,
+                        size: 16,
+                        fill: tutor.isBookmarked ? 1 : 0,
+                        color: tutor.isBookmarked
+                            ? colors.accentYellow
+                            : Colors.white,
                       ),
                     ),
                   ),
-                  GestureDetector(
-                    onTap: onClose,
-                    child: Icon(
-                      Icons.close,
-                      color: context.colors.textPrimary,
-                      size: 24,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
 
-            Divider(color: context.colors.border),
-
-            // Recent searches header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-              child: Text(
-                'Recent searches',
-                style: TextStyle(
-                  fontFamily: 'SF Pro',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400,
-                  color: context.colors.textTertiary,
-                ),
-              ),
-            ),
-
-            // Recent search items
-            ...List.generate(
-              recentSearches.length,
-              (i) => Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
-                child: Row(
+            // Info
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.access_time_rounded,
-                      size: 20,
-                      color: context.colors.textTertiary,
+                    Text(
+                      tutor.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: colors.textPrimary,
+                      ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => onSearch(recentSearches[i]),
-                        behavior: HitTestBehavior.opaque,
-                        child: Text(
-                          recentSearches[i],
-                          style: TextStyle(
-                            fontFamily: 'SF Pro',
-                            fontSize: 15,
-                            color: context.colors.textPrimary,
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Symbols.work_rounded,
+                          size: 12,
+                          opticalSize: 20,
+                          color: colors.textTertiary,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            '${tutor.experience}+ yrs experience',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: colors.textSecondary,
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                    GestureDetector(
-                      onTap: () => onRemove(i),
-                      child: Icon(
-                        Icons.close,
-                        size: 18,
-                        color: context.colors.textTertiary,
-                      ),
-                    ),
+                    const Spacer(),
+                    _IeltsBadge(score: tutor.score, gold: gold),
                   ],
                 ),
               ),
@@ -903,6 +1016,249 @@ class _SearchView extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Gold-outlined score badge; a perfect 9.0 gets a solid gold badge with a
+/// star so it reads as a different tier at a glance.
+class _IeltsBadge extends StatelessWidget {
+  final double score;
+  final Color gold;
+  const _IeltsBadge({required this.score, required this.gold});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    if (score >= 9) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: colors.accentYellow,
+          borderRadius: BorderRadius.circular(7),
+          boxShadow: [
+            BoxShadow(
+              color: colors.accentYellow.withValues(alpha: 0.35),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Symbols.star_rounded,
+              size: 12,
+              fill: 1,
+              // Fixed navy for contrast on gold in both themes.
+              color: Color(0xFF272942),
+            ),
+            const SizedBox(width: 3),
+            Text(
+              'IELTS ${score.toStringAsFixed(1)}',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.2,
+                color: Color(0xFF272942),
+                height: 1.2,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: colors.accentYellow.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(
+          color: colors.accentYellow.withValues(alpha: 0.45),
+        ),
+      ),
+      child: Text(
+        'IELTS ${score % 1 == 0 ? score.toInt() : score}',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.2,
+          color: gold,
+          height: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+class _ImageFallback extends StatelessWidget {
+  final AppColors colors;
+  const _ImageFallback({required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: colors.surfaceAlt,
+      alignment: Alignment.center,
+      child: Icon(
+        Symbols.person_rounded,
+        size: 40,
+        fill: 1,
+        color: colors.textTertiary,
+      ),
+    );
+  }
+}
+
+// ─── Loading skeleton ───────────────────────────────────────────────────────────
+
+class _TutorGridSkeleton extends StatelessWidget {
+  const _TutorGridSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTablet = MediaQuery.of(context).size.width >= 600;
+        final cols = isTablet ? 3 : 2;
+        final cardWidth =
+            (constraints.maxWidth - 40 - (cols - 1) * 12) / cols;
+        final imageHeight = cardWidth * 2 / 3;
+        return GridView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: cardWidth / (imageHeight + 96),
+          ),
+          itemCount: 6,
+          itemBuilder: (_, _) => Container(
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: colors.border),
+            ),
+            clipBehavior: Clip.hardEdge,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Skeleton(height: imageHeight, borderRadius: 0),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Skeleton(height: 15, width: 110, borderRadius: 6),
+                      SizedBox(height: 8),
+                      Skeleton(height: 12, width: 90, borderRadius: 6),
+                      SizedBox(height: 10),
+                      Skeleton(height: 20, width: 64, borderRadius: 7),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─── Empty / error state ────────────────────────────────────────────────────────
+
+class _EmptyState extends StatelessWidget {
+  final bool isError;
+  final bool hasFilters;
+  final VoidCallback onRetry;
+  final VoidCallback onClearFilters;
+
+  const _EmptyState({
+    required this.isError,
+    required this.hasFilters,
+    required this.onRetry,
+    required this.onClearFilters,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final showClear = !isError && hasFilters;
+    return Column(
+      children: [
+        Container(
+          width: 72,
+          height: 72,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: colors.surface,
+            shape: BoxShape.circle,
+            border: Border.all(color: colors.border),
+          ),
+          child: Icon(
+            isError
+                ? Symbols.wifi_off_rounded
+                : Symbols.person_search_rounded,
+            size: 32,
+            color: colors.textTertiary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          isError ? 'Failed to load tutors' : 'No tutors found',
+          style: TextStyle(
+            color: colors.textPrimary,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Text(
+            isError
+                ? 'Check your connection and try again.'
+                : hasFilters
+                    ? 'Try adjusting your search or filters.'
+                    : 'New tutors are joining soon — check back later.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: colors.textSecondary,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+        ),
+        if (isError || showClear) ...[
+          const SizedBox(height: 18),
+          GestureDetector(
+            onTap: isError ? onRetry : onClearFilters,
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 11),
+              decoration: BoxDecoration(
+                color: colors.brand,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                isError ? 'Retry' : 'Clear filters',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: colors.onBrand,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -918,14 +1274,6 @@ class _FilterSheet extends StatefulWidget {
 }
 
 class _FilterSheetState extends State<_FilterSheet> {
-  static const _timeSlots = [
-    '9:00 - 12:00',
-    '12:00 - 15:00',
-    '15:00 - 18:00',
-    '18:00 - 21:00',
-    '21:00 - 0:00',
-    '00:00 - 03:00',
-  ];
   static const _ieltsScores = ['6.5', '7.0', '7.5', '8.0', '8.5', '9.0'];
   static const _genders = ['Male', 'Female'];
   static const _experiences = ['1-3 yrs', '3-5 yrs', '5-8 yrs', '8+ years'];
@@ -937,8 +1285,6 @@ class _FilterSheetState extends State<_FilterSheet> {
     '8+ years': (8, null),
   };
 
-  final Set<String> _selectedTimes = {};
-  final Set<String> _selectedDays = {};
   final Set<String> _selectedScores = {};
   String? _selectedGender;
   String? _selectedExperience;
@@ -951,7 +1297,8 @@ class _FilterSheetState extends State<_FilterSheet> {
     // Restore experience label from min/max
     if (widget.filters.experienceMin != null) {
       for (final entry in _experienceRanges.entries) {
-        if (entry.value.$1 == widget.filters.experienceMin) {
+        if (entry.value.$1 == widget.filters.experienceMin &&
+            entry.value.$2 == widget.filters.experienceMax) {
           _selectedExperience = entry.key;
           break;
         }
@@ -967,6 +1314,12 @@ class _FilterSheetState extends State<_FilterSheet> {
         expMin = range.$1;
         expMax = range.$2;
       }
+    } else if (widget.filters.experienceMin != null &&
+        _restoredLabelMissing) {
+      // A quick-chip range (e.g. 5+) that has no sheet label — keep it
+      // unless the user picked a different range.
+      expMin = widget.filters.experienceMin;
+      expMax = widget.filters.experienceMax;
     }
     return _TutorFilters(
       gender: _selectedGender,
@@ -976,328 +1329,312 @@ class _FilterSheetState extends State<_FilterSheet> {
     );
   }
 
-  void _openCalendarDialog(BuildContext context) {
-    DateTime calendarMonth = DateTime(2026, 3);
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.4),
-      builder: (_) => StatefulBuilder(
-        builder: (context, setDialogState) => Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Material(
-              color: Colors.transparent,
-              child: _FilterCalendar(
-                focusedMonth: calendarMonth,
-                selectedDays: _selectedDays,
-                onPrevMonth: () => setDialogState(() {
-                  calendarMonth = DateTime(
-                    calendarMonth.year,
-                    calendarMonth.month - 1,
-                  );
-                }),
-                onNextMonth: () => setDialogState(() {
-                  calendarMonth = DateTime(
-                    calendarMonth.year,
-                    calendarMonth.month + 1,
-                  );
-                }),
-                onDayTap: (dayLabel) {
-                  setDialogState(() {
-                    if (_selectedDays.contains(dayLabel)) {
-                      _selectedDays.remove(dayLabel);
-                    } else {
-                      _selectedDays.add(dayLabel);
-                    }
-                  });
-                  setState(() {});
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  bool get _restoredLabelMissing {
+    if (widget.filters.experienceMin == null) return false;
+    for (final entry in _experienceRanges.entries) {
+      if (entry.value.$1 == widget.filters.experienceMin &&
+          entry.value.$2 == widget.filters.experienceMax) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _clearedQuickRange = false;
+
+  void _reset() {
+    setState(() {
+      _selectedScores.clear();
+      _selectedGender = null;
+      _selectedExperience = null;
+      _clearedQuickRange = true;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return DraggableScrollableSheet(
-      initialChildSize: 0.85,
+      initialChildSize: 0.72,
       maxChildSize: 0.95,
       minChildSize: 0.5,
       expand: false,
-      builder: (_, scrollController) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: ListView(
-          controller: scrollController,
-          children: [
-            // Handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(top: 10, bottom: 16),
-                decoration: BoxDecoration(
-                  color: context.colors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-
-            // Header
-            Row(
+      builder: (_, scrollController) => Column(
+        children: [
+          Expanded(
+            child: ListView(
+              controller: scrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               children: [
-                const Spacer(),
-                Text(
-                  'Filters',
-                  style: TextStyle(
-                    fontFamily: 'SF Pro',
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: context.colors.textPrimary,
-                  ),
-                ),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Icon(
-                    Icons.close,
-                    size: 24,
-                    color: context.colors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 28),
-
-            // Availability
-            _sectionTitleSvg(
-              context,
-              'assets/images/icons/calendar_outline_20.svg',
-              'Availability',
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                ..._selectedDays.map(
-                  (d) => _chipButton(
-                    context,
-                    d,
-                    true,
-                    () => setState(() => _selectedDays.remove(d)),
-                  ),
-                ),
-                _chipButton(context, '+ Add a day', false, () {
-                  _openCalendarDialog(context);
-                }),
-              ],
-            ),
-
-            const SizedBox(height: 28),
-            Divider(color: context.colors.border),
-            const SizedBox(height: 20),
-
-            // Time
-            _sectionTitleSvg(
-              context,
-              'assets/images/icons/recent_outline_grey.svg',
-              'Time',
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _timeSlots
-                  .map(
-                    (t) => _chipButton(
-                      context,
-                      t,
-                      _selectedTimes.contains(t),
-                      () => setState(() {
-                        _selectedTimes.contains(t)
-                            ? _selectedTimes.remove(t)
-                            : _selectedTimes.add(t);
-                      }),
-                    ),
-                  )
-                  .toList(),
-            ),
-
-            const SizedBox(height: 28),
-            Divider(color: context.colors.border),
-            const SizedBox(height: 20),
-
-            // IELTS score
-            _sectionTitleSvg(
-              context,
-              'assets/images/icons/live_outline_20.svg',
-              'IELTS score',
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _ieltsScores
-                  .map(
-                    (s) => _chipButton(
-                      context,
-                      s,
-                      _selectedScores.contains(s),
-                      () => setState(() {
-                        if (_selectedScores.contains(s)) {
-                          _selectedScores.remove(s);
-                        } else {
-                          _selectedScores.add(s);
-                        }
-                      }),
-                    ),
-                  )
-                  .toList(),
-            ),
-
-            const SizedBox(height: 28),
-            Divider(color: context.colors.border),
-            const SizedBox(height: 20),
-
-            // Gender
-            _sectionTitleSvg(
-              context,
-              'assets/images/icons/accessibility_outline_20 (1).svg',
-              'Gender',
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              children: _genders
-                  .map(
-                    (g) => _chipButton(
-                      context,
-                      g,
-                      _selectedGender == g,
-                      () => setState(
-                        () => _selectedGender = _selectedGender == g ? null : g,
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-
-            const SizedBox(height: 28),
-            Divider(color: context.colors.border),
-            const SizedBox(height: 20),
-
-            // Experience
-            _sectionTitleSvg(
-              context,
-              'assets/images/icons/work_outline_20.svg',
-              'Experience',
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _experiences
-                  .map(
-                    (e) => _chipButton(
-                      context,
-                      e,
-                      _selectedExperience == e,
-                      () => setState(
-                        () => _selectedExperience = _selectedExperience == e
-                            ? null
-                            : e,
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Apply button
-            Builder(
-              builder: (context) {
-                final hasSelection =
-                    _selectedTimes.isNotEmpty ||
-                    _selectedScores.isNotEmpty ||
-                    _selectedGender != null ||
-                    _selectedExperience != null ||
-                    _selectedDays.isNotEmpty;
-                return GestureDetector(
-                  onTap: () => Navigator.pop(context, _buildFilters()),
+                // Handle
+                Center(
                   child: Container(
-                    width: double.infinity,
-                    height: 50,
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(top: 10, bottom: 16),
                     decoration: BoxDecoration(
-                      color: hasSelection
-                          ? context.colors.brand
-                          : context.colors.border,
-                      borderRadius: BorderRadius.circular(14),
+                      color: colors.border,
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    child: Center(
+                  ),
+                ),
+
+                // Header
+                Row(
+                  children: [
+                    Text(
+                      'Filters',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: _reset,
+                      behavior: HitTestBehavior.opaque,
                       child: Text(
-                        'Apply',
+                        'Reset',
                         style: TextStyle(
-                          fontFamily: 'SF Pro',
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: hasSelection
-                              ? Colors.white
-                              : context.colors.textSecondary,
+                          color: colors.textSecondary,
+                          decoration: TextDecoration.underline,
                         ),
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
+                  ],
+                ),
 
-            const SizedBox(height: 20),
-          ],
-        ),
+                const SizedBox(height: 24),
+
+                _SectionTitle(
+                  icon: Symbols.military_tech_rounded,
+                  title: 'IELTS score',
+                  subtitle: 'Tutor\'s own certified score',
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _ieltsScores
+                      .map(
+                        (s) => _SheetChip(
+                          label: s,
+                          selected: _selectedScores.contains(s),
+                          onTap: () => setState(() {
+                            if (_selectedScores.contains(s)) {
+                              _selectedScores.remove(s);
+                            } else {
+                              _selectedScores.add(s);
+                            }
+                          }),
+                        ),
+                      )
+                      .toList(),
+                ),
+
+                const SizedBox(height: 24),
+                Divider(height: 1, color: colors.border),
+                const SizedBox(height: 20),
+
+                _SectionTitle(
+                  icon: Symbols.work_rounded,
+                  title: 'Teaching experience',
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _experiences
+                      .map(
+                        (e) => _SheetChip(
+                          label: e,
+                          selected: _selectedExperience == e,
+                          onTap: () => setState(() {
+                            _selectedExperience =
+                                _selectedExperience == e ? null : e;
+                            _clearedQuickRange = true;
+                          }),
+                        ),
+                      )
+                      .toList(),
+                ),
+
+                const SizedBox(height: 24),
+                Divider(height: 1, color: colors.border),
+                const SizedBox(height: 20),
+
+                _SectionTitle(
+                  icon: Symbols.person_rounded,
+                  title: 'Gender',
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: _genders
+                      .map(
+                        (g) => _SheetChip(
+                          label: g,
+                          icon: g == 'Male'
+                              ? Symbols.male_rounded
+                              : Symbols.female_rounded,
+                          selected: _selectedGender == g,
+                          onTap: () => setState(
+                            () => _selectedGender =
+                                _selectedGender == g ? null : g,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+
+          // Sticky apply
+          Container(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              12 + MediaQuery.of(context).padding.bottom,
+            ),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              border: Border(top: BorderSide(color: colors.border, width: 0.5)),
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () {
+                  var result = _buildFilters();
+                  if (_clearedQuickRange && _selectedExperience == null) {
+                    result = result.copyWith(
+                      experienceMin: () => null,
+                      experienceMax: () => null,
+                    );
+                  }
+                  Navigator.pop(context, result);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colors.brand,
+                  foregroundColor: colors.onBrand,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text(
+                  'Show tutors',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
+}
 
-  Widget _sectionTitleSvg(BuildContext context, String svgPath, String title) {
+class _SectionTitle extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  const _SectionTitle({required this.icon, required this.title, this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
     return Row(
       children: [
-        SvgPicture.asset(svgPath, width: 20, height: 20),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: TextStyle(
-            fontFamily: 'SF Pro',
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: context.colors.textPrimary,
+        Container(
+          width: 32,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: colors.surfaceAlt,
+            borderRadius: BorderRadius.circular(10),
           ),
+          child: Icon(icon, size: 17, opticalSize: 20, color: colors.textPrimary),
+        ),
+        const SizedBox(width: 10),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: colors.textPrimary,
+              ),
+            ),
+            if (subtitle != null)
+              Text(
+                subtitle!,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colors.textTertiary,
+                ),
+              ),
+          ],
         ),
       ],
     );
   }
+}
 
-  Widget _chipButton(BuildContext context, String label, bool selected, VoidCallback onTap) {
+class _SheetChip extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final bool selected;
+  final VoidCallback onTap;
+  const _SheetChip({
+    required this.label,
+    this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? context.colors.brand : context.colors.surfaceAlt,
-          borderRadius: BorderRadius.circular(20),
+          color: selected ? colors.brand : colors.surfaceAlt,
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'SF Pro',
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: selected ? Colors.white : context.colors.textPrimary,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 16,
+                opticalSize: 20,
+                color: selected ? colors.onBrand : colors.textSecondary,
+              ),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: selected ? colors.onBrand : colors.textPrimary,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1323,294 +1660,109 @@ class _SavedTutorsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final canvas = isDark ? colors.background : colors.surfaceAlt;
+    final gradientEnd = Color.lerp(colors.brand, Colors.black, 0.35)!;
     return Scaffold(
-      backgroundColor: context.colors.background,
-      body: SafeArea(
-        child: Column(
+      backgroundColor: canvas,
+      body: Column(
           children: [
-            const SizedBox(height: 12),
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: onClose,
-                    child: Icon(
-                      Icons.chevron_left_rounded,
-                      size: 30,
-                      color: context.colors.textPrimary,
-                    ),
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        'Saved tutors',
-                        style: TextStyle(
-                          fontFamily: 'SF Pro',
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: context.colors.textPrimary,
+            // Navy header band
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [colors.brand, gradientEnd],
+                ),
+                borderRadius:
+                    const BorderRadius.vertical(bottom: Radius.circular(24)),
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  child: Row(
+                    children: [
+                      _FrostedIconButton(
+                        icon: Symbols.arrow_back_ios_new_rounded,
+                        onTap: onClose,
+                      ),
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            'Saved tutors',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white.withValues(alpha: 0.95),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 40),
+                    ],
                   ),
-                  const SizedBox(width: 30),
-                ],
+                ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 4),
 
             // Content
             Expanded(
               child: loading
-                  ? Center(
-                      child: CircularProgressIndicator(color: context.colors.textPrimary),
-                    )
+                  ? const _TutorGridSkeleton()
                   : tutors.isEmpty
                       ? Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              SvgPicture.asset(
-                                'assets/images/icons/bookmark_outline_16.svg',
-                                width: 40,
-                                height: 40,
+                              Container(
+                                width: 72,
+                                height: 72,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: colors.surface,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: colors.border),
+                                ),
+                                child: Icon(
+                                  Symbols.bookmarks_rounded,
+                                  size: 30,
+                                  color: colors.textTertiary,
+                                ),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 16),
                               Text(
                                 'No saved tutors yet',
                                 style: TextStyle(
-                                  fontFamily: 'SF Pro',
                                   fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                  color: context.colors.textTertiary,
+                                  fontWeight: FontWeight.w700,
+                                  color: colors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Tap the bookmark on a tutor card to save them here.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: colors.textSecondary,
                                 ),
                               ),
                             ],
                           ),
                         )
-                      : LayoutBuilder(
-                          builder: (context, constraints) {
-                            final isTablet = MediaQuery.of(context).size.width >= 600;
-                            final cols = isTablet ? 3 : 2;
-                            final cardWidth = (constraints.maxWidth - 40 - (cols - 1) * 12) / cols;
-                            final imageHeight = cardWidth * 2 / 3;
-                            return GridView.builder(
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: cols,
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 12,
-                                childAspectRatio: cardWidth / (imageHeight + 116),
-                              ),
-                              itemCount: tutors.length,
-                              itemBuilder: (_, i) => GestureDetector(
-                                onTap: () => onTutorTap(tutors[i].id),
-                                child: _TutorGridCard(
-                                  tutor: tutors[i],
-                                  onBookmark: () => onToggleBookmark(tutors[i]),
-                                ),
-                              ),
-                            );
-                          },
+                      : _TutorGrid(
+                          tutors: tutors,
+                          onTutorTap: onTutorTap,
+                          onToggleBookmark: onToggleBookmark,
                         ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ─── Filter calendar ────────────────────────────────────────────────────────────
-
-class _FilterCalendar extends StatelessWidget {
-  final DateTime focusedMonth;
-  final Set<String> selectedDays;
-  final VoidCallback onPrevMonth;
-  final VoidCallback onNextMonth;
-  final void Function(String) onDayTap;
-
-  const _FilterCalendar({
-    required this.focusedMonth,
-    required this.selectedDays,
-    required this.onPrevMonth,
-    required this.onNextMonth,
-    required this.onDayTap,
-  });
-
-  static const _dayHeaders = ['SAN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-  static const _monthNames = [
-    '',
-    'JANUARY',
-    'FEBRUARY',
-    'MARCH',
-    'APRIL',
-    'MAY',
-    'JUNE',
-    'JULY',
-    'AUGUST',
-    'SEPTEMBER',
-    'OCTOBER',
-    'NOVEMBER',
-    'DECEMBER',
-  ];
-  static const _shortMonths = [
-    '',
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  static const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-  String _dayLabel(int day) {
-    final date = DateTime(focusedMonth.year, focusedMonth.month, day);
-    return '${_weekdays[date.weekday - 1]}, $day ${_shortMonths[focusedMonth.month]}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final year = focusedMonth.year;
-    final month = focusedMonth.month;
-    final daysInMonth = DateTime(year, month + 1, 0).day;
-    final firstWeekday = DateTime(year, month, 1).weekday % 7;
-    final now = DateTime.now();
-    final isTodayMonth = month == now.month && year == now.year;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              GestureDetector(
-                onTap: onPrevMonth,
-                child: Icon(
-                  Icons.chevron_left,
-                  color: context.colors.textPrimary,
-                  size: 24,
-                ),
-              ),
-              Expanded(
-                child: Center(
-                  child: Text(
-                    '${_monthNames[month]} $year',
-                    style: TextStyle(
-                      fontFamily: 'SF Pro',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: context.colors.textPrimary,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                ),
-              ),
-              GestureDetector(
-                onTap: onNextMonth,
-                child: Icon(
-                  Icons.chevron_right,
-                  color: context.colors.textPrimary,
-                  size: 24,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: _dayHeaders
-                .map(
-                  (d) => Expanded(
-                    child: Center(
-                      child: Text(
-                        d,
-                        style: TextStyle(
-                          fontFamily: 'SF Pro',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: context.colors.textTertiary,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 12),
-          ...List.generate(6, (week) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: List.generate(7, (weekday) {
-                  final dayNum = week * 7 + weekday - firstWeekday + 1;
-                  if (dayNum < 1 || dayNum > daysInMonth) {
-                    return const Expanded(child: SizedBox());
-                  }
-                  final label = _dayLabel(dayNum);
-                  final isSelected = selectedDays.contains(label);
-                  final isTodayDay = isTodayMonth && dayNum == now.day;
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => onDayTap(label),
-                      child: Center(
-                        child: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: isSelected ? context.colors.brand : null,
-                            borderRadius: BorderRadius.circular(8),
-                            border: isTodayDay && !isSelected
-                                ? Border.all(
-                                    color: context.colors.brand,
-                                    width: 1.5,
-                                  )
-                                : null,
-                          ),
-                          child: Center(
-                            child: Text(
-                              '$dayNum',
-                              style: TextStyle(
-                                fontFamily: 'SF Pro',
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                                color: isSelected
-                                    ? Colors.white
-                                    : context.colors.textPrimary,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            );
-          }),
-        ],
-      ),
     );
   }
 }

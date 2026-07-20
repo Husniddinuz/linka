@@ -48,6 +48,30 @@ class AuthService {
     throw AuthException(data['message']?.toString() ?? 'Invalid OTP');
   }
 
+  /// Exchanges a one-time Telegram login token (from the linkaapp.uz/tg-login
+  /// deep link issued by the bot) for JWT tokens + user info.
+  static Future<Map<String, dynamic>> exchangeTelegramToken(
+    String token,
+  ) async {
+    const path = '/auth/telegram/exchange/';
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl$path'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'token': token}),
+    );
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data;
+    }
+
+    throw AuthException(
+      data['message']?.toString() ?? 'Telegram login failed',
+    );
+  }
+
   /// Refreshes the access token.
   static Future<Map<String, dynamic>> refreshToken(String refresh) async {
     const path = '/auth/refresh/';

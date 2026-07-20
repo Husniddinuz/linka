@@ -68,7 +68,7 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
             Icon(Icons.workspace_premium_rounded, color: MockTestColors.yellow),
             SizedBox(width: 8),
             Text(
-              'Daily limit reached',
+              'Free limit reached',
               style: TextStyle(
                 fontFamily: 'SF Pro',
                 color: MockTestColors.navy,
@@ -127,7 +127,7 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
     }
     if (_quotaExhausted) {
       _showUpgradeDialog(
-        'You\'ve used all ${_quota!['limit']} free AI-graded essays today. Upgrade to Plus for unlimited submissions.',
+        'You\'ve used your ${_quota!['limit']} free AI-graded essays. Upgrade to Plus for unlimited submissions.',
       );
       return;
     }
@@ -182,7 +182,7 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
                   child: Text(
                     _isPlus
                         ? 'Unlimited'
-                        : '${_remaining ?? 0}/${_quota!['limit']} left today',
+                        : '${_remaining ?? 0}/${_quota!['limit']} free left',
                     style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 12,
@@ -375,7 +375,7 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
                 loading: _submitting,
                 onPressed: _quotaExhausted
                     ? () => _showUpgradeDialog(
-                        'You\'ve used all ${_quota!['limit']} free AI-graded essays today. Upgrade to Plus for unlimited submissions.',
+                        'You\'ve used your ${_quota!['limit']} free AI-graded essays. Upgrade to Plus for unlimited submissions.',
                       )
                     : _submit,
               ),
