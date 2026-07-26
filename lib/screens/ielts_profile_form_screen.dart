@@ -772,7 +772,7 @@ class _RegisterSkeleton extends StatelessWidget {
           style: TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, color: MockTestColors.grey),
         ),
         const SizedBox(height: 20),
-        _card([
+        _card(context, [
           const Skeleton(height: 14, width: double.infinity, borderRadius: 6),
           const SizedBox(height: 14),
           const Skeleton(height: 14, width: double.infinity, borderRadius: 6),
@@ -780,13 +780,13 @@ class _RegisterSkeleton extends StatelessWidget {
           const Skeleton(height: 14, width: 160, borderRadius: 6),
         ]),
         const SizedBox(height: 16),
-        _card([
+        _card(context, [
           const Skeleton(height: 14, width: double.infinity, borderRadius: 6),
           const SizedBox(height: 14),
           const Skeleton(height: 14, width: 200, borderRadius: 6),
         ]),
         const SizedBox(height: 16),
-        _card([
+        _card(context, [
           const Skeleton(height: 14, width: double.infinity, borderRadius: 6),
           const SizedBox(height: 14),
           const Skeleton(height: 14, width: double.infinity, borderRadius: 6),
@@ -797,10 +797,10 @@ class _RegisterSkeleton extends StatelessWidget {
     );
   }
 
-  Widget _card(List<Widget> children) {
+  Widget _card(BuildContext context, List<Widget> children) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: mtSoftCard(radius: 18),
+      decoration: mtSoftCard(context, radius: 18),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
     );
   }

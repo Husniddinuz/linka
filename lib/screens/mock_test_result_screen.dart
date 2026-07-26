@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/mock_test.dart';
 import '../widgets/mock_test_styles.dart';
+import '../theme/app_colors.dart';
 
 class MockTestResultScreen extends StatelessWidget {
   const MockTestResultScreen({super.key, required this.attempt});
@@ -15,7 +16,7 @@ class MockTestResultScreen extends StatelessWidget {
     final details = attempt.resultDetail;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: mtAppBar(context, title: 'Result'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -24,7 +25,7 @@ class MockTestResultScreen extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 28),
             decoration: BoxDecoration(
-              color: MockTestColors.navy,
+              color: context.colors.brand,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
@@ -58,13 +59,13 @@ class MockTestResultScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'Review',
             style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: MockTestColors.navy,
+              color: context.colors.textPrimary,
             ),
           ),
           const SizedBox(height: 10),
@@ -77,7 +78,8 @@ class MockTestResultScreen extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
               decoration: mtSoftCard(
-                color: correct ? MockTestColors.greenBg : MockTestColors.redBg,
+                context,
+                color: correct ? context.colors.successBg : context.colors.errorBg,
                 radius: 12,
               ),
               child: Row(
@@ -85,7 +87,7 @@ class MockTestResultScreen extends StatelessWidget {
                 children: [
                   Icon(
                     correct ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                    color: correct ? MockTestColors.green : MockTestColors.red,
+                    color: correct ? context.colors.success : context.colors.error,
                     size: 20,
                   ),
                   const SizedBox(width: 10),
@@ -95,27 +97,27 @@ class MockTestResultScreen extends StatelessWidget {
                       children: [
                         Text(
                           'Question $label',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'SF Pro',
                             fontWeight: FontWeight.w700,
                             fontSize: 13.5,
-                            color: MockTestColors.navy,
+                            color: context.colors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 3),
                         Text(
                           'Your answer: $submitted',
-                          style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: MockTestColors.grey),
+                          style: TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: context.colors.textSecondary),
                         ),
                         if (!correct) ...[
                           const SizedBox(height: 2),
                           Text(
                             'Correct: $correctAnswer',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'SF Pro',
                               fontSize: 12.5,
                               fontWeight: FontWeight.w600,
-                              color: MockTestColors.green,
+                              color: context.colors.success,
                             ),
                           ),
                         ],

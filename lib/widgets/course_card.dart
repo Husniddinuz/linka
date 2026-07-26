@@ -111,7 +111,7 @@ class CourseCard extends StatelessWidget {
                       children: [
                         _MetaChip(
                           icon: Symbols.calendar_month_rounded,
-                          label: course.dateRangeLabel,
+                          label: _dateLabel,
                           colors: colors,
                         ),
                         const SizedBox(width: 8),
@@ -136,6 +136,13 @@ class CourseCard extends StatelessWidget {
   String get _seatsLabel {
     if (course.isFull) return 'Sold out';
     return '${course.seatsLeft} of ${course.maxStudents} left';
+  }
+
+  String get _dateLabel {
+    if (course.startTime != null && course.dateRangeLabel.isNotEmpty) {
+      return '${course.dateRangeLabel} · ${course.startTime}';
+    }
+    return course.dateRangeLabel;
   }
 }
 
@@ -177,6 +184,9 @@ class _Banner extends StatelessWidget {
   Widget? get _statusBadge {
     if (course.isCancelled) {
       return const _Pill(text: 'Cancelled', bg: Color(0xCC4A4A4A), fg: Colors.white);
+    }
+    if (course.sessionActiveNow) {
+      return const _Pill(text: '● LIVE', bg: Color(0xE6E23A3A), fg: Colors.white);
     }
     if (course.isEnrolled) {
       return const _Pill(text: 'Enrolled', bg: Color(0xE627AE60), fg: Colors.white);

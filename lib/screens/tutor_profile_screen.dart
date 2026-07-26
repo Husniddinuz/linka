@@ -50,7 +50,9 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
 
   Future<void> _loadReviews() async {
     try {
-      final result = await ApiService.getList('/tutors/${widget.tutorId}/reviews/');
+      final result = await ApiService.getList(
+        '/tutors/${widget.tutorId}/reviews/',
+      );
       if (!mounted) return;
       setState(() {
         _reviews = result.cast<Map<String, dynamic>>();
@@ -69,7 +71,9 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
       if (_isBookmarked) {
         await ApiService.delete('/student/saved-tutors/${widget.tutorId}/');
       } else {
-        await ApiService.post('/student/saved-tutors/', {'tutor_id': widget.tutorId});
+        await ApiService.post('/student/saved-tutors/', {
+          'tutor_id': widget.tutorId,
+        });
       }
       if (mounted) setState(() => _isBookmarked = !_isBookmarked);
     } catch (_) {}
@@ -101,8 +105,8 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
     final expStr = rawExp is int
         ? '+$rawExp yrs'
         : rawExp is String
-            ? '+${RegExp(r'(\d+)').firstMatch(rawExp)?.group(1) ?? '0'} yrs'
-            : '+0 yrs';
+        ? '+${RegExp(r'(\d+)').firstMatch(rawExp)?.group(1) ?? '0'} yrs'
+        : '+0 yrs';
 
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -169,8 +173,9 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
     final experience = rawExp is int
         ? rawExp
         : rawExp is String
-            ? (int.tryParse(RegExp(r'(\d+)').firstMatch(rawExp)?.group(1) ?? '') ?? 0)
-            : 0;
+        ? (int.tryParse(RegExp(r'(\d+)').firstMatch(rawExp)?.group(1) ?? '') ??
+              0)
+        : 0;
     final ieltsScore = (t?['ielts_score'] as num?)?.toDouble() ?? 0;
     final scores = [
       ('Listening', _formatScore(t?['listening_score'])),
@@ -180,9 +185,14 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
     ];
     final isFeatured = t?['pin_status'] as bool? ?? false;
     final isEnrollable = t?['is_enrollable'] as bool? ?? true;
-    final hasCertificate = (t?['ielts_certificate'] as String?)?.isNotEmpty ?? false;
-    final ratings = _reviews.map((r) => (r['rating'] as num?)?.toDouble() ?? 0).toList();
-    final avgRating = ratings.isEmpty ? null : ratings.reduce((a, b) => a + b) / ratings.length;
+    final hasCertificate =
+        (t?['ielts_certificate'] as String?)?.isNotEmpty ?? false;
+    final ratings = _reviews
+        .map((r) => (r['rating'] as num?)?.toDouble() ?? 0)
+        .toList();
+    final avgRating = ratings.isEmpty
+        ? null
+        : ratings.reduce((a, b) => a + b) / ratings.length;
     final reviewCount = _reviews.length;
 
     return Scaffold(
@@ -219,7 +229,9 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: _CertificateBadge(
-                              onTap: () => _showCertificate(t!['ielts_certificate'] as String),
+                              onTap: () => _showCertificate(
+                                t!['ielts_certificate'] as String,
+                              ),
                             ),
                           ),
                         ],
@@ -239,42 +251,52 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
                   const SizedBox(height: 16),
 
                   // ── Bio ─────────────────────────────────────────────────────
-                  Builder(builder: (_) {
-                    final bio = (t?['about_me'] as String?)?.trim() ?? '';
-                    if (bio.isEmpty) return const SizedBox.shrink();
-                    return _PremiumCard(
-                      child: _BioSection(bio: bio),
-                    );
-                  }),
+                  Builder(
+                    builder: (_) {
+                      final bio = (t?['about_me'] as String?)?.trim() ?? '';
+                      if (bio.isEmpty) return const SizedBox.shrink();
+                      return _PremiumCard(child: _BioSection(bio: bio));
+                    },
+                  ),
 
-                  Builder(builder: (_) {
-                    final bio = (t?['about_me'] as String?)?.trim() ?? '';
-                    return bio.isEmpty ? const SizedBox.shrink() : const SizedBox(height: 16);
-                  }),
+                  Builder(
+                    builder: (_) {
+                      final bio = (t?['about_me'] as String?)?.trim() ?? '';
+                      return bio.isEmpty
+                          ? const SizedBox.shrink()
+                          : const SizedBox(height: 16);
+                    },
+                  ),
 
                   // ── Lesson duration (info) ──────────────────────────────────
-                  Builder(builder: (_) {
-                    final prices = t?['lesson_prices'] as List<dynamic>? ?? [];
-                    if (prices.isEmpty) return const SizedBox.shrink();
-                    final durations = prices.map((p) {
-                      final m = p as Map<String, dynamic>;
-                      final mins = m['duration_minutes'] as int? ?? 0;
-                      final priceStr = m['price']?.toString() ?? '0';
-                      final price = double.tryParse(priceStr)?.toInt() ?? 0;
-                      final formatted = _formatAmount(price);
-                      return ('$mins min', '$formatted UZS');
-                    }).toList();
-                    return _PremiumCard(
-                      child: _LessonDurationSection(durations: durations),
-                    );
-                  }),
+                  Builder(
+                    builder: (_) {
+                      final prices =
+                          t?['lesson_prices'] as List<dynamic>? ?? [];
+                      if (prices.isEmpty) return const SizedBox.shrink();
+                      final durations = prices.map((p) {
+                        final m = p as Map<String, dynamic>;
+                        final mins = m['duration_minutes'] as int? ?? 0;
+                        final priceStr = m['price']?.toString() ?? '0';
+                        final price = double.tryParse(priceStr)?.toInt() ?? 0;
+                        final formatted = _formatAmount(price);
+                        return ('$mins min', '$formatted UZS');
+                      }).toList();
+                      return _PremiumCard(
+                        child: _LessonDurationSection(durations: durations),
+                      );
+                    },
+                  ),
 
                   const SizedBox(height: 16),
 
                   // ── Reviews ────────────────────────────────────────────────
                   if (_reviewsLoading || _reviews.isNotEmpty) ...[
                     _PremiumCard(
-                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 0),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 20,
+                        horizontal: 0,
+                      ),
                       child: _ReviewsSection(
                         reviews: _reviews,
                         loading: _reviewsLoading,
@@ -390,12 +412,15 @@ class _TutorVideoState extends State<_TutorVideo> {
       ..addListener(() {
         if (mounted) setState(() {});
       });
-    _controller.initialize().then((_) {
-      if (!mounted) return;
-      setState(() => _initialized = true);
-    }).catchError((_) {
-      // Video URL is invalid or unreachable — hide the player silently.
-    });
+    _controller
+        .initialize()
+        .then((_) {
+          if (!mounted) return;
+          setState(() => _initialized = true);
+        })
+        .catchError((_) {
+          // Video URL is invalid or unreachable — hide the player silently.
+        });
   }
 
   @override
@@ -443,97 +468,114 @@ class _TutorVideoState extends State<_TutorVideo> {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: AspectRatio(
-          aspectRatio: 16 / 9,
-          child: _initialized
-              ? GestureDetector(
-                  onTap: _onTapVideo,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      VideoPlayer(_controller),
-                      AnimatedOpacity(
-                        opacity: _showControls ? 1.0 : 0.0,
-                        duration: const Duration(milliseconds: 250),
-                        child: IgnorePointer(
-                          ignoring: !_showControls,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              // Rewind 15s
-                              GestureDetector(
-                                onTap: () => _seekBy(-15),
-                                child: Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.5),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: SvgPicture.asset(
-                                      'assets/images/branding/video-back.svg',
-                                      width: 28,
-                                      height: 28,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 480),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: AspectRatio(
+              // Use the video's real aspect ratio so portrait clips aren't
+              // stretched into a landscape frame; fall back to 16:9 while loading.
+              aspectRatio: _initialized && _controller.value.aspectRatio > 0
+                  ? _controller.value.aspectRatio
+                  : 16 / 9,
+              child: _initialized
+                  ? GestureDetector(
+                      onTap: _onTapVideo,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          VideoPlayer(_controller),
+                          AnimatedOpacity(
+                            opacity: _showControls ? 1.0 : 0.0,
+                            duration: const Duration(milliseconds: 250),
+                            child: IgnorePointer(
+                              ignoring: !_showControls,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  // Rewind 15s
+                                  GestureDetector(
+                                    onTap: () => _seekBy(-15),
+                                    child: Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: SvgPicture.asset(
+                                          'assets/images/branding/video-back.svg',
+                                          width: 28,
+                                          height: 28,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ),
-                              const SizedBox(width: 24),
-                              // Play/Pause
-                              GestureDetector(
-                                onTap: _togglePlay,
-                                child: Container(
-                                  width: 56,
-                                  height: 56,
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.5),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    _controller.value.isPlaying
-                                        ? Icons.pause_rounded
-                                        : Icons.play_arrow_rounded,
-                                    color: Colors.white,
-                                    size: 36,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 24),
-                              // Forward 15s
-                              GestureDetector(
-                                onTap: () => _seekBy(15),
-                                child: Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.5),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: SvgPicture.asset(
-                                      'assets/images/branding/video-front.svg',
-                                      width: 28,
-                                      height: 28,
+                                  const SizedBox(width: 24),
+                                  // Play/Pause
+                                  GestureDetector(
+                                    onTap: _togglePlay,
+                                    child: Container(
+                                      width: 56,
+                                      height: 56,
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        _controller.value.isPlaying
+                                            ? Icons.pause_rounded
+                                            : Icons.play_arrow_rounded,
+                                        color: Colors.white,
+                                        size: 36,
+                                      ),
                                     ),
                                   ),
-                                ),
+                                  const SizedBox(width: 24),
+                                  // Forward 15s
+                                  GestureDetector(
+                                    onTap: () => _seekBy(15),
+                                    child: Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: SvgPicture.asset(
+                                          'assets/images/branding/video-front.svg',
+                                          width: 28,
+                                          height: 28,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
+                        ],
+                      ),
+                    )
+                  : Container(
+                      color: context.colors.border,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: context.colors.textPrimary,
                         ),
                       ),
-                    ],
-                  ),
-                )
-              : Container(
-                  color: context.colors.border,
-                  child: Center(
-                    child: CircularProgressIndicator(color: context.colors.textPrimary),
-                  ),
-                ),
+                    ),
+            ),
+          ),
         ),
       ),
     );
@@ -573,7 +615,9 @@ class _ProfileHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scoreLabel = ieltsScore % 1 == 0 ? ieltsScore.toInt().toString() : ieltsScore.toString();
+    final scoreLabel = ieltsScore % 1 == 0
+        ? ieltsScore.toInt().toString()
+        : ieltsScore.toString();
     return SizedBox(
       height: 340,
       child: Stack(
@@ -586,12 +630,20 @@ class _ProfileHero extends StatelessWidget {
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => Container(
                     color: context.colors.border,
-                    child: Icon(Icons.person, size: 64, color: context.colors.textTertiary),
+                    child: Icon(
+                      Icons.person,
+                      size: 64,
+                      color: context.colors.textTertiary,
+                    ),
                   ),
                 )
               : Container(
                   color: context.colors.border,
-                  child: Icon(Icons.person, size: 64, color: context.colors.textTertiary),
+                  child: Icon(
+                    Icons.person,
+                    size: 64,
+                    color: context.colors.textTertiary,
+                  ),
                 ),
 
           // Top scrim for icon legibility
@@ -624,12 +676,22 @@ class _ProfileHero extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  _heroIconButton(Icons.chevron_left_rounded, onBackTap, size: 26),
+                  _heroIconButton(
+                    Icons.chevron_left_rounded,
+                    onBackTap,
+                    size: 26,
+                  ),
                   const Spacer(),
-                  _heroIconButton(Icons.ios_share_rounded, onShareTap, size: 19),
+                  _heroIconButton(
+                    Icons.ios_share_rounded,
+                    onShareTap,
+                    size: 19,
+                  ),
                   const SizedBox(width: 10),
                   _heroIconButton(
-                    isBookmarked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                    isBookmarked
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
                     onBookmarkTap,
                     size: 19,
                     tint: isBookmarked ? const Color(0xFFE53935) : Colors.white,
@@ -645,9 +707,14 @@ class _ProfileHero extends StatelessWidget {
               top: 64,
               left: 16,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFFFFD451), Color(0xFFF5B81E)]),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFFD451), Color(0xFFF5B81E)],
+                  ),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
@@ -709,7 +776,12 @@ class _ProfileHero extends StatelessWidget {
     );
   }
 
-  Widget _heroIconButton(IconData icon, VoidCallback onTap, {required double size, Color tint = Colors.white}) {
+  Widget _heroIconButton(
+    IconData icon,
+    VoidCallback onTap, {
+    required double size,
+    Color tint = Colors.white,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -731,7 +803,9 @@ class _ProfileHero extends StatelessWidget {
         gradient: gradient,
         color: gradient == null ? Colors.white.withValues(alpha: 0.18) : null,
         borderRadius: BorderRadius.circular(20),
-        border: gradient == null ? Border.all(color: Colors.white.withValues(alpha: 0.3)) : null,
+        border: gradient == null
+            ? Border.all(color: Colors.white.withValues(alpha: 0.3))
+            : null,
       ),
       child: Text(
         label,
@@ -765,7 +839,11 @@ class _CertificateBadge extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.verified_rounded, size: 18, color: Color(0xFF2E7D32)),
+            const Icon(
+              Icons.verified_rounded,
+              size: 18,
+              color: Color(0xFF2E7D32),
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -778,7 +856,11 @@ class _CertificateBadge extends StatelessWidget {
                 ),
               ),
             ),
-            Icon(Icons.chevron_right_rounded, size: 18, color: context.colors.textTertiary),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: context.colors.textTertiary,
+            ),
           ],
         ),
       ),
@@ -1036,7 +1118,9 @@ class _ReviewsSection extends StatelessWidget {
           height: 260,
           child: loading
               ? Center(
-                  child: CircularProgressIndicator(color: context.colors.textPrimary),
+                  child: CircularProgressIndicator(
+                    color: context.colors.textPrimary,
+                  ),
                 )
               : ListView.builder(
                   scrollDirection: Axis.horizontal,
@@ -1056,7 +1140,10 @@ class _ReviewsSection extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: context.colors.surface,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: context.colors.border, width: 1),
+                        border: Border.all(
+                          color: context.colors.border,
+                          width: 1,
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

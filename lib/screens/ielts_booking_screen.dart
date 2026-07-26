@@ -184,7 +184,7 @@ class _SessionCard extends StatelessWidget {
       ),
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: mtSoftCard(radius: 18),
+        decoration: mtSoftCard(context, radius: 18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -296,7 +296,7 @@ class _SessionCardSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: mtSoftCard(radius: 18),
+      decoration: mtSoftCard(context, radius: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

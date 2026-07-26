@@ -48,12 +48,20 @@ class Course {
     required this.enrollmentOpen,
     required this.startDate,
     required this.endDate,
+    required this.startTime,
+    required this.endTime,
+    required this.sessionTimeLabel,
+    required this.sessionActiveNow,
     required this.scheduleDetails,
     required this.tutorId,
     required this.tutorName,
     required this.tutorImageUrl,
+    required this.coTutorId,
+    required this.coTutorName,
+    required this.coTutorImageUrl,
     required this.isEnrolled,
     required this.isOwner,
+    required this.isPrimaryTutor,
     required this.isCancelled,
     required this.sharedLink,
     required this.announcements,
@@ -72,13 +80,23 @@ class Course {
   final bool enrollmentOpen;
   final DateTime? startDate;
   final DateTime? endDate;
+  final String? startTime; // "16:00"
+  final String? endTime; // "17:00"
+  final String sessionTimeLabel; // "16:00 – 17:00"
+  final bool sessionActiveNow;
   final String scheduleDetails;
   final int tutorId;
   final String tutorName;
   final String? tutorImageUrl;
+  final int? coTutorId;
+  final String? coTutorName;
+  final String? coTutorImageUrl;
   final bool isEnrolled;
   final bool isOwner;
+  final bool isPrimaryTutor;
   final bool isCancelled;
+
+  bool get hasCoTutor => coTutorId != null;
 
   /// Detail-only: the meeting/group link, empty unless enrolled or owner.
   final String sharedLink;
@@ -139,14 +157,32 @@ class Course {
         enrollmentOpen: json['enrollment_open'] as bool? ?? false,
         startDate: _asDate(json['start_date']),
         endDate: _asDate(json['end_date']),
+        startTime: (json['start_time']?.toString().isEmpty ?? true)
+            ? null
+            : json['start_time'].toString(),
+        endTime: (json['end_time']?.toString().isEmpty ?? true)
+            ? null
+            : json['end_time'].toString(),
+        sessionTimeLabel: json['session_time_label']?.toString() ?? '',
+        sessionActiveNow: json['session_active_now'] as bool? ?? false,
         scheduleDetails: json['schedule_details']?.toString() ?? '',
         tutorId: _asInt(json['tutor_id']),
         tutorName: json['tutor_name']?.toString() ?? '',
         tutorImageUrl: (json['tutor_image_url']?.toString().isEmpty ?? true)
             ? null
             : json['tutor_image_url'].toString(),
+        coTutorId: json['co_tutor_id'] == null
+            ? null
+            : _asInt(json['co_tutor_id']),
+        coTutorName: (json['co_tutor_name']?.toString().isEmpty ?? true)
+            ? null
+            : json['co_tutor_name'].toString(),
+        coTutorImageUrl: (json['co_tutor_image_url']?.toString().isEmpty ?? true)
+            ? null
+            : json['co_tutor_image_url'].toString(),
         isEnrolled: json['is_enrolled'] as bool? ?? false,
         isOwner: json['is_owner'] as bool? ?? false,
+        isPrimaryTutor: json['is_primary_tutor'] as bool? ?? false,
         isCancelled: json['is_cancelled'] as bool? ?? false,
         sharedLink: json['shared_link']?.toString() ?? '',
         announcements:
@@ -178,6 +214,36 @@ class CourseAnnouncement {
   static List<CourseAnnouncement> listFromJson(List? raw) => (raw ?? const [])
       .map((e) => CourseAnnouncement.fromJson(e as Map<String, dynamic>))
       .toList();
+}
+
+/// A tutor from `/tutors/?search=`, used to pick a co-tutor.
+class TutorSearchResult {
+  const TutorSearchResult({
+    required this.id,
+    required this.name,
+    required this.imageUrl,
+  });
+
+  final int id;
+  final String name;
+  final String? imageUrl;
+
+  factory TutorSearchResult.fromJson(Map<String, dynamic> json) {
+    final full = json['tutor_name']?.toString().trim() ?? '';
+    final name = full.isNotEmpty
+        ? full
+        : '${json['first_name'] ?? ''} ${json['last_name'] ?? ''}'.trim();
+    return TutorSearchResult(
+      id: _asInt(json['id']),
+      name: name,
+      imageUrl: (json['profile_image']?.toString().isEmpty ?? true)
+          ? null
+          : json['profile_image'].toString(),
+    );
+  }
+
+  static List<TutorSearchResult> listFromJson(List raw) =>
+      raw.map((e) => TutorSearchResult.fromJson(e as Map<String, dynamic>)).toList();
 }
 
 /// One roster row from `/tutor/courses/{id}/enrollments/`.

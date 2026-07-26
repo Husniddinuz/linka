@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import '../models/mock_test.dart';
 import 'mock_test_styles.dart';
+import '../theme/app_colors.dart';
 
-const _promptStyle = TextStyle(
+/// Question prompt text. A function rather than a top-level const because the
+/// colour is a theme lookup.
+TextStyle _promptStyle(BuildContext context) => TextStyle(
   fontFamily: 'SF Pro',
   fontSize: 14.5,
   height: 1.45,
-  color: MockTestColors.navy,
+  color: context.colors.textPrimary,
 );
 
 class _QuestionShell extends StatelessWidget {
@@ -31,7 +34,7 @@ class _QuestionShell extends StatelessWidget {
                 if (prompt.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8, top: 3),
-                    child: Text(prompt, style: _promptStyle),
+                    child: Text(prompt, style: _promptStyle(context)),
                   )
                 else
                   const SizedBox(height: 3),
@@ -56,7 +59,7 @@ class _QuestionNumberBadge extends StatelessWidget {
     return Container(
       constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(color: MockTestColors.navy, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(color: context.colors.textPrimary, borderRadius: BorderRadius.circular(14)),
       alignment: Alignment.center,
       child: Text(
         label,
@@ -118,17 +121,17 @@ class _TextAnswerFieldState extends State<TextAnswerField> {
       question: widget.question,
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F7),
+          color: Color(0xFFF5F5F7),
           borderRadius: BorderRadius.circular(10),
         ),
         child: TextField(
           controller: _controller,
           onChanged: widget.onChanged,
-          style: const TextStyle(fontFamily: 'SF Pro', fontSize: 14.5, color: MockTestColors.navy),
-          decoration: const InputDecoration(
+          style: TextStyle(fontFamily: 'SF Pro', fontSize: 14.5, color: context.colors.textPrimary),
+          decoration: InputDecoration(
             isDense: true,
             hintText: 'Your answer',
-            hintStyle: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.greyLight),
+            hintStyle: TextStyle(fontFamily: 'SF Pro', color: context.colors.textTertiary),
             contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             border: InputBorder.none,
           ),
@@ -156,7 +159,7 @@ class TextGroupInline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const style = TextStyle(fontFamily: 'SF Pro', fontSize: 14.5, height: 2.2, color: MockTestColors.navy);
+    final style = TextStyle(fontFamily: 'SF Pro', fontSize: 14.5, height: 2.2, color: context.colors.textPrimary);
     final spans = <InlineSpan>[];
 
     // Ingested note/summary/flow-chart groups duplicate a shared block onto
@@ -257,7 +260,7 @@ class _InlineBlankState extends State<_InlineBlank> {
         Container(
           width: 20,
           height: 20,
-          decoration: const BoxDecoration(color: MockTestColors.navy, shape: BoxShape.circle),
+          decoration: BoxDecoration(color: context.colors.textPrimary, shape: BoxShape.circle),
           alignment: Alignment.center,
           child: Text(
             widget.label,
@@ -272,7 +275,7 @@ class _InlineBlankState extends State<_InlineBlank> {
             controller: _controller,
             onChanged: widget.onChanged,
             textAlignVertical: TextAlignVertical.center,
-            style: const TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, color: MockTestColors.navy),
+            style: TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, color: context.colors.textPrimary),
             decoration: InputDecoration(
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -319,7 +322,7 @@ class SingleChoiceField extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: selected ? MockTestColors.navy : const Color(0xFFF5F5F7),
+                  color: selected ? context.colors.textPrimary : const Color(0xFFF5F5F7),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
@@ -327,7 +330,7 @@ class SingleChoiceField extends StatelessWidget {
                     Icon(
                       selected ? Icons.check_circle_rounded : Icons.circle_outlined,
                       size: 19,
-                      color: selected ? Colors.white : MockTestColors.greyLight,
+                      color: selected ? Colors.white : context.colors.textTertiary,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -337,7 +340,7 @@ class SingleChoiceField extends StatelessWidget {
                           fontFamily: 'SF Pro',
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
-                          color: selected ? Colors.white : MockTestColors.navy,
+                          color: selected ? Colors.white : context.colors.textPrimary,
                         ),
                       ),
                     ),
@@ -393,7 +396,7 @@ class MultiSelectField extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
                 'Select $expected (${values.length} chosen)',
-                style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, fontWeight: FontWeight.w600, color: MockTestColors.grey),
+                style: TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, fontWeight: FontWeight.w600, color: context.colors.textSecondary),
               ),
             ),
           ...options.map((opt) {
@@ -416,7 +419,7 @@ class MultiSelectField extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
-                    color: selected ? MockTestColors.navy : const Color(0xFFF5F5F7),
+                    color: selected ? context.colors.textPrimary : const Color(0xFFF5F5F7),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -424,7 +427,7 @@ class MultiSelectField extends StatelessWidget {
                       Icon(
                         selected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
                         size: 19,
-                        color: selected ? Colors.white : MockTestColors.greyLight,
+                        color: selected ? Colors.white : context.colors.textTertiary,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -434,7 +437,7 @@ class MultiSelectField extends StatelessWidget {
                             fontFamily: 'SF Pro',
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: selected ? Colors.white : MockTestColors.navy,
+                            color: selected ? Colors.white : context.colors.textPrimary,
                           ),
                         ),
                       ),
@@ -574,11 +577,11 @@ class _OptionBankGroupState extends State<OptionBankGroup> {
     }
     return Text.rich(
       TextSpan(
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: 'SF Pro',
           fontSize: 14.5,
           height: 2.0,
-          color: MockTestColors.navy,
+          color: context.colors.textPrimary,
         ),
         children: spans,
       ),
@@ -604,11 +607,11 @@ class _OptionBankGroupState extends State<OptionBankGroup> {
           )
         else
           ...widget.questions.map((q) => _questionRow(q, isActive: active?.id == q.id)),
-        const Padding(
+        Padding(
           padding: EdgeInsets.only(top: 2, bottom: 8),
           child: Text(
             'Tap a question, then tap an answer below to fill its gap.',
-            style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: MockTestColors.grey),
+            style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: context.colors.textSecondary),
           ),
         ),
         Wrap(
@@ -670,11 +673,11 @@ class _OptionBankGroupState extends State<OptionBankGroup> {
                 padding: const EdgeInsets.only(top: 3),
                 child: Text.rich(
                   TextSpan(
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 14.5,
                       height: 1.7,
-                      color: MockTestColors.navy,
+                      color: context.colors.textPrimary,
                     ),
                     children: spans,
                   ),
@@ -705,11 +708,11 @@ class _GapSlot extends StatelessWidget {
     final Color bg;
     final Color fg;
     if (filled) {
-      bg = active ? MockTestColors.navy : MockTestColors.chipBg;
-      fg = active ? Colors.white : MockTestColors.navy;
+      bg = active ? context.colors.textPrimary : context.colors.surfaceAlt;
+      fg = active ? Colors.white : context.colors.textPrimary;
     } else {
-      bg = active ? const Color(0xFFFDF4DA) : MockTestColors.softBg;
-      fg = MockTestColors.greyLight;
+      bg = active ? const Color(0xFFFDF4DA) : context.colors.surfaceAlt;
+      fg = context.colors.textTertiary;
     }
     return GestureDetector(
       onTap: onTap,
@@ -723,8 +726,8 @@ class _GapSlot extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: active
-                ? (filled ? MockTestColors.navy : MockTestColors.yellowDark)
-                : MockTestColors.divider,
+                ? (filled ? context.colors.textPrimary : MockTestColors.yellowDark)
+                : context.colors.border,
             width: active ? 1.6 : 1,
           ),
         ),
@@ -736,7 +739,7 @@ class _GapSlot extends StatelessWidget {
                 width: 18,
                 height: 18,
                 decoration: BoxDecoration(
-                  color: active && filled ? Colors.white : MockTestColors.navy,
+                  color: active && filled ? Colors.white : context.colors.textPrimary,
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -746,7 +749,7 @@ class _GapSlot extends StatelessWidget {
                     fontFamily: 'SF Pro',
                     fontSize: 9.5,
                     fontWeight: FontWeight.w700,
-                    color: active && filled ? MockTestColors.navy : Colors.white,
+                    color: active && filled ? context.colors.textPrimary : Colors.white,
                   ),
                 ),
               ),
@@ -785,7 +788,7 @@ class _BankChip extends StatelessWidget {
     final hasLabel = option.label.isNotEmpty && option.label != option.value;
     final fg = selected
         ? Colors.white
-        : MockTestColors.navy.withValues(alpha: dimmed ? 0.4 : 1);
+        : context.colors.textPrimary.withValues(alpha: dimmed ? 0.4 : 1);
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -793,8 +796,8 @@ class _BankChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: selected
-              ? MockTestColors.navy
-              : (dimmed ? MockTestColors.softBg : MockTestColors.chipBg),
+              ? context.colors.textPrimary
+              : (dimmed ? context.colors.surfaceAlt : context.colors.surfaceAlt),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text.rich(
@@ -895,7 +898,7 @@ class GroupInstructionCard extends StatelessWidget {
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(14),
-      decoration: mtSoftCard(color: MockTestColors.chipBg, radius: 12),
+      decoration: mtSoftCard(context, color: context.colors.surfaceAlt, radius: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -905,7 +908,7 @@ class GroupInstructionCard extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: MockTestColors.navy,
+                  color: context.colors.brand,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -928,11 +931,11 @@ class GroupInstructionCard extends StatelessWidget {
                   const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 13.5,
                 fontWeight: FontWeight.w500,
-                color: MockTestColors.navy,
+                color: context.colors.textPrimary,
                 height: 1.45,
               ),
             ),

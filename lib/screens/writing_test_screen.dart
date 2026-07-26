@@ -4,6 +4,7 @@ import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
 import 'plus_subscription_screen.dart';
 import 'writing_result_screen.dart';
+import '../theme/app_colors.dart';
 
 class WritingTestScreen extends StatefulWidget {
   const WritingTestScreen({super.key, required this.prompt});
@@ -61,36 +62,36 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.workspace_premium_rounded, color: MockTestColors.yellow),
+            Icon(Icons.workspace_premium_rounded, color: context.colors.accentYellow),
             SizedBox(width: 8),
             Text(
               'Free limit reached',
               style: TextStyle(
                 fontFamily: 'SF Pro',
-                color: MockTestColors.navy,
+                color: context.colors.textPrimary,
               ),
             ),
           ],
         ),
         content: Text(
           message,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'SF Pro',
-            color: MockTestColors.grey,
+            color: context.colors.textSecondary,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Not now',
               style: TextStyle(
                 fontFamily: 'SF Pro',
-                color: MockTestColors.grey,
+                color: context.colors.textSecondary,
               ),
             ),
           ),
@@ -104,11 +105,11 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
                 ),
               );
             },
-            child: const Text(
+            child: Text(
               'Get Plus',
               style: TextStyle(
                 fontFamily: 'SF Pro',
-                color: MockTestColors.navy,
+                color: context.colors.textPrimary,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -166,7 +167,7 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
     final belowMin = _wordCount < _minWords;
     final imageUrl = widget.prompt['image_url'] as String?;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: mtAppBar(
         context,
         title: widget.prompt['title']?.toString() ?? 'Writing task',
@@ -177,8 +178,8 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
               child: Center(
                 child: MtPill(
                   background: _quotaExhausted
-                      ? MockTestColors.redBg
-                      : MockTestColors.chipBg,
+                      ? context.colors.errorBg
+                      : context.colors.surfaceAlt,
                   child: Text(
                     _isPlus
                         ? 'Unlimited'
@@ -188,8 +189,8 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: _quotaExhausted
-                          ? MockTestColors.red
-                          : MockTestColors.navy,
+                          ? context.colors.error
+                          : context.colors.textPrimary,
                     ),
                   ),
                 ),
@@ -217,7 +218,7 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
                       width: double.infinity,
                       margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                       padding: const EdgeInsets.all(14),
-                      decoration: mtSoftCard(color: MockTestColors.chipBg, radius: 14),
+                      decoration: mtSoftCard(context, color: context.colors.surfaceAlt, radius: 14),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -233,25 +234,25 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
                                   fit: BoxFit.contain,
                                   loadingBuilder: (context, child, progress) {
                                     if (progress == null) return child;
-                                    return const Padding(
+                                    return Padding(
                                       padding: EdgeInsets.symmetric(vertical: 40),
                                       child: Center(
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          color: MockTestColors.yellow,
+                                          color: context.colors.accentYellow,
                                         ),
                                       ),
                                     );
                                   },
                                   errorBuilder: (context, error, stackTrace) =>
-                                      const Padding(
+                                      Padding(
                                         padding: EdgeInsets.symmetric(vertical: 24),
                                         child: Center(
                                           child: Text(
                                             'Could not load chart image',
                                             style: TextStyle(
                                               fontFamily: 'SF Pro',
-                                              color: MockTestColors.greyLight,
+                                              color: context.colors.textTertiary,
                                               fontSize: 12.5,
                                             ),
                                           ),
@@ -264,11 +265,11 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
                           ],
                           Text(
                             widget.prompt['prompt_html']?.toString() ?? '',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'SF Pro',
                               fontSize: 14,
                               height: 1.5,
-                              color: MockTestColors.navy,
+                              color: context.colors.textPrimary,
                             ),
                           ),
                         ],
@@ -292,17 +293,17 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
                             maxLines: null,
                             expands: true,
                             textAlignVertical: TextAlignVertical.top,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'SF Pro',
                               fontSize: 14.5,
-                              color: MockTestColors.navy,
+                              color: context.colors.textPrimary,
                               height: 1.5,
                             ),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               hintText: 'Write your answer here…',
                               hintStyle: TextStyle(
                                 fontFamily: 'SF Pro',
-                                color: MockTestColors.greyLight,
+                                color: context.colors.textTertiary,
                               ),
                               border: InputBorder.none,
                               contentPadding: EdgeInsets.fromLTRB(16, 16, 52, 16),
@@ -331,10 +332,10 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
                                     ),
                                   ],
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.keyboard_hide_rounded,
                                   size: 18,
-                                  color: MockTestColors.grey,
+                                  color: context.colors.textSecondary,
                                 ),
                               ),
                             ),
@@ -363,7 +364,7 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
                     fontFamily: 'SF Pro',
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
-                    color: belowMin ? MockTestColors.red : MockTestColors.green,
+                    color: belowMin ? context.colors.error : context.colors.success,
                   ),
                 ),
               ),

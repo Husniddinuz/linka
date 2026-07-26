@@ -8,6 +8,7 @@ import '../services/course_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/cached_avatar.dart';
 import '../widgets/course_card.dart';
+import 'lesson_meeting_screen.dart';
 import 'payment_topup_screen.dart';
 
 /// A live-cohort course: banner, price/dates/seats, description, and the
@@ -25,6 +26,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   Course? _course;
   bool _loading = true;
   bool _enrolling = false;
+  bool _joining = false;
 
   Color get _accent => CourseCard.accentFor(widget.courseId);
 
@@ -96,6 +98,36 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
       _showSnack(e.message);
     } finally {
       if (mounted) setState(() => _enrolling = false);
+    }
+  }
+
+  Future<void> _join() async {
+    final course = _course;
+    if (course == null || _joining) return;
+    setState(() => _joining = true);
+    try {
+      final info = await CourseService.joinSession(course.id);
+      if (!mounted) return;
+      if (info.roomUrl.isEmpty) {
+        _showSnack('Could not get the room. Please try again.');
+        return;
+      }
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LessonMeetingScreen(
+            roomUrl: info.roomUrl,
+            token: info.token,
+            tutorName: course.tutorName,
+          ),
+        ),
+      );
+    } on SessionNotLiveException catch (e) {
+      if (mounted) _showSnack(e.message);
+    } on ApiException catch (e) {
+      if (mounted) _showSnack(e.message);
+    } finally {
+      if (mounted) setState(() => _joining = false);
     }
   }
 
@@ -217,22 +249,21 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                Row(
+                Wrap(
+                  spacing: 18,
+                  runSpacing: 10,
                   children: [
-                    CachedAvatar(imageUrl: course.tutorImageUrl, size: 34),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        course.tutorName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w600,
-                          color: colors.textPrimary,
-                        ),
-                      ),
+                    _TutorChip(
+                      name: course.tutorName,
+                      imageUrl: course.tutorImageUrl,
+                      colors: colors,
                     ),
+                    if (course.hasCoTutor)
+                      _TutorChip(
+                        name: course.coTutorName ?? 'Co-tutor',
+                        imageUrl: course.coTutorImageUrl,
+                        colors: colors,
+                      ),
                   ],
                 ),
                 const SizedBox(height: 18),
@@ -241,6 +272,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                   label: course.dateRangeLabel,
                   colors: colors,
                 ),
+                if (course.sessionTimeLabel.isNotEmpty)
+                  _InfoRow(
+                    icon: Symbols.schedule_rounded,
+                    label: '${course.sessionTimeLabel} · daily',
+                    colors: colors,
+                  ),
                 if (course.scheduleDetails.isNotEmpty)
                   _InfoRow(
                     icon: Symbols.schedule_rounded,
@@ -282,60 +319,117 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     );
   }
 
-  Widget _buildCta(Course course, AppColors colors) {
-    // Owners manage from "My Courses"; here they just see the room above.
-    if (course.isOwner) return const SizedBox.shrink();
+  Widget _ctaWrap(Widget child) => SafeArea(
+        minimum: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+        child: SizedBox(height: 52, child: child),
+      );
 
-    String? disabledLabel;
+  Widget _buildCta(Course course, AppColors colors) {
     if (course.isCancelled) {
-      disabledLabel = 'This course was cancelled';
-    } else if (course.isEnrolled) {
-      disabledLabel = "You're enrolled";
-    } else if (course.isFull) {
+      return _ctaWrap(
+        _DisabledButton(
+            label: 'This course was cancelled', enrolled: false, colors: colors),
+      );
+    }
+
+    // Enrolled students and the course tutors get the Join action.
+    if (course.isEnrolled || course.isOwner) {
+      if (course.sessionActiveNow) {
+        return _ctaWrap(
+          FilledButton.icon(
+            onPressed: _joining ? null : _join,
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.success,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            icon: _joining
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2.4, color: Colors.white),
+                  )
+                : const Icon(Symbols.videocam_rounded),
+            label: Text(
+              _joining ? 'Joining…' : 'Join live session',
+              style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700),
+            ),
+          ),
+        );
+      }
+      final label = course.sessionTimeLabel.isNotEmpty
+          ? 'Live daily at ${course.sessionTimeLabel}'
+          : "You're enrolled";
+      return _ctaWrap(
+        _DisabledButton(label: label, enrolled: true, colors: colors),
+      );
+    }
+
+    // Not enrolled.
+    String? disabledLabel;
+    if (course.isFull) {
       disabledLabel = 'Sold out';
     } else if (!course.enrollmentOpen) {
       disabledLabel = 'Enrollment closed';
     }
-
-    return SafeArea(
-      minimum: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-      child: SizedBox(
-        height: 52,
-        child: disabledLabel != null
-            ? _DisabledButton(
-                label: disabledLabel,
-                enrolled: course.isEnrolled,
-                colors: colors,
+    if (disabledLabel != null) {
+      return _ctaWrap(
+        _DisabledButton(label: disabledLabel, enrolled: false, colors: colors),
+      );
+    }
+    return _ctaWrap(
+      FilledButton(
+        onPressed: _enrolling ? null : _enroll,
+        style: FilledButton.styleFrom(
+          backgroundColor: colors.textPrimary,
+          foregroundColor: colors.background,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        child: _enrolling
+            ? SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.4, color: colors.background),
               )
-            : FilledButton(
-                onPressed: _enrolling ? null : _enroll,
-                style: FilledButton.styleFrom(
-                  backgroundColor: colors.textPrimary,
-                  foregroundColor: colors.background,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: _enrolling
-                    ? SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.4,
-                          color: colors.background,
-                        ),
-                      )
-                    : Text(
-                        course.isFree
-                            ? 'Enroll for free'
-                            : 'Enroll · ${course.priceLabel}',
-                        style: const TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+            : Text(
+                course.isFree ? 'Enroll for free' : 'Enroll · ${course.priceLabel}',
+                style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700),
               ),
       ),
+    );
+  }
+}
+
+class _TutorChip extends StatelessWidget {
+  final String name;
+  final String? imageUrl;
+  final AppColors colors;
+  const _TutorChip({
+    required this.name,
+    required this.imageUrl,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CachedAvatar(imageUrl: imageUrl, size: 32),
+        const SizedBox(width: 8),
+        Text(
+          name,
+          style: TextStyle(
+            fontSize: 14.5,
+            fontWeight: FontWeight.w600,
+            color: colors.textPrimary,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -487,8 +581,26 @@ class _RoomSection extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          if (course.sharedLink.isNotEmpty)
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Symbols.videocam_rounded, size: 16, color: colors.textTertiary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Live sessions run in the app — use the button below during the session time.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: colors.textTertiary,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          // Optional extra link (e.g. materials), only if the tutor/admin set one.
+          if (course.sharedLink.isNotEmpty) ...[
+            const SizedBox(height: 10),
             GestureDetector(
               onTap: () => onOpenLink(course.sharedLink),
               child: Container(
@@ -518,12 +630,8 @@ class _RoomSection extends StatelessWidget {
                   ],
                 ),
               ),
-            )
-          else
-            Text(
-              'The tutor will share a join link here.',
-              style: TextStyle(fontSize: 13, color: colors.textTertiary),
             ),
+          ],
           const SizedBox(height: 16),
           Text(
             'ANNOUNCEMENTS',

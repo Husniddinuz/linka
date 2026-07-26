@@ -41,6 +41,38 @@ class CourseService {
     return CourseAnnouncement.listFromJson(data);
   }
 
+  /// Get a Daily.co room URL + token for the live session. Throws
+  /// [SessionNotLiveException] when the session isn't currently in its window
+  /// (so the caller can show "starts at …" instead of a raw error).
+  static Future<CourseJoinInfo> joinSession(int courseId) async {
+    try {
+      final res = await ApiService.post('/courses/$courseId/join/', {});
+      final payload = (res['data'] as Map<String, dynamic>?) ?? res;
+      final roomUrl = (payload['joinUrl'] ??
+              payload['join_url'] ??
+              payload['room_url'] ??
+              '')
+          .toString();
+      final token = (payload['token'] ?? '').toString();
+      return CourseJoinInfo(roomUrl: roomUrl, token: token);
+    } on ApiException catch (e) {
+      // The join endpoint returns 400 with session_active:false outside the window.
+      final msg = e.message.toLowerCase();
+      if (msg.contains("isn't live") || msg.contains('not live') ||
+          msg.contains('session')) {
+        throw SessionNotLiveException(e.message);
+      }
+      rethrow;
+    }
+  }
+
+  /// Search active tutors by name for the co-tutor picker.
+  static Future<List<TutorSearchResult>> searchTutors(String query) async {
+    final q = Uri.encodeQueryComponent(query);
+    final data = await ApiService.getList('/tutors/?search=$q');
+    return TutorSearchResult.listFromJson(data);
+  }
+
   // ─── Tutor self-service ────────────────────────────────────────────────────
 
   static Future<List<Course>> fetchMyCourses() async {
@@ -56,8 +88,10 @@ class CourseService {
     required int maxStudents,
     required DateTime startDate,
     required DateTime endDate,
+    required String startTime, // "HH:MM"
+    required String endTime, // "HH:MM"
     required String scheduleDetails,
-    required String sharedLink,
+    int? coTutorId,
     File? banner,
   }) async {
     final fields = <String, String>{
@@ -68,8 +102,10 @@ class CourseService {
       'max_students': '$maxStudents',
       'start_date': _fmtDate(startDate),
       'end_date': _fmtDate(endDate),
+      'start_time': startTime,
+      'end_time': endTime,
       'schedule_details': scheduleDetails,
-      'shared_link': sharedLink,
+      if (coTutorId != null) 'co_tutor_id': '$coTutorId',
     };
     final data = await ApiService.postMultipart(
       '/tutor/courses/',
@@ -111,4 +147,20 @@ class InsufficientBalanceException implements Exception {
   const InsufficientBalanceException(this.message);
   @override
   String toString() => message;
+}
+
+/// Thrown by [CourseService.joinSession] when the session isn't in its live
+/// window — the UI shows the schedule instead of an error.
+class SessionNotLiveException implements Exception {
+  final String message;
+  const SessionNotLiveException(this.message);
+  @override
+  String toString() => message;
+}
+
+/// Daily.co room URL + token returned by [CourseService.joinSession].
+class CourseJoinInfo {
+  final String roomUrl;
+  final String token;
+  const CourseJoinInfo({required this.roomUrl, required this.token});
 }

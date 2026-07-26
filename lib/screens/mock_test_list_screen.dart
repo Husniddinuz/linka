@@ -4,6 +4,7 @@ import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
 import 'mock_test_taking_screen.dart';
 import 'plus_subscription_screen.dart';
+import '../theme/app_colors.dart';
 
 /// How many distinct mock tests (Reading + Listening combined) a non-Plus
 /// user can take for free. Tests they have already attempted stay open for
@@ -73,30 +74,30 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
   void _showPlusPrompt() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (sheetContext) => Padding(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.workspace_premium_rounded, color: MockTestColors.yellow, size: 40),
+            Icon(Icons.workspace_premium_rounded, color: context.colors.accentYellow, size: 40),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'You\'ve used your $_freeSolvedTestsLimit free tests',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 16.5,
                 fontWeight: FontWeight.w700,
-                color: MockTestColors.navy,
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Get Linka Plus to unlock all Reading and Listening mock tests.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, height: 1.4, color: MockTestColors.grey),
+              style: TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, height: 1.4, color: context.colors.textSecondary),
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -110,7 +111,7 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: MockTestColors.navy,
+                  backgroundColor: context.colors.brand,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -131,13 +132,13 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
   Widget build(BuildContext context) {
     final isListening = widget.testType == 'listening';
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: mtAppBar(context, title: isListening ? 'Listening' : 'Reading'),
       body: FutureBuilder<List<MockTest>>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator(color: MockTestColors.yellow));
+            return Center(child: CircularProgressIndicator(color: context.colors.accentYellow));
           }
           if (snapshot.hasError) {
             return Center(
@@ -146,17 +147,17 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
                 child: Text(
                   'Failed to load: ${snapshot.error}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
+                  style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textSecondary, fontSize: 14),
                 ),
               ),
             );
           }
           final tests = snapshot.data ?? const [];
           if (tests.isEmpty) {
-            return const Center(
+            return Center(
               child: Text(
                 'No tests available yet',
-                style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.greyLight, fontSize: 15),
+                style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textTertiary, fontSize: 15),
               ),
             );
           }
@@ -164,7 +165,7 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
           final freeWindowUsed = _isLocked && _solvedTestIds.length >= _freeSolvedTestsLimit;
 
           return RefreshIndicator(
-            color: MockTestColors.navy,
+            color: context.colors.textPrimary,
             onRefresh: () async {
               setState(() {
                 _future = MockTestService.fetchTests(widget.testType);
@@ -174,12 +175,15 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
-                for (final test in tests) ...[
+                for (final (index, test) in tests.indexed) ...[
                   Builder(builder: (context) {
                     final locked = freeWindowUsed && !_solvedTestIds.contains(test.id);
                     return _TestCard(
                       test: test,
-                      testType: widget.testType,
+                      // Position in the list, not `test.number` — backend
+                      // numbers have gaps from unpublished tests, and a
+                      // "Test 25" sitting 23rd in the list reads as a bug.
+                      position: index + 1,
                       locked: locked,
                       onTap: locked ? _showPlusPrompt : () => _openTest(test),
                     );
@@ -196,24 +200,31 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
 }
 
 class _TestCard extends StatelessWidget {
-  const _TestCard({required this.test, required this.testType, required this.locked, required this.onTap});
+  const _TestCard({
+    required this.test,
+    required this.position,
+    required this.locked,
+    required this.onTap,
+  });
   final MockTest test;
-  final String testType;
+
+  /// 1-based position in the list, shown in the avatar so the tests are
+  /// countable at a glance (every title is otherwise identical).
+  final int position;
   final bool locked;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final minutes = test.durationSeconds ~/ 60;
-    final icon = testType == 'listening' ? Icons.headphones_rounded : Icons.menu_book_rounded;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(14),
-        decoration: mtSoftCard(),
+        decoration: mtSoftCard(context),
         child: Row(
           children: [
-            MtAvatar(icon: icon),
+            MtAvatar(text: '$position'),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -223,24 +234,24 @@ class _TestCard extends StatelessWidget {
                     test.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: MockTestColors.navy,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '${test.totalQuestions} questions · $minutes min',
-                    style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: MockTestColors.grey),
+                    style: TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: context.colors.textSecondary),
                   ),
                 ],
               ),
             ),
             Icon(
               locked ? Icons.lock_rounded : Icons.chevron_right_rounded,
-              color: MockTestColors.greyLight,
+              color: context.colors.textTertiary,
               size: locked ? 18 : 24,
             ),
           ],

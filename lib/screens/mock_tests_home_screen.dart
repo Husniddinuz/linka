@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
 import 'ielts_booking_screen.dart';
 import 'mock_test_history_screen.dart';
@@ -7,20 +8,53 @@ import 'speaking_samples_list_screen.dart';
 import 'tutors_screen.dart';
 import 'writing_prompts_list_screen.dart';
 import 'writing_samples_list_screen.dart';
+import '../theme/app_colors.dart';
 
-class MockTestsHomeScreen extends StatelessWidget {
+class MockTestsHomeScreen extends StatefulWidget {
   const MockTestsHomeScreen({super.key});
+
+  @override
+  State<MockTestsHomeScreen> createState() => _MockTestsHomeScreenState();
+}
+
+class _MockTestsHomeScreenState extends State<MockTestsHomeScreen> {
+  /// Live test counts keyed by test type, so newly published tests show up in
+  /// the subtitles without an app release. Null until loaded (or if the fetch
+  /// fails) — the subtitle then omits the count rather than showing a stale one.
+  int? _readingCount;
+  int? _listeningCount;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCounts();
+  }
+
+  Future<void> _loadCounts() async {
+    final counts = await Future.wait([
+      MockTestService.fetchTests('reading').then((t) => t.length).catchError((_) => -1),
+      MockTestService.fetchTests('listening').then((t) => t.length).catchError((_) => -1),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      if (counts[0] >= 0) _readingCount = counts[0];
+      if (counts[1] >= 0) _listeningCount = counts[1];
+    });
+  }
+
+  static String _testsSubtitle(int? count, String minutes) =>
+      count == null ? 'Full practice tests · $minutes each' : '$count practice tests · $minutes each';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: mtAppBar(
         context,
         title: 'Mock Tests',
         actions: [
           IconButton(
-            icon: const Icon(Icons.history_rounded, color: MockTestColors.navy),
+            icon: Icon(Icons.history_rounded, color: context.colors.textPrimary),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const MockTestHistoryScreen()),
@@ -31,15 +65,15 @@ class MockTestsHomeScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
         children: [
-          const Text(
+          Text(
             'Choose a skill to practise a full IELTS mock test.',
-            style: TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, color: MockTestColors.grey),
+            style: TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, color: context.colors.textSecondary),
           ),
           const SizedBox(height: 18),
           _SkillButton(
             icon: Icons.menu_book_rounded,
             title: 'Reading',
-            subtitle: '28 practice tests · 60 min each',
+            subtitle: _testsSubtitle(_readingCount, '60 min'),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const MockTestListScreen(testType: 'reading')),
@@ -49,7 +83,7 @@ class MockTestsHomeScreen extends StatelessWidget {
           _SkillButton(
             icon: Icons.headphones_rounded,
             title: 'Listening',
-            subtitle: '25 practice tests · 40 min each',
+            subtitle: _testsSubtitle(_listeningCount, '40 min'),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const MockTestListScreen(testType: 'listening')),
@@ -86,13 +120,13 @@ class MockTestsHomeScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'SAMPLES FROM REAL TESTS',
             style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 12.5,
               fontWeight: FontWeight.w700,
-              color: MockTestColors.greyLight,
+              color: context.colors.textTertiary,
               letterSpacing: 0.8,
             ),
           ),
@@ -141,7 +175,7 @@ class _SkillButton extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: mtSoftCard(radius: 18),
+        decoration: mtSoftCard(context, radius: 18),
         child: Row(
           children: [
             MtAvatar(icon: icon, size: 52),
@@ -152,22 +186,22 @@ class _SkillButton extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: MockTestColors.navy,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: MockTestColors.grey),
+                    style: TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: context.colors.textSecondary),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: MockTestColors.greyLight),
+            Icon(Icons.chevron_right_rounded, color: context.colors.textTertiary),
           ],
         ),
       ),

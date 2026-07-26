@@ -3,6 +3,7 @@ import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
 import 'plus_subscription_screen.dart';
 import 'speaking_sample_screen.dart';
+import '../theme/app_colors.dart';
 
 /// How many of a tutor's topics a non-Plus user can open for free; the rest
 /// stay visible but locked and route to the Plus subscription screen.
@@ -25,13 +26,13 @@ class _SpeakingSamplesListScreenState extends State<SpeakingSamplesListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: mtAppBar(context, title: 'Speaking Samples'),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator(color: MockTestColors.yellow));
+            return Center(child: CircularProgressIndicator(color: context.colors.accentYellow));
           }
           if (snapshot.hasError) {
             return Center(
@@ -40,17 +41,17 @@ class _SpeakingSamplesListScreenState extends State<SpeakingSamplesListScreen> {
                 child: Text(
                   'Failed to load: ${snapshot.error}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
+                  style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textSecondary, fontSize: 14),
                 ),
               ),
             );
           }
           final tutors = snapshot.data ?? const [];
           if (tutors.isEmpty) {
-            return const Center(
+            return Center(
               child: Text(
                 'No speaking samples yet',
-                style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
+                style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textSecondary, fontSize: 14),
               ),
             );
           }
@@ -140,13 +141,13 @@ class _SpeakingSampleTutorTopicsScreenState extends State<SpeakingSampleTutorTop
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: mtAppBar(context, title: widget.tutorName),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator(color: MockTestColors.yellow));
+            return Center(child: CircularProgressIndicator(color: context.colors.accentYellow));
           }
           if (snapshot.hasError) {
             return Center(
@@ -155,17 +156,17 @@ class _SpeakingSampleTutorTopicsScreenState extends State<SpeakingSampleTutorTop
                 child: Text(
                   'Failed to load: ${snapshot.error}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
+                  style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textSecondary, fontSize: 14),
                 ),
               ),
             );
           }
           final samples = snapshot.data ?? const [];
           if (samples.isEmpty) {
-            return const Center(
+            return Center(
               child: Text(
                 'No speaking samples yet',
-                style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
+                style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textSecondary, fontSize: 14),
               ),
             );
           }
@@ -239,15 +240,15 @@ class _TutorCard extends StatelessWidget {
                 top: 10,
                 right: 10,
                 child: MtPill(
-                  background: MockTestColors.yellow,
+                  background: context.colors.accentYellow,
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   child: Text(
                     scoreLabel!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 11.5,
                       fontWeight: FontWeight.w800,
-                      color: MockTestColors.navy,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                 ),
@@ -322,7 +323,7 @@ class _TopicRow extends StatelessWidget {
       ),
       child: Container(
         padding: const EdgeInsets.all(14),
-        decoration: mtSoftCard(),
+        decoration: mtSoftCard(context),
         child: Opacity(
           opacity: locked ? 0.55 : 1,
           child: Row(
@@ -331,10 +332,10 @@ class _TopicRow extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: MockTestColors.chipBg,
+                  color: context.colors.surfaceAlt,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.mic_rounded, color: MockTestColors.navy, size: 22),
+                child: Icon(Icons.mic_rounded, color: context.colors.textPrimary, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -345,11 +346,11 @@ class _TopicRow extends StatelessWidget {
                       title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'SF Pro',
                         fontSize: 14.5,
                         fontWeight: FontWeight.w600,
-                        color: MockTestColors.navy,
+                        color: context.colors.textPrimary,
                         height: 1.25,
                       ),
                     ),
@@ -358,7 +359,7 @@ class _TopicRow extends StatelessWidget {
                       locked
                           ? 'Linka Plus'
                           : '${parts.length} part${parts.length == 1 ? '' : 's'} recorded',
-                      style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: MockTestColors.grey),
+                      style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: context.colors.textSecondary),
                     ),
                   ],
                 ),
@@ -366,15 +367,15 @@ class _TopicRow extends StatelessWidget {
               if (band != null) ...[
                 const SizedBox(width: 8),
                 MtPill(
-                  background: MockTestColors.yellow,
+                  background: context.colors.accentYellow,
                   padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                   child: Text(
                     'Band $band',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      color: MockTestColors.navy,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                 ),
@@ -382,7 +383,7 @@ class _TopicRow extends StatelessWidget {
               const SizedBox(width: 4),
               Icon(
                 locked ? Icons.lock_rounded : Icons.chevron_right_rounded,
-                color: MockTestColors.greyLight,
+                color: context.colors.textTertiary,
                 size: locked ? 18 : 22,
               ),
             ],
@@ -399,9 +400,9 @@ class _TutorImageFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: MockTestColors.chipBg,
+      color: context.colors.surfaceAlt,
       alignment: Alignment.center,
-      child: const Icon(Icons.person_rounded, color: MockTestColors.greyLight, size: 40),
+      child: Icon(Icons.person_rounded, color: context.colors.textTertiary, size: 40),
     );
   }
 }

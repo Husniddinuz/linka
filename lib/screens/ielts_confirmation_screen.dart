@@ -56,7 +56,7 @@ class IeltsConfirmationScreen extends StatelessWidget {
           const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: mtSoftCard(radius: 18),
+            decoration: mtSoftCard(context, radius: 18),
             child: Column(
               children: [
                 _row('Receipt number', receiptNumber),

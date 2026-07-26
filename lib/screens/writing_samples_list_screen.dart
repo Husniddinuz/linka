@@ -4,13 +4,17 @@ import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
 import 'plus_subscription_screen.dart';
 import 'writing_sample_screen.dart';
+import '../theme/app_colors.dart';
 
 const int _freeSamplesPerTask = 3;
 const double _cardWidth = 172;
 const double _cardHeight = 220;
+// Fixed accent triad for the card placeholders — these identify the card kind
+// (Task 1 / Task 2 / tutor) rather than following the surface theme, so they
+// stay constant in dark mode like the other two always have.
 const Color _task1Accent = Color(0xFF2F6FED);
 const Color _task2Accent = Color(0xFF8B5CF6);
-const Color _tutorAccent = MockTestColors.green;
+const Color _tutorAccent = Color(0xFF27AE60);
 
 /// Tutors with at least one published Writing sample — read-only reference
 /// content, no submission/grading. Tapping a tutor drills into their
@@ -31,13 +35,13 @@ class _WritingSamplesListScreenState extends State<WritingSamplesListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: mtAppBar(context, title: 'Writing Samples'),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator(color: MockTestColors.yellow));
+            return Center(child: CircularProgressIndicator(color: context.colors.accentYellow));
           }
           if (snapshot.hasError) {
             return Center(
@@ -46,17 +50,17 @@ class _WritingSamplesListScreenState extends State<WritingSamplesListScreen> {
                 child: Text(
                   'Failed to load: ${snapshot.error}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
+                  style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textSecondary, fontSize: 14),
                 ),
               ),
             );
           }
           final tutors = snapshot.data ?? const [];
           if (tutors.isEmpty) {
-            return const Center(
+            return Center(
               child: Text(
                 'No writing samples yet',
-                style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
+                style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textSecondary, fontSize: 14),
               ),
             );
           }
@@ -134,7 +138,7 @@ class _WritingSampleTutorTopicsScreenState extends State<WritingSampleTutorTopic
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: mtAppBar(context, title: widget.tutorName),
       body: _TutorWritingSamplesBody(future: _future),
     );
@@ -173,7 +177,7 @@ class _TutorWritingSamplesBodyState extends State<_TutorWritingSamplesBody> {
       future: widget.future,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator(color: MockTestColors.yellow));
+          return Center(child: CircularProgressIndicator(color: context.colors.accentYellow));
         }
         if (snapshot.hasError) {
           return Center(
@@ -182,7 +186,7 @@ class _TutorWritingSamplesBodyState extends State<_TutorWritingSamplesBody> {
               child: Text(
                 'Failed to load: ${snapshot.error}',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
+                style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textSecondary, fontSize: 14),
               ),
             ),
           );
@@ -193,9 +197,9 @@ class _TutorWritingSamplesBodyState extends State<_TutorWritingSamplesBody> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
-            const Text(
+            Text(
               'Study real, examiner-scored essays — tap a topic, then tap a highlight for the tutor\'s note.',
-              style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, height: 1.4, color: MockTestColors.grey),
+              style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, height: 1.4, color: context.colors.textSecondary),
             ),
             const SizedBox(height: 20),
             _TaskSection(
@@ -271,15 +275,15 @@ class _TutorCard extends StatelessWidget {
                 top: 10,
                 right: 10,
                 child: MtPill(
-                  background: MockTestColors.yellow,
+                  background: context.colors.accentYellow,
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   child: Text(
                     'IELTS $writingScore',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 11.5,
                       fontWeight: FontWeight.w800,
-                      color: MockTestColors.navy,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                 ),
@@ -342,18 +346,18 @@ class _TaskSection extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 12.5,
                 fontWeight: FontWeight.w700,
-                color: MockTestColors.greyLight,
+                color: context.colors.textTertiary,
                 letterSpacing: 0.8,
               ),
             ),
             const SizedBox(width: 8),
             Text(
               '${samples.length} essays',
-              style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: MockTestColors.greyLight),
+              style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: context.colors.textTertiary),
             ),
           ],
         ),
@@ -404,7 +408,7 @@ class _EssayRow extends StatelessWidget {
       ),
       child: Container(
         padding: const EdgeInsets.all(14),
-        decoration: mtSoftCard(),
+        decoration: mtSoftCard(context),
         child: Opacity(
           opacity: locked ? 0.55 : 1,
           child: Row(
@@ -427,25 +431,25 @@ class _EssayRow extends StatelessWidget {
                       title.isNotEmpty ? title : 'Writing sample',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'SF Pro',
                         fontSize: 14.5,
                         fontWeight: FontWeight.w600,
-                        color: MockTestColors.navy,
+                        color: context.colors.textPrimary,
                         height: 1.25,
                       ),
                     ),
                     if (locked) ...[
                       const SizedBox(height: 3),
-                      const Text(
+                      Text(
                         'Linka Plus',
-                        style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: MockTestColors.grey),
+                        style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: context.colors.textSecondary),
                       ),
                     ] else if (highlightCount > 0) ...[
                       const SizedBox(height: 3),
                       Text(
                         '$highlightCount highlight${highlightCount == 1 ? '' : 's'}',
-                        style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: MockTestColors.grey),
+                        style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: context.colors.textSecondary),
                       ),
                     ],
                   ],
@@ -454,18 +458,18 @@ class _EssayRow extends StatelessWidget {
               if (band != null) ...[
                 const SizedBox(width: 8),
                 MtPill(
-                  background: MockTestColors.yellow,
+                  background: context.colors.accentYellow,
                   padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                   child: Text(
                     'Band $band',
-                    style: const TextStyle(fontFamily: 'SF Pro', fontSize: 11, fontWeight: FontWeight.w800, color: MockTestColors.navy),
+                    style: TextStyle(fontFamily: 'SF Pro', fontSize: 11, fontWeight: FontWeight.w800, color: context.colors.textPrimary),
                   ),
                 ),
               ],
               const SizedBox(width: 4),
               Icon(
                 locked ? Icons.lock_rounded : Icons.chevron_right_rounded,
-                color: MockTestColors.greyLight,
+                color: context.colors.textTertiary,
                 size: locked ? 18 : 22,
               ),
             ],

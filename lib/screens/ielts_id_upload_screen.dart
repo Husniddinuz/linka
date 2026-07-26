@@ -139,7 +139,7 @@ class _IeltsIdUploadScreenState extends State<IeltsIdUploadScreen> {
             child: Container(
               height: 200,
               width: double.infinity,
-              decoration: mtSoftCard(radius: 14),
+              decoration: mtSoftCard(context, radius: 14),
               clipBehavior: Clip.antiAlias,
               child: _idPhoto == null
                   ? const Center(

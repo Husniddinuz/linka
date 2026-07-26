@@ -115,7 +115,7 @@ class _IeltsResumeUploadScreenState extends State<IeltsResumeUploadScreen> {
                           onTap: _opening ? null : () => _open(app),
                           child: Container(
                             padding: const EdgeInsets.all(14),
-                            decoration: mtSoftCard(radius: 14),
+                            decoration: mtSoftCard(context, radius: 14),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [

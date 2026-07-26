@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import '../services/plus_service.dart';
 import '../services/user_service.dart';
+import '../theme/app_colors.dart';
 
-/// Shared colors/decorations for the Mock Tests feature, matching the app's
-/// existing flat design language (navy + soft grey containers, no Material
-/// card shadows) — see lesson_card.dart / podcasts_list_screen.dart.
+/// Legacy light-mode palette for the Mock Tests feature.
+///
+/// Superseded by [AppColors] / `context.colors`, which re-skins in dark mode.
+/// Only the IELTS registration flow (`ielts_*_screen.dart`) still reads these
+/// directly; everything else in Mock Tests goes through `context.colors`.
+/// Prefer `context.colors` in new code — these constants never flip.
 class MockTestColors {
   static const navy = Color(0xFF272942);
   static const grey = Color(0xFF6C6C6C);
@@ -20,28 +24,31 @@ class MockTestColors {
   static const redBg = Color(0xFFFCECEC);
 }
 
-BoxDecoration mtSoftCard({Color? color, double radius = 16, Border? border}) {
+/// Soft filled container used for list rows and panels. Takes [context] so the
+/// default fill follows the active theme.
+BoxDecoration mtSoftCard(BuildContext context, {Color? color, double radius = 16, Border? border}) {
   return BoxDecoration(
-    color: color ?? MockTestColors.softBg,
+    color: color ?? context.colors.surfaceAlt,
     borderRadius: BorderRadius.circular(radius),
     border: border,
   );
 }
 
 AppBar mtAppBar(BuildContext context, {required String title, List<Widget>? actions, PreferredSizeWidget? bottom}) {
+  final colors = context.colors;
   return AppBar(
-    backgroundColor: Colors.white,
+    backgroundColor: colors.background,
     elevation: 0,
-    surfaceTintColor: Colors.white,
+    surfaceTintColor: colors.background,
     leading: IconButton(
       onPressed: () => Navigator.pop(context),
-      icon: const Icon(Icons.chevron_left_rounded, color: MockTestColors.navy, size: 30),
+      icon: Icon(Icons.chevron_left_rounded, color: colors.textPrimary, size: 30),
     ),
     title: Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontFamily: 'SF Pro',
-        color: MockTestColors.navy,
+        color: colors.textPrimary,
         fontSize: 17,
         fontWeight: FontWeight.w600,
       ),
@@ -62,23 +69,24 @@ class MtPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
         onPressed: loading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: MockTestColors.navy,
-          foregroundColor: Colors.white,
-          disabledBackgroundColor: MockTestColors.navy.withValues(alpha: 0.5),
+          backgroundColor: colors.brand,
+          foregroundColor: colors.onBrand,
+          disabledBackgroundColor: colors.brand.withValues(alpha: 0.5),
           elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
         child: loading
-            ? const SizedBox(
+            ? SizedBox(
                 height: 20,
                 width: 20,
-                child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                child: CircularProgressIndicator(strokeWidth: 2.2, color: colors.onBrand),
               )
             : Text(
                 label,
@@ -99,14 +107,15 @@ class MtChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         decoration: BoxDecoration(
-          color: selected ? MockTestColors.navy : Colors.white,
+          color: selected ? colors.brand : colors.surface,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: selected ? MockTestColors.navy : const Color(0xFFDDDDDD), width: 1.5),
+          border: Border.all(color: selected ? colors.brand : colors.border, width: 1.5),
         ),
         child: Text(
           label,
@@ -114,7 +123,7 @@ class MtChip extends StatelessWidget {
             fontFamily: 'SF Pro',
             fontSize: 13.5,
             fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : MockTestColors.navy,
+            color: selected ? colors.onBrand : colors.textPrimary,
           ),
         ),
       ),
@@ -124,24 +133,28 @@ class MtChip extends StatelessWidget {
 
 /// Circular navy badge used for list-row leading icons/numbers.
 class MtAvatar extends StatelessWidget {
-  const MtAvatar({super.key, this.icon, this.text, this.size = 46, this.background = MockTestColors.navy});
+  const MtAvatar({super.key, this.icon, this.text, this.size = 46, this.background});
   final IconData? icon;
   final String? text;
   final double size;
-  final Color background;
+
+  /// Defaults to the themed brand fill — a const default can't read the theme,
+  /// hence nullable rather than `= MockTestColors.navy`.
+  final Color? background;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+      decoration: BoxDecoration(color: background ?? colors.brand, shape: BoxShape.circle),
       alignment: Alignment.center,
       child: icon != null
-          ? Icon(icon, color: Colors.white, size: size * 0.46)
+          ? Icon(icon, color: colors.onBrand, size: size * 0.46)
           : Text(
               text ?? '',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: size * 0.36),
+              style: TextStyle(color: colors.onBrand, fontWeight: FontWeight.w700, fontSize: size * 0.36),
             ),
     );
   }
@@ -152,19 +165,24 @@ class MtPill extends StatelessWidget {
   const MtPill({
     super.key,
     required this.child,
-    this.background = MockTestColors.chipBg,
+    this.background,
     this.padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
   });
 
   final Widget child;
-  final Color background;
+
+  /// Defaults to the themed soft fill — see [MtAvatar.background].
+  final Color? background;
   final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: padding,
-      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+        color: background ?? context.colors.surfaceAlt,
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: child,
     );
   }

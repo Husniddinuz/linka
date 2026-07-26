@@ -7,6 +7,7 @@ import '../services/course_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/cached_avatar.dart';
 import 'create_course_screen.dart';
+import 'lesson_meeting_screen.dart';
 
 /// The tutor's control panel for one of their courses: overview + roster,
 /// post announcements, edit details, and cancel (which refunds all enrollees).
@@ -25,6 +26,37 @@ class _TutorCourseManageScreenState extends State<TutorCourseManageScreen> {
   bool _loading = true;
   final _announce = TextEditingController();
   bool _posting = false;
+  bool _joining = false;
+
+  Future<void> _join() async {
+    final course = _course;
+    if (course == null || _joining) return;
+    setState(() => _joining = true);
+    try {
+      final info = await CourseService.joinSession(course.id);
+      if (!mounted) return;
+      if (info.roomUrl.isEmpty) {
+        _showSnack('Could not get the room. Please try again.');
+        return;
+      }
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LessonMeetingScreen(
+            roomUrl: info.roomUrl,
+            token: info.token,
+            tutorName: course.tutorName,
+          ),
+        ),
+      );
+    } on SessionNotLiveException catch (e) {
+      if (mounted) _showSnack(e.message);
+    } on ApiException catch (e) {
+      if (mounted) _showSnack(e.message);
+    } finally {
+      if (mounted) setState(() => _joining = false);
+    }
+  }
 
   @override
   void initState() {
@@ -150,7 +182,8 @@ class _TutorCourseManageScreenState extends State<TutorCourseManageScreen> {
                 fontWeight: FontWeight.w600)),
         centerTitle: true,
         actions: [
-          if (course != null && !course.isCancelled)
+          // Only the primary tutor may edit; a co-tutor manages read-only.
+          if (course != null && !course.isCancelled && course.isPrimaryTutor)
             IconButton(
               onPressed: _edit,
               icon: Icon(Symbols.edit_rounded, color: colors.textPrimary),
@@ -184,9 +217,27 @@ class _TutorCourseManageScreenState extends State<TutorCourseManageScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          '${course.dateRangeLabel} · ${course.priceLabel}',
+          [
+            course.dateRangeLabel,
+            if (course.sessionTimeLabel.isNotEmpty) course.sessionTimeLabel,
+            course.priceLabel,
+          ].join(' · '),
           style: TextStyle(fontSize: 13.5, color: colors.textSecondary),
         ),
+        if (course.hasCoTutor)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                CachedAvatar(imageUrl: course.coTutorImageUrl, size: 22),
+                const SizedBox(width: 6),
+                Text(
+                  'with ${course.coTutorName ?? 'co-tutor'}',
+                  style: TextStyle(fontSize: 13, color: colors.textSecondary),
+                ),
+              ],
+            ),
+          ),
         if (course.isCancelled)
           Padding(
             padding: const EdgeInsets.only(top: 10),
@@ -221,6 +272,10 @@ class _TutorCourseManageScreenState extends State<TutorCourseManageScreen> {
             ),
           ],
         ),
+        if (!course.isCancelled) ...[
+          const SizedBox(height: 16),
+          _joinButton(course, colors),
+        ],
         const SizedBox(height: 24),
         _SectionTitle('STUDENTS', colors),
         const SizedBox(height: 8),
@@ -240,7 +295,7 @@ class _TutorCourseManageScreenState extends State<TutorCourseManageScreen> {
         else
           ...course.announcements.map((a) => _AnnouncementRow(a: a, colors: colors)),
         const SizedBox(height: 28),
-        if (!course.isCancelled)
+        if (!course.isCancelled && course.isPrimaryTutor)
           OutlinedButton.icon(
             onPressed: _cancel,
             style: OutlinedButton.styleFrom(
@@ -256,6 +311,53 @@ class _TutorCourseManageScreenState extends State<TutorCourseManageScreen> {
                 style: TextStyle(fontWeight: FontWeight.w700)),
           ),
       ],
+    );
+  }
+
+  Widget _joinButton(Course course, AppColors colors) {
+    if (course.sessionActiveNow) {
+      return SizedBox(
+        width: double.infinity,
+        height: 50,
+        child: FilledButton.icon(
+          onPressed: _joining ? null : _join,
+          style: FilledButton.styleFrom(
+            backgroundColor: colors.success,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+          icon: _joining
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                )
+              : const Icon(Symbols.videocam_rounded),
+          label: Text(
+            _joining ? 'Joining…' : 'Start / join live session',
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          ),
+        ),
+      );
+    }
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: colors.surfaceAlt,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        course.sessionTimeLabel.isNotEmpty
+            ? 'Live daily at ${course.sessionTimeLabel}'
+            : 'No session time set',
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: colors.textTertiary,
+        ),
+      ),
     );
   }
 

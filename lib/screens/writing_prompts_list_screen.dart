@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
 import 'writing_test_screen.dart';
+import '../theme/app_colors.dart';
 
 /// Writing Task 1 & 2 prompts. All prompts are open to everyone — the free
 /// window is on AI-graded *submissions* (see WritingTestScreen's quota),
@@ -27,7 +28,7 @@ class _WritingPromptsListScreenState extends State<WritingPromptsListScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: mtAppBar(
         context,
         title: 'Writing',
@@ -42,9 +43,9 @@ class _WritingPromptsListScreenState extends State<WritingPromptsListScreen>
             padding: const EdgeInsets.only(bottom: 8),
             child: TabBar(
               controller: _tabController,
-              labelColor: MockTestColors.navy,
-              unselectedLabelColor: MockTestColors.greyLight,
-              indicatorColor: MockTestColors.navy,
+              labelColor: context.colors.textPrimary,
+              unselectedLabelColor: context.colors.textTertiary,
+              indicatorColor: context.colors.textPrimary,
               indicatorSize: TabBarIndicatorSize.label,
               labelStyle: const TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, fontWeight: FontWeight.w600),
               tabs: const [Tab(text: 'Task 1'), Tab(text: 'Task 2')],
@@ -56,7 +57,7 @@ class _WritingPromptsListScreenState extends State<WritingPromptsListScreen>
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator(color: MockTestColors.yellow));
+            return Center(child: CircularProgressIndicator(color: context.colors.accentYellow));
           }
           if (snapshot.hasError) {
             return Center(
@@ -65,7 +66,7 @@ class _WritingPromptsListScreenState extends State<WritingPromptsListScreen>
                 child: Text(
                   'Failed to load: ${snapshot.error}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
+                  style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textSecondary, fontSize: 14),
                 ),
               ),
             );
@@ -117,7 +118,7 @@ class _PromptCard extends StatelessWidget {
         ),
         child: Container(
           padding: const EdgeInsets.all(14),
-          decoration: mtSoftCard(),
+          decoration: mtSoftCard(context),
           child: Row(
             children: [
               const MtAvatar(icon: Icons.edit_note_rounded),
@@ -130,24 +131,24 @@ class _PromptCard extends StatelessWidget {
                       prompt['title']?.toString() ?? '',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'SF Pro',
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: MockTestColors.navy,
+                        color: context.colors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Minimum ${prompt['min_words'] ?? 150} words',
-                      style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: MockTestColors.grey),
+                      style: TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: context.colors.textSecondary),
                     ),
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
-                color: MockTestColors.greyLight,
+                color: context.colors.textTertiary,
                 size: 24,
               ),
             ],

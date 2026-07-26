@@ -4,6 +4,7 @@ import 'mock_test_history_screen.dart';
 import 'mock_test_list_screen.dart';
 import 'tutors_screen.dart';
 import 'writing_prompts_list_screen.dart';
+import '../theme/app_colors.dart';
 
 class MockExamsScreen extends StatelessWidget {
   const MockExamsScreen({super.key});
@@ -11,13 +12,13 @@ class MockExamsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: mtAppBar(
         context,
         title: 'Mock Exams',
         actions: [
           IconButton(
-            icon: const Icon(Icons.history_rounded, color: MockTestColors.navy),
+            icon: Icon(Icons.history_rounded, color: context.colors.textPrimary),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const MockTestHistoryScreen()),
@@ -28,9 +29,9 @@ class MockExamsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
         children: [
-          const Text(
+          Text(
             'Choose a skill to practise a full IELTS mock test.',
-            style: TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, color: MockTestColors.grey),
+            style: TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, color: context.colors.textSecondary),
           ),
           const SizedBox(height: 18),
           _ExamTypeButton(
@@ -97,7 +98,7 @@ class _ExamTypeButton extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: mtSoftCard(radius: 18),
+        decoration: mtSoftCard(context, radius: 18),
         child: Row(
           children: [
             MtAvatar(icon: icon, size: 52),
@@ -108,22 +109,22 @@ class _ExamTypeButton extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: MockTestColors.navy,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: MockTestColors.grey),
+                    style: TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: context.colors.textSecondary),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: MockTestColors.greyLight),
+            Icon(Icons.chevron_right_rounded, color: context.colors.textTertiary),
           ],
         ),
       ),

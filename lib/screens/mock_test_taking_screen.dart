@@ -8,6 +8,7 @@ import '../services/prefs_service.dart';
 import '../widgets/mock_test_question_widgets.dart';
 import '../widgets/mock_test_styles.dart';
 import 'mock_test_result_screen.dart';
+import '../theme/app_colors.dart';
 
 /// Background tint choices for the reading passage, persisted locally so
 /// they apply across every passage the learner opens.
@@ -174,43 +175,43 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
         : await showDialog<bool>(
                 context: context,
                 builder: (_) => AlertDialog(
-                  backgroundColor: Colors.white,
+                  backgroundColor: context.colors.surface,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  title: const Text(
+                  title: Text(
                     'Submit test?',
                     style: TextStyle(
                       fontFamily: 'SF Pro',
-                      color: MockTestColors.navy,
+                      color: context.colors.textPrimary,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   content: Text(
                     'You answered $_answeredCount of $_totalQuestions questions.',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
-                      color: MockTestColors.grey,
+                      color: context.colors.textSecondary,
                     ),
                   ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: const Text(
+                      child: Text(
                         'Cancel',
                         style: TextStyle(
                           fontFamily: 'SF Pro',
-                          color: MockTestColors.grey,
+                          color: context.colors.textSecondary,
                         ),
                       ),
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text(
+                      child: Text(
                         'Submit',
                         style: TextStyle(
                           fontFamily: 'SF Pro',
-                          color: MockTestColors.navy,
+                          color: context.colors.textPrimary,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -244,7 +245,7 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
   Future<void> _openPassageSettings() async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -257,23 +258,23 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Passage display',
                     style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: MockTestColors.navy,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 18),
-                  const Text(
+                  Text(
                     'Background',
                     style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: MockTestColors.grey,
+                      color: context.colors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -299,8 +300,8 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: selected
-                                    ? MockTestColors.navy
-                                    : MockTestColors.divider,
+                                    ? context.colors.textPrimary
+                                    : context.colors.border,
                                 width: selected ? 2.5 : 1,
                               ),
                             ),
@@ -310,13 +311,13 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                     }).toList(),
                   ),
                   const SizedBox(height: 22),
-                  const Text(
+                  Text(
                     'Text size',
                     style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: MockTestColors.grey,
+                      color: context.colors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -337,8 +338,8 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: selected
-                                  ? MockTestColors.navy
-                                  : MockTestColors.chipBg,
+                                  ? context.colors.textPrimary
+                                  : context.colors.surfaceAlt,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
@@ -349,7 +350,7 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                                 fontSize: 14 * scale,
                                 color: selected
                                     ? Colors.white
-                                    : MockTestColors.navy,
+                                    : context.colors.textPrimary,
                               ),
                             ),
                           ),
@@ -369,16 +370,16 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
+      return Scaffold(
+        backgroundColor: context.colors.background,
         body: Center(
-          child: CircularProgressIndicator(color: MockTestColors.yellow),
+          child: CircularProgressIndicator(color: context.colors.accentYellow),
         ),
       );
     }
     if (_error != null || _test == null) {
       return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.background,
         appBar: mtAppBar(context, title: 'Mock test'),
         body: Center(
           child: Text(
@@ -395,7 +396,7 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
         : null;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: mtAppBar(
         context,
         title: _test!.title.isNotEmpty ? _test!.title : 'Mock test',
@@ -403,9 +404,9 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
           if (!_isListening)
             IconButton(
               onPressed: _openPassageSettings,
-              icon: const Icon(
+              icon: Icon(
                 Icons.text_fields_rounded,
-                color: MockTestColors.navy,
+                color: context.colors.textPrimary,
               ),
               tooltip: 'Passage display settings',
             ),
@@ -418,8 +419,8 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                   final urgent = remaining.inMinutes < 5;
                   return MtPill(
                     background: urgent
-                        ? MockTestColors.redBg
-                        : MockTestColors.chipBg,
+                        ? context.colors.errorBg
+                        : context.colors.surfaceAlt,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -427,8 +428,8 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                           Icons.timer_outlined,
                           size: 15,
                           color: urgent
-                              ? MockTestColors.red
-                              : MockTestColors.navy,
+                              ? context.colors.error
+                              : context.colors.textPrimary,
                         ),
                         const SizedBox(width: 5),
                         Text(
@@ -438,8 +439,8 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                             fontWeight: FontWeight.w700,
                             fontSize: 12.5,
                             color: urgent
-                                ? MockTestColors.red
-                                : MockTestColors.navy,
+                                ? context.colors.error
+                                : context.colors.textPrimary,
                           ),
                         ),
                       ],
@@ -460,7 +461,7 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                 label: _isListening ? 'Part' : 'Passage',
                 onSelected: (i) => setState(() => _sectionIndex = i),
               ),
-              const Divider(height: 1, color: MockTestColors.divider),
+              Divider(height: 1, color: context.colors.border),
             ],
           ),
         ),
@@ -553,11 +554,11 @@ class _SectionSelector extends StatelessWidget {
                   child: Container(
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: selected ? MockTestColors.navy : Colors.white,
+                      color: selected ? context.colors.textPrimary : Colors.white,
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
                         color: selected
-                            ? MockTestColors.navy
+                            ? context.colors.textPrimary
                             : const Color(0xFFDDDDDD),
                         width: 1.5,
                       ),
@@ -570,7 +571,7 @@ class _SectionSelector extends StatelessWidget {
                         fontFamily: 'SF Pro',
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: selected ? Colors.white : MockTestColors.navy,
+                        color: selected ? Colors.white : context.colors.textPrimary,
                       ),
                     ),
                   ),
@@ -689,13 +690,13 @@ class _ReadingSplitViewState extends State<_ReadingSplitView>
                   child: Container(
                     height: _handleHeight,
                     width: double.infinity,
-                    color: MockTestColors.softBg,
+                    color: context.colors.surfaceAlt,
                     alignment: Alignment.center,
                     child: Container(
                       width: 34,
                       height: 3,
                       decoration: BoxDecoration(
-                        color: MockTestColors.greyLight,
+                        color: context.colors.textTertiary,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -807,7 +808,7 @@ class _PassageViewState extends State<_PassageView> {
     matches.sort((a, b) => a.$1.compareTo(b.$1));
 
     final highlightStyle = baseStyle.copyWith(
-      backgroundColor: MockTestColors.yellow.withValues(alpha: 0.45),
+      backgroundColor: context.colors.accentYellow.withValues(alpha: 0.45),
     );
     final spans = <InlineSpan>[];
     var cursor = 0;
@@ -841,7 +842,7 @@ class _PassageViewState extends State<_PassageView> {
       fontFamily: 'SF Pro',
       fontSize: 14.5 * widget.fontScale,
       height: 1.6,
-      color: MockTestColors.navy,
+      color: context.colors.textPrimary,
     );
 
     return Container(
@@ -967,7 +968,7 @@ class _AudioBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final player = PodcastPlaybackService.instance;
     return Container(
-      color: MockTestColors.softBg,
+      color: context.colors.surfaceAlt,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: StreamBuilder(
         stream: player.playerStateStream,
@@ -981,8 +982,8 @@ class _AudioBar extends StatelessWidget {
                 child: Container(
                   width: 42,
                   height: 42,
-                  decoration: const BoxDecoration(
-                    color: MockTestColors.navy,
+                  decoration: BoxDecoration(
+                    color: context.colors.brand,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -1007,10 +1008,10 @@ class _AudioBar extends StatelessWidget {
                         .toDouble();
                     return SliderTheme(
                       data: SliderTheme.of(context).copyWith(
-                        activeTrackColor: MockTestColors.navy,
-                        inactiveTrackColor: MockTestColors.divider,
-                        thumbColor: MockTestColors.navy,
-                        overlayColor: MockTestColors.navy.withValues(
+                        activeTrackColor: context.colors.textPrimary,
+                        inactiveTrackColor: context.colors.border,
+                        thumbColor: context.colors.textPrimary,
+                        overlayColor: context.colors.textPrimary.withValues(
                           alpha: 0.12,
                         ),
                         trackHeight: 3,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/podcast_playback_service.dart';
 import '../services/subtitle_service.dart';
 import '../widgets/mock_test_styles.dart';
+import '../theme/app_colors.dart';
 
 /// A tutor's real Speaking sample answer: photo/name/band score, with
 /// Part 1/2/3 kept separate (some tutors may only have 2 of the 3 parts).
@@ -99,13 +100,13 @@ class _SpeakingSampleTutorScreenState extends State<SpeakingSampleTutorScreen> {
     final tutor = widget.tutor;
     final name = tutor['tutor_name']?.toString() ?? '';
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: mtAppBar(context, title: name),
       body: _parts.isEmpty
-          ? const Center(
+          ? Center(
               child: Text(
                 'No sample parts yet',
-                style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey, fontSize: 14),
+                style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textSecondary, fontSize: 14),
               ),
             )
           : _buildBody(tutor, name),
@@ -135,30 +136,30 @@ class _SpeakingSampleTutorScreenState extends State<SpeakingSampleTutorScreen> {
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(14),
-          decoration: mtSoftCard(color: MockTestColors.greenBg, radius: 14),
+          decoration: mtSoftCard(context, color: context.colors.successBg, radius: 14),
           child: Text(
             part['question_text']?.toString() ?? '',
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 14,
               height: 1.5,
               fontWeight: FontWeight.w700,
-              color: MockTestColors.navy,
+              color: context.colors.textPrimary,
             ),
           ),
         ),
         const SizedBox(height: 16),
         const _AudioBar(),
         const SizedBox(height: 20),
-        const Text(
+        Text(
           'Live transcript',
-          style: TextStyle(fontFamily: 'SF Pro', fontWeight: FontWeight.w700, fontSize: 15, color: MockTestColors.navy),
+          style: TextStyle(fontFamily: 'SF Pro', fontWeight: FontWeight.w700, fontSize: 15, color: context.colors.textPrimary),
         ),
         const SizedBox(height: 10),
         if (_cues.isEmpty)
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(child: CircularProgressIndicator(color: MockTestColors.yellow)),
+            child: Center(child: CircularProgressIndicator(color: context.colors.accentYellow)),
           )
         else
           _Transcript(
@@ -193,9 +194,9 @@ class _TutorHeader extends StatelessWidget {
                   width: 68,
                   height: 68,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => _fallbackAvatar(),
+                  errorBuilder: (context, error, stackTrace) => _fallbackAvatar(context),
                 )
-              : _fallbackAvatar(),
+              : _fallbackAvatar(context),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -204,12 +205,12 @@ class _TutorHeader extends StatelessWidget {
             children: [
               Text(
                 name,
-                style: const TextStyle(fontFamily: 'SF Pro', fontSize: 17, fontWeight: FontWeight.w700, color: MockTestColors.navy),
+                style: TextStyle(fontFamily: 'SF Pro', fontSize: 17, fontWeight: FontWeight.w700, color: context.colors.textPrimary),
               ),
               if (bandScore != null) ...[
                 const SizedBox(height: 6),
                 MtPill(
-                  background: MockTestColors.navy,
+                  background: context.colors.brand,
                   child: Text(
                     'IELTS $bandScore',
                     style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
@@ -223,13 +224,13 @@ class _TutorHeader extends StatelessWidget {
     );
   }
 
-  Widget _fallbackAvatar() {
+  Widget _fallbackAvatar(BuildContext context) {
     return Container(
       width: 68,
       height: 68,
-      color: MockTestColors.chipBg,
+      color: context.colors.surfaceAlt,
       alignment: Alignment.center,
-      child: const Icon(Icons.person_rounded, color: MockTestColors.greyLight, size: 32),
+      child: Icon(Icons.person_rounded, color: context.colors.textTertiary, size: 32),
     );
   }
 }
@@ -248,7 +249,7 @@ class _PartChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? MockTestColors.navy : MockTestColors.chipBg,
+          color: selected ? context.colors.textPrimary : context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
@@ -257,7 +258,7 @@ class _PartChip extends StatelessWidget {
             fontFamily: 'SF Pro',
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: selected ? Colors.white : MockTestColors.navy,
+            color: selected ? Colors.white : context.colors.textPrimary,
           ),
         ),
       ),
@@ -283,7 +284,7 @@ class _Transcript extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      decoration: mtSoftCard(radius: 14),
+      decoration: mtSoftCard(context, radius: 14),
       child: Wrap(
         children: [
           for (var i = 0; i < cues.length; i++)
@@ -299,7 +300,7 @@ class _Transcript extends StatelessWidget {
                     fontSize: i == activeCue ? 15.5 : 14,
                     height: 1.6,
                     fontWeight: i == activeCue ? FontWeight.w700 : FontWeight.w400,
-                    color: i == activeCue ? MockTestColors.navy : MockTestColors.greyLight,
+                    color: i == activeCue ? context.colors.textPrimary : context.colors.textTertiary,
                   ),
                 ),
               ),
@@ -317,7 +318,7 @@ class _AudioBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final player = PodcastPlaybackService.instance;
     return Container(
-      decoration: mtSoftCard(radius: 14),
+      decoration: mtSoftCard(context, radius: 14),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: StreamBuilder(
         stream: player.playerStateStream,
@@ -331,7 +332,7 @@ class _AudioBar extends StatelessWidget {
                 child: Container(
                   width: 42,
                   height: 42,
-                  decoration: const BoxDecoration(color: MockTestColors.navy, shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: context.colors.textPrimary, shape: BoxShape.circle),
                   child: Icon(
                     playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
                     color: Colors.white,
@@ -350,10 +351,10 @@ class _AudioBar extends StatelessWidget {
                     final value = pos.inMilliseconds.clamp(0, max.toInt()).toDouble();
                     return SliderTheme(
                       data: SliderTheme.of(context).copyWith(
-                        activeTrackColor: MockTestColors.navy,
-                        inactiveTrackColor: MockTestColors.divider,
-                        thumbColor: MockTestColors.navy,
-                        overlayColor: MockTestColors.navy.withValues(alpha: 0.12),
+                        activeTrackColor: context.colors.textPrimary,
+                        inactiveTrackColor: context.colors.border,
+                        thumbColor: context.colors.textPrimary,
+                        overlayColor: context.colors.textPrimary.withValues(alpha: 0.12),
                         trackHeight: 3,
                       ),
                       child: Slider(

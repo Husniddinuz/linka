@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../widgets/mock_test_styles.dart';
+import '../theme/app_colors.dart';
 
 /// Read-only view of a real Writing sample essay: tutor, prompt, sample
 /// essay text (with tap-to-reveal examiner highlights), achieved band
@@ -21,7 +22,7 @@ class WritingSampleScreen extends StatelessWidget {
     final annotations = ((sample['annotations'] as List?) ?? const []).cast<Map<String, dynamic>>();
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: mtAppBar(context, title: sample['title']?.toString() ?? 'Writing sample'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -33,7 +34,7 @@ class WritingSampleScreen extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
-            decoration: mtSoftCard(color: MockTestColors.greenBg, radius: 14),
+            decoration: mtSoftCard(context, color: context.colors.successBg, radius: 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -49,19 +50,19 @@ class WritingSampleScreen extends StatelessWidget {
                         fit: BoxFit.contain,
                         loadingBuilder: (context, child, progress) {
                           if (progress == null) return child;
-                          return const Padding(
+                          return Padding(
                             padding: EdgeInsets.symmetric(vertical: 40),
                             child: Center(
-                              child: CircularProgressIndicator(strokeWidth: 2, color: MockTestColors.yellow),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.accentYellow),
                             ),
                           );
                         },
-                        errorBuilder: (context, error, stackTrace) => const Padding(
+                        errorBuilder: (context, error, stackTrace) => Padding(
                           padding: EdgeInsets.symmetric(vertical: 24),
                           child: Center(
                             child: Text(
                               'Could not load chart image',
-                              style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.greyLight, fontSize: 12.5),
+                              style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textTertiary, fontSize: 12.5),
                             ),
                           ),
                         ),
@@ -72,12 +73,12 @@ class WritingSampleScreen extends StatelessWidget {
                 ],
                 Text(
                   sample['prompt_html']?.toString() ?? '',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 14,
                     height: 1.5,
                     fontWeight: FontWeight.w700,
-                    color: MockTestColors.navy,
+                    color: context.colors.textPrimary,
                   ),
                 ),
               ],
@@ -88,7 +89,7 @@ class WritingSampleScreen extends StatelessWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 22),
-              decoration: BoxDecoration(color: MockTestColors.navy, borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(color: context.colors.textPrimary, borderRadius: BorderRadius.circular(20)),
               child: Column(
                 children: [
                   const Text(
@@ -117,17 +118,17 @@ class WritingSampleScreen extends StatelessWidget {
           const SizedBox(height: 20),
           Row(
             children: [
-              const Text(
+              Text(
                 'Sample essay',
-                style: TextStyle(fontFamily: 'SF Pro', fontWeight: FontWeight.w700, fontSize: 15, color: MockTestColors.navy),
+                style: TextStyle(fontFamily: 'SF Pro', fontWeight: FontWeight.w700, fontSize: 15, color: context.colors.textPrimary),
               ),
               if (annotations.isNotEmpty) ...[
                 const SizedBox(width: 8),
-                Icon(Icons.touch_app_rounded, size: 15, color: MockTestColors.grey),
+                Icon(Icons.touch_app_rounded, size: 15, color: context.colors.textSecondary),
                 const SizedBox(width: 3),
-                const Text(
+                Text(
                   'tap highlights for notes',
-                  style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: MockTestColors.grey),
+                  style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: context.colors.textSecondary),
                 ),
               ],
             ],
@@ -136,23 +137,23 @@ class WritingSampleScreen extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
-            decoration: mtSoftCard(radius: 14),
+            decoration: mtSoftCard(context, radius: 14),
             child: _AnnotatedEssay(essay: essay, annotations: annotations),
           ),
           if (examinerComment.isNotEmpty) ...[
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'Why this scores well',
-              style: TextStyle(fontFamily: 'SF Pro', fontWeight: FontWeight.w700, fontSize: 15, color: MockTestColors.navy),
+              style: TextStyle(fontFamily: 'SF Pro', fontWeight: FontWeight.w700, fontSize: 15, color: context.colors.textPrimary),
             ),
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
-              decoration: mtSoftCard(color: MockTestColors.chipBg, radius: 14),
+              decoration: mtSoftCard(context, color: context.colors.surfaceAlt, radius: 14),
               child: Text(
                 examinerComment,
-                style: const TextStyle(fontFamily: 'SF Pro', fontSize: 14, height: 1.5, color: MockTestColors.navy),
+                style: TextStyle(fontFamily: 'SF Pro', fontSize: 14, height: 1.5, color: context.colors.textPrimary),
               ),
             ),
           ],
@@ -179,23 +180,23 @@ class _TutorHeader extends StatelessWidget {
                   width: 56,
                   height: 56,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => _fallbackAvatar(),
+                  errorBuilder: (context, error, stackTrace) => _fallbackAvatar(context),
                 )
-              : _fallbackAvatar(),
+              : _fallbackAvatar(context),
         ),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'SAMPLE BY',
-                style: TextStyle(fontFamily: 'SF Pro', fontSize: 11, fontWeight: FontWeight.w700, color: MockTestColors.greyLight, letterSpacing: 0.8),
+                style: TextStyle(fontFamily: 'SF Pro', fontSize: 11, fontWeight: FontWeight.w700, color: context.colors.textTertiary, letterSpacing: 0.8),
               ),
               const SizedBox(height: 2),
               Text(
                 name,
-                style: const TextStyle(fontFamily: 'SF Pro', fontSize: 16, fontWeight: FontWeight.w700, color: MockTestColors.navy),
+                style: TextStyle(fontFamily: 'SF Pro', fontSize: 16, fontWeight: FontWeight.w700, color: context.colors.textPrimary),
               ),
             ],
           ),
@@ -204,13 +205,13 @@ class _TutorHeader extends StatelessWidget {
     );
   }
 
-  Widget _fallbackAvatar() {
+  Widget _fallbackAvatar(BuildContext context) {
     return Container(
       width: 56,
       height: 56,
-      color: MockTestColors.chipBg,
+      color: context.colors.surfaceAlt,
       alignment: Alignment.center,
-      child: const Icon(Icons.person_rounded, color: MockTestColors.greyLight, size: 28),
+      child: Icon(Icons.person_rounded, color: context.colors.textTertiary, size: 28),
     );
   }
 }
@@ -243,26 +244,26 @@ class _AnnotatedEssayState extends State<_AnnotatedEssay> {
   void _showNote(String highlightedText, String note) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: context.colors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: mtSoftCard(color: MockTestColors.yellow.withValues(alpha: 0.25), radius: 8),
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: mtSoftCard(context, color: context.colors.accentYellow.withValues(alpha: 0.25), radius: 8),
               child: Text(
                 '"$highlightedText"',
-                style: const TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, fontStyle: FontStyle.italic, color: MockTestColors.navy),
+                style: TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, fontStyle: FontStyle.italic, color: context.colors.textPrimary),
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             Text(
               note,
-              style: const TextStyle(fontFamily: 'SF Pro', fontSize: 14.5, height: 1.5, color: MockTestColors.navy),
+              style: TextStyle(fontFamily: 'SF Pro', fontSize: 14.5, height: 1.5, color: context.colors.textPrimary),
             ),
           ],
         ),
@@ -272,10 +273,10 @@ class _AnnotatedEssayState extends State<_AnnotatedEssay> {
 
   @override
   Widget build(BuildContext context) {
-    const baseStyle = TextStyle(fontFamily: 'SF Pro', fontSize: 14, height: 1.6, color: MockTestColors.navy);
+    final baseStyle = TextStyle(fontFamily: 'SF Pro', fontSize: 14, height: 1.6, color: context.colors.textPrimary);
     final highlightStyle = baseStyle.copyWith(
       fontWeight: FontWeight.w700,
-      backgroundColor: MockTestColors.yellow.withValues(alpha: 0.35),
+      backgroundColor: context.colors.accentYellow.withValues(alpha: 0.35),
     );
 
     for (final r in _recognizers) {

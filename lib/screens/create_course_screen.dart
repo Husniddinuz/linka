@@ -9,6 +9,7 @@ import '../models/course.dart';
 import '../services/api_service.dart';
 import '../services/course_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/cached_avatar.dart';
 
 /// Create a new course, or edit an existing one. In edit mode, price and dates
 /// are locked once anyone has enrolled (the backend enforces this too).
@@ -27,12 +28,29 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
   final _price = TextEditingController();
   final _maxStudents = TextEditingController();
   final _schedule = TextEditingController();
-  final _link = TextEditingController();
 
   DateTime? _startDate;
   DateTime? _endDate;
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
+  TutorSearchResult? _coTutor;
   File? _banner;
   bool _submitting = false;
+
+  static TimeOfDay? _parseTime(String? hhmm) {
+    if (hhmm == null) return null;
+    final parts = hhmm.split(':');
+    if (parts.length < 2) return null;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null) return null;
+    return TimeOfDay(hour: h, minute: m);
+  }
+
+  static String _fmtTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  static int _minutes(TimeOfDay t) => t.hour * 60 + t.minute;
 
   bool get _isEdit => widget.existing != null;
   bool get _termsLocked =>
@@ -49,9 +67,17 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
       _price.text = c.isFree ? '0' : c.priceUzs.round().toString();
       _maxStudents.text = c.maxStudents.toString();
       _schedule.text = c.scheduleDetails;
-      _link.text = c.sharedLink;
       _startDate = c.startDate;
       _endDate = c.endDate;
+      _startTime = _parseTime(c.startTime);
+      _endTime = _parseTime(c.endTime);
+      if (c.coTutorId != null) {
+        _coTutor = TutorSearchResult(
+          id: c.coTutorId!,
+          name: c.coTutorName ?? 'Co-tutor',
+          imageUrl: c.coTutorImageUrl,
+        );
+      }
     }
   }
 
@@ -64,7 +90,6 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
       _price,
       _maxStudents,
       _schedule,
-      _link,
     ]) {
       ctrl.dispose();
     }
@@ -126,6 +151,35 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
     });
   }
 
+  Future<void> _pickTime({required bool isStart}) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: (isStart ? _startTime : _endTime) ??
+          const TimeOfDay(hour: 16, minute: 0),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      if (isStart) {
+        _startTime = picked;
+      } else {
+        _endTime = picked;
+      }
+    });
+  }
+
+  Future<void> _pickCoTutor() async {
+    final selected = await showModalBottomSheet<TutorSearchResult>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const _CoTutorPickerSheet(),
+    );
+    if (selected != null && mounted) setState(() => _coTutor = selected);
+  }
+
   String? _validate() {
     if (_title.text.trim().isEmpty) return 'Please enter a title.';
     final max = int.tryParse(_maxStudents.text.trim());
@@ -134,6 +188,12 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
     if (price == null || price < 0) return 'Enter a valid price (0 for free).';
     if (_startDate == null || _endDate == null) return 'Please pick start and end dates.';
     if (_endDate!.isBefore(_startDate!)) return 'End date must be after the start date.';
+    if (_startTime == null || _endTime == null) {
+      return 'Please set the daily session start and end times.';
+    }
+    if (_minutes(_endTime!) <= _minutes(_startTime!)) {
+      return 'Session end time must be after the start time.';
+    }
     if (_termsLocked && max < (widget.existing?.enrolledCount ?? 0)) {
       return 'Max students cannot be below the ${widget.existing?.enrolledCount} already enrolled.';
     }
@@ -158,13 +218,15 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
           'category': _category.text.trim(),
           'max_students': max,
           'schedule_details': _schedule.text.trim(),
-          'shared_link': _link.text.trim(),
         };
         // Only send locked fields when they're still editable (no enrollments).
         if (!_termsLocked) {
           fields['price_uzs'] = price.toStringAsFixed(2);
           fields['start_date'] = _fmt(_startDate!);
           fields['end_date'] = _fmt(_endDate!);
+          fields['start_time'] = _fmtTime(_startTime!);
+          fields['end_time'] = _fmtTime(_endTime!);
+          fields['co_tutor_id'] = _coTutor?.id;
         }
         await CourseService.updateCourse(widget.existing!.id, fields);
       } else {
@@ -176,8 +238,10 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
           maxStudents: max,
           startDate: _startDate!,
           endDate: _endDate!,
+          startTime: _fmtTime(_startTime!),
+          endTime: _fmtTime(_endTime!),
           scheduleDetails: _schedule.text.trim(),
-          sharedLink: _link.text.trim(),
+          coTutorId: _coTutor?.id,
           banner: _banner,
         );
       }
@@ -289,14 +353,47 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                 ),
               ],
             ),
+            Row(
+              children: [
+                Expanded(
+                  child: _TimeField(
+                    label: 'Start time',
+                    value: _startTime,
+                    onTap: _termsLocked ? null : () => _pickTime(isStart: true),
+                    colors: colors,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: _TimeField(
+                    label: 'End time',
+                    value: _endTime,
+                    onTap: _termsLocked ? null : () => _pickTime(isStart: false),
+                    colors: colors,
+                  ),
+                ),
+              ],
+            ),
+            Text(
+              'The course runs at this time every day within the date range.',
+              style: TextStyle(fontSize: 12, color: colors.textTertiary),
+            ),
             if (_termsLocked)
               Padding(
-                padding: const EdgeInsets.only(top: 4, bottom: 8),
+                padding: const EdgeInsets.only(top: 6, bottom: 4),
                 child: Text(
-                  'Price and dates are locked — students have already enrolled.',
+                  'Price, dates, times and co-tutor are locked — students have already enrolled.',
                   style: TextStyle(fontSize: 12, color: colors.textTertiary),
                 ),
               ),
+            const SizedBox(height: 16),
+            _CoTutorField(
+              coTutor: _coTutor,
+              enabled: !_termsLocked,
+              onPick: _pickCoTutor,
+              onRemove: () => setState(() => _coTutor = null),
+              colors: colors,
+            ),
             const SizedBox(height: 4),
             _Field(
               label: 'Schedule details',
@@ -304,12 +401,20 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
               colors: colors,
               hint: "e.g. Mon–Fri, 6pm (optional)",
             ),
-            _Field(
-              label: 'Meeting / group link',
-              controller: _link,
-              colors: colors,
-              hint: 'Telegram / Zoom link — shown to enrolled students',
-              keyboardType: TextInputType.url,
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  Icon(Symbols.videocam_rounded, size: 16, color: colors.textTertiary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Live sessions run in a Daily.co video room created automatically — no link needed.',
+                      style: TextStyle(fontSize: 12, color: colors.textTertiary),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -551,6 +656,269 @@ class _DateField extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TimeField extends StatelessWidget {
+  final String label;
+  final TimeOfDay? value;
+  final VoidCallback? onTap;
+  final AppColors colors;
+  const _TimeField({
+    required this.label,
+    required this.value,
+    required this.onTap,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    final text = value == null
+        ? 'Select'
+        : '${value!.hour.toString().padLeft(2, '0')}:${value!.minute.toString().padLeft(2, '0')}';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: colors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: onTap,
+            child: Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: enabled ? colors.surfaceAlt : colors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colors.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(Symbols.schedule_rounded, size: 18, color: colors.textTertiary),
+                  const SizedBox(width: 8),
+                  Text(
+                    text,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      color: value == null ? colors.textTertiary : colors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CoTutorField extends StatelessWidget {
+  final TutorSearchResult? coTutor;
+  final bool enabled;
+  final VoidCallback onPick;
+  final VoidCallback onRemove;
+  final AppColors colors;
+  const _CoTutorField({
+    required this.coTutor,
+    required this.enabled,
+    required this.onPick,
+    required this.onRemove,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Co-tutor (optional)',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: colors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        if (coTutor != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: colors.surfaceAlt,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: colors.border),
+            ),
+            child: Row(
+              children: [
+                CachedAvatar(imageUrl: coTutor!.imageUrl, size: 30),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    coTutor!.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                ),
+                if (enabled)
+                  GestureDetector(
+                    onTap: onRemove,
+                    child: Icon(Symbols.close_rounded, size: 20, color: colors.textTertiary),
+                  ),
+              ],
+            ),
+          )
+        else
+          GestureDetector(
+            onTap: enabled ? onPick : null,
+            child: Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: enabled ? colors.surfaceAlt : colors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colors.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(Symbols.person_add_rounded, size: 18, color: colors.textTertiary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Add a co-tutor',
+                    style: TextStyle(fontSize: 14.5, color: colors.textTertiary),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _CoTutorPickerSheet extends StatefulWidget {
+  const _CoTutorPickerSheet();
+
+  @override
+  State<_CoTutorPickerSheet> createState() => _CoTutorPickerSheetState();
+}
+
+class _CoTutorPickerSheetState extends State<_CoTutorPickerSheet> {
+  final _controller = TextEditingController();
+  List<TutorSearchResult> _results = [];
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search(String q) async {
+    if (q.trim().length < 2) {
+      setState(() => _results = []);
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final res = await CourseService.searchTutors(q.trim());
+      if (!mounted) return;
+      setState(() {
+        _results = res;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.7,
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _controller,
+                autofocus: true,
+                onChanged: _search,
+                style: TextStyle(color: colors.textPrimary),
+                decoration: InputDecoration(
+                  hintText: 'Search tutors by name',
+                  hintStyle: TextStyle(color: colors.textTertiary),
+                  prefixIcon: Icon(Icons.search, color: colors.textTertiary),
+                  filled: true,
+                  fillColor: colors.surfaceAlt,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: _loading
+                  ? Center(child: CircularProgressIndicator(color: colors.accentYellow))
+                  : _results.isEmpty
+                      ? Center(
+                          child: Text(
+                            _controller.text.trim().length < 2
+                                ? 'Type a name to search'
+                                : 'No tutors found',
+                            style: TextStyle(color: colors.textTertiary),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _results.length,
+                          itemBuilder: (_, i) {
+                            final t = _results[i];
+                            return ListTile(
+                              leading: CachedAvatar(imageUrl: t.imageUrl, size: 40),
+                              title: Text(
+                                t.name,
+                                style: TextStyle(
+                                  color: colors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              onTap: () => Navigator.pop(context, t),
+                            );
+                          },
+                        ),
+            ),
+          ],
+        ),
       ),
     );
   }

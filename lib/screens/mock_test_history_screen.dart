@@ -4,6 +4,7 @@ import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
 import 'mock_test_result_screen.dart';
 import 'writing_result_screen.dart';
+import '../theme/app_colors.dart';
 
 class MockTestHistoryScreen extends StatefulWidget {
   const MockTestHistoryScreen({super.key});
@@ -27,7 +28,7 @@ class _MockTestHistoryScreenState extends State<MockTestHistoryScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       appBar: mtAppBar(
         context,
         title: 'History',
@@ -38,9 +39,9 @@ class _MockTestHistoryScreenState extends State<MockTestHistoryScreen>
             padding: const EdgeInsets.only(bottom: 8),
             child: TabBar(
               controller: _tabController,
-              labelColor: MockTestColors.navy,
-              unselectedLabelColor: MockTestColors.greyLight,
-              indicatorColor: MockTestColors.navy,
+              labelColor: context.colors.textPrimary,
+              unselectedLabelColor: context.colors.textTertiary,
+              indicatorColor: context.colors.textPrimary,
               indicatorSize: TabBarIndicatorSize.label,
               labelStyle: const TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, fontWeight: FontWeight.w600),
               tabs: const [Tab(text: 'Reading / Listening'), Tab(text: 'Writing')],
@@ -55,7 +56,7 @@ class _MockTestHistoryScreenState extends State<MockTestHistoryScreen>
             future: _testAttempts,
             builder: (context, snapshot) {
               if (snapshot.connectionState != ConnectionState.done) {
-                return const Center(child: CircularProgressIndicator(color: MockTestColors.yellow));
+                return Center(child: CircularProgressIndicator(color: context.colors.accentYellow));
               }
               final attempts = snapshot.data ?? const [];
               if (attempts.isEmpty) return const _EmptyHistory();
@@ -84,7 +85,7 @@ class _MockTestHistoryScreenState extends State<MockTestHistoryScreen>
             future: _writingAttempts,
             builder: (context, snapshot) {
               if (snapshot.connectionState != ConnectionState.done) {
-                return const Center(child: CircularProgressIndicator(color: MockTestColors.yellow));
+                return Center(child: CircularProgressIndicator(color: context.colors.accentYellow));
               }
               final attempts = snapshot.data ?? const [];
               if (attempts.isEmpty) return const _EmptyHistory();
@@ -136,7 +137,7 @@ class _HistoryRow extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(14),
-        decoration: mtSoftCard(),
+        decoration: mtSoftCard(context),
         child: Row(
           children: [
             MtAvatar(icon: icon),
@@ -149,17 +150,17 @@ class _HistoryRow extends StatelessWidget {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
-                      color: MockTestColors.navy,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: MockTestColors.grey),
+                    style: TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: context.colors.textSecondary),
                   ),
                 ],
               ),
@@ -167,11 +168,11 @@ class _HistoryRow extends StatelessWidget {
             MtPill(
               child: Text(
                 'Band $band',
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'SF Pro',
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,
-                  color: MockTestColors.navy,
+                  color: context.colors.textPrimary,
                 ),
               ),
             ),
@@ -187,10 +188,10 @@ class _EmptyHistory extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Text(
         'No attempts yet',
-        style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.greyLight, fontSize: 15),
+        style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textTertiary, fontSize: 15),
       ),
     );
   }
