@@ -283,7 +283,7 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
                     child: Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F7),
+                        color: context.colors.surfaceAlt,
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Stack(

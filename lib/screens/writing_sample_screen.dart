@@ -89,7 +89,7 @@ class WritingSampleScreen extends StatelessWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 22),
-              decoration: BoxDecoration(color: context.colors.textPrimary, borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(color: context.colors.brand, borderRadius: BorderRadius.circular(20)),
               child: Column(
                 children: [
                   const Text(

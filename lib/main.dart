@@ -14,6 +14,7 @@ import 'services/app_feature_service.dart';
 import 'services/auth_service.dart';
 import 'services/facebook_events_service.dart';
 import 'services/notification_service.dart';
+import 'services/podcast_progress_service.dart';
 import 'services/theme_service.dart';
 import 'services/token_service.dart';
 import 'services/update_service.dart';
@@ -37,6 +38,9 @@ void main() async {
   await Firebase.initializeApp();
   await FacebookEventsService.init();
   await ThemeService.init();
+  // Resume points are read synchronously from cache while building podcast
+  // lists, so they have to be in memory before the first frame.
+  await PodcastProgressService.load();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   // Global session-expired handler: any 401 that can't be recovered by

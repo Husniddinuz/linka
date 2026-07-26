@@ -59,7 +59,7 @@ class _QuestionNumberBadge extends StatelessWidget {
     return Container(
       constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(color: context.colors.textPrimary, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(color: context.colors.brand, borderRadius: BorderRadius.circular(14)),
       alignment: Alignment.center,
       child: Text(
         label,
@@ -121,7 +121,7 @@ class _TextAnswerFieldState extends State<TextAnswerField> {
       question: widget.question,
       child: Container(
         decoration: BoxDecoration(
-          color: Color(0xFFF5F5F7),
+          color: context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(10),
         ),
         child: TextField(
@@ -260,7 +260,7 @@ class _InlineBlankState extends State<_InlineBlank> {
         Container(
           width: 20,
           height: 20,
-          decoration: BoxDecoration(color: context.colors.textPrimary, shape: BoxShape.circle),
+          decoration: BoxDecoration(color: context.colors.brand, shape: BoxShape.circle),
           alignment: Alignment.center,
           child: Text(
             widget.label,
@@ -280,7 +280,7 @@ class _InlineBlankState extends State<_InlineBlank> {
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               filled: true,
-              fillColor: const Color(0xFFF5F5F7),
+              fillColor: context.colors.surfaceAlt,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide.none),
             ),
           ),
@@ -322,7 +322,7 @@ class SingleChoiceField extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: selected ? context.colors.textPrimary : const Color(0xFFF5F5F7),
+                  color: selected ? context.colors.brand : context.colors.surfaceAlt,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
@@ -419,7 +419,7 @@ class MultiSelectField extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
-                    color: selected ? context.colors.textPrimary : const Color(0xFFF5F5F7),
+                    color: selected ? context.colors.brand : context.colors.surfaceAlt,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -726,7 +726,7 @@ class _GapSlot extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: active
-                ? (filled ? context.colors.textPrimary : MockTestColors.yellowDark)
+                ? (filled ? context.colors.brand : MockTestColors.yellowDark)
                 : context.colors.border,
             width: active ? 1.6 : 1,
           ),
@@ -739,7 +739,7 @@ class _GapSlot extends StatelessWidget {
                 width: 18,
                 height: 18,
                 decoration: BoxDecoration(
-                  color: active && filled ? Colors.white : context.colors.textPrimary,
+                  color: active && filled ? context.colors.onBrand : context.colors.brand,
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -796,8 +796,8 @@ class _BankChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: selected
-              ? context.colors.textPrimary
-              : (dimmed ? context.colors.surfaceAlt : context.colors.surfaceAlt),
+              ? context.colors.brand
+              : context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text.rich(

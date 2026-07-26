@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linka/models/mock_test.dart';
+import 'package:linka/theme/app_colors.dart';
+import 'package:linka/theme/app_theme.dart';
 import 'package:linka/widgets/mock_test_question_widgets.dart';
 
 Question _question(int id, int number, String prompt, {List<QuestionOption> options = const []}) =>
@@ -31,9 +33,13 @@ const _pool = [
 /// Mirrors _QuestionsView: one shared answers map mutated in setState, with
 /// the group block rebuilt from the registry on every change.
 class _GroupHarness extends StatefulWidget {
-  const _GroupHarness({required this.group, required this.answers});
+  const _GroupHarness({required this.group, required this.answers, this.theme});
   final QuestionGroup group;
   final Map<String, dynamic> answers;
+
+  /// Defaults to the light theme; pass [AppTheme.dark] to exercise the same
+  /// widgets against the dark palette.
+  final ThemeData? theme;
 
   @override
   State<_GroupHarness> createState() => _GroupHarnessState();
@@ -49,6 +55,9 @@ class _GroupHarnessState extends State<_GroupHarness> {
       (id, val) => setState(() => widget.answers[id] = val),
     );
     return MaterialApp(
+      // The question widgets read colours off the AppColors theme extension,
+      // so the harness has to carry the real theme rather than a bare default.
+      theme: widget.theme ?? AppTheme.light,
       home: Scaffold(
         body: SingleChildScrollView(
           child: block ??
@@ -216,6 +225,39 @@ void main() {
       await tester.pumpAndSettle();
       expect(answers['21'], 'coral reefs');
       expect(find.text('coral reefs'), findsOneWidget);
+    });
+  });
+
+  group('dark mode', () {
+    // These widgets resolve every colour through `context.colors`, which throws
+    // a null-check error if a theme lookup is missing. Rendering each question
+    // type under the dark palette catches a colour that slipped back to a
+    // hardcoded literal or a token the dark theme doesn't carry.
+    for (final type in ['text', 'single_choice', 'true_false_ng', 'multi_select']) {
+      testWidgets('$type group renders under the dark palette', (tester) async {
+        final g = _group(
+          type: type,
+          sharedOptions: _pool,
+          questions: [_question(31, 1, 'Paragraph A'), _question(32, 2, 'Paragraph B')],
+        );
+        await tester.pumpWidget(
+          _GroupHarness(group: g, answers: <String, dynamic>{}, theme: AppTheme.dark),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('question text uses the dark palette, not the light navy', (tester) async {
+      final g = _group(type: 'text', questions: [_question(33, 1, 'No blank marker here')]);
+      await tester.pumpWidget(
+        _GroupHarness(group: g, answers: <String, dynamic>{}, theme: AppTheme.dark),
+      );
+      await tester.pumpAndSettle();
+
+      final prompt = tester.widget<Text>(find.text('No blank marker here'));
+      expect(prompt.style?.color, AppColors.dark.textPrimary);
+      expect(prompt.style?.color, isNot(AppColors.light.textPrimary));
     });
   });
 }

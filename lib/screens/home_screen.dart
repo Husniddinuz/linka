@@ -1,7 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import '../models/podcast.dart';
+import '../services/podcast_progress_service.dart';
 import '../widgets/cached_avatar.dart';
+import '../widgets/podcast_artwork.dart';
 import '../widgets/lesson_card.dart';
 import '../widgets/mini_player_bar.dart';
 import '../widgets/skeleton.dart';
@@ -129,41 +135,6 @@ class _StoryTutorBuilder {
     isEnrollable: isEnrollable,
     isLinka: isLinka,
   );
-}
-
-class _Podcast {
-  final int id;
-  final String title;
-  final String? audioUrl;
-  final int? durationSeconds;
-  final bool isNew;
-
-  const _Podcast({
-    required this.id,
-    required this.title,
-    this.audioUrl,
-    this.durationSeconds,
-    this.isNew = false,
-  });
-
-  factory _Podcast.fromJson(Map<String, dynamic> json) {
-    return _Podcast(
-      id: json['id'] as int,
-      title: json['title'] as String? ?? '',
-      audioUrl: json['audio_url'] as String?,
-      durationSeconds: json['duration'] as int?,
-      isNew: json['is_new'] as bool? ?? false,
-    );
-  }
-
-  String get formattedDuration {
-    if (durationSeconds == null || durationSeconds == 0) return '';
-    final m = durationSeconds! ~/ 60;
-    final s = durationSeconds! % 60;
-    if (m > 0 && s > 0) return '$m min $s sec';
-    if (m > 0) return '$m min';
-    return '$s sec';
-  }
 }
 
 class _Article {
@@ -360,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() {
         _podcasts = list
-            .map((e) => _Podcast.fromJson(e as Map<String, dynamic>))
+            .map((e) => Podcast.fromJson(e as Map<String, dynamic>))
             .toList();
         _loadingPodcasts = false;
       });
@@ -590,7 +561,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  List<_Podcast> _podcasts = [];
+  List<Podcast> _podcasts = [];
 
   List<_Article> _articles = [];
 
@@ -1216,7 +1187,7 @@ class _StudentHomeSkeleton extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 100,
+            height: 232,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               physics: const NeverScrollableScrollPhysics(),
@@ -1225,8 +1196,17 @@ class _StudentHomeSkeleton extends StatelessWidget {
               itemBuilder: (_, _) => const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 6),
                 child: SizedBox(
-                  width: 240,
-                  child: Skeleton(height: 100, borderRadius: 14),
+                  width: 158,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Skeleton(height: 158, borderRadius: 18),
+                      SizedBox(height: 10),
+                      Skeleton(height: 12, borderRadius: 4),
+                      SizedBox(height: 6),
+                      Skeleton(width: 90, height: 12, borderRadius: 4),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -2787,16 +2767,98 @@ class _DebateBlockState extends State<_DebateBlock>
 
 // ─── Podcasts section ──────────────────────────────────────────────────────────
 
-class _PodcastsSection extends StatelessWidget {
-  final List<_Podcast> podcasts;
+class _PodcastsSection extends StatefulWidget {
+  final List<Podcast> podcasts;
   final bool loading;
   const _PodcastsSection({required this.podcasts, this.loading = false});
 
   @override
+  State<_PodcastsSection> createState() => _PodcastsSectionState();
+}
+
+class _PodcastsSectionState extends State<_PodcastsSection> {
+  static const _cardWidth = 158.0;
+  static const _artSize = 158.0;
+
+  final _service = PodcastPlaybackService.instance;
+  StreamSubscription<Duration>? _positionSub;
+  StreamSubscription<PlayerState>? _stateSub;
+  Duration _position = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _position = _service.position;
+    // The playing card's "x min left" only changes once a second.
+    _positionSub = _service.positionStream.listen((pos) {
+      if (!mounted || pos.inSeconds == _position.inSeconds) return;
+      setState(() => _position = pos);
+    });
+    _stateSub = _service.playerStateStream.listen((_) {
+      if (mounted) setState(() {});
+    });
+    _service.currentTrack.addListener(_rebuild);
+    PodcastProgressService.revision.addListener(_rebuild);
+  }
+
+  @override
+  void dispose() {
+    _positionSub?.cancel();
+    _stateSub?.cancel();
+    _service.currentTrack.removeListener(_rebuild);
+    PodcastProgressService.revision.removeListener(_rebuild);
+    super.dispose();
+  }
+
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  /// Queues every playable episode so the lock screen can walk the library,
+  /// starting at [podcast].
+  void _play(Podcast podcast) {
+    final tracks = <PodcastTrack>[];
+    var startIndex = 0;
+    for (final p in widget.podcasts) {
+      if (!p.playable) continue;
+      if (p.id == podcast.id) startIndex = tracks.length;
+      tracks.add(p.toTrack());
+    }
+    if (tracks.isEmpty) return;
+    _service.setQueue(tracks, startIndex);
+  }
+
+  void _open(Podcast podcast) {
+    _play(podcast);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PodcastPlayerScreen(
+          podcastId: podcast.id,
+          initialTitle: podcast.title,
+          initialAudioUrl: podcast.audioUrl,
+          initialSubtitleUrl: podcast.subtitleUrl,
+          initialImageUrl: podcast.imageUrl,
+        ),
+      ),
+    );
+  }
+
+  void _toggle(Podcast podcast) {
+    if (_service.currentTrack.value?.id == podcast.id) {
+      _service.togglePlay();
+    } else if (podcast.playable) {
+      _play(podcast);
+    } else {
+      _open(podcast);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (loading) {
+    if (widget.loading) {
       return SizedBox(
-        height: 120,
+        height: 232,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -2804,129 +2866,223 @@ class _PodcastsSection extends StatelessWidget {
           itemBuilder: (_, _) => const Padding(
             padding: EdgeInsets.symmetric(horizontal: 6),
             child: SizedBox(
-              width: 240,
-              child: Skeleton(height: 120, borderRadius: 14),
+              width: _cardWidth,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Skeleton(height: _artSize, borderRadius: 18),
+                  SizedBox(height: 10),
+                  Skeleton(height: 12, borderRadius: 4),
+                  SizedBox(height: 6),
+                  Skeleton(width: 90, height: 12, borderRadius: 4),
+                ],
+              ),
             ),
           ),
         ),
       );
     }
+
     return SizedBox(
-      height: 120,
+      height: 232,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: podcasts.length,
-        itemBuilder: (_, i) =>
-            _PodcastCard(podcast: podcasts[i], podcasts: podcasts, index: i),
+        itemCount: widget.podcasts.length,
+        itemBuilder: (_, i) {
+          final podcast = widget.podcasts[i];
+          final isCurrent = _service.currentTrack.value?.id == podcast.id;
+          final stored = PodcastProgressService.of(podcast.id);
+          final position =
+              isCurrent ? _position : stored?.position ?? Duration.zero;
+          final duration = isCurrent && _service.duration > Duration.zero
+              ? _service.duration
+              : podcast.duration ?? stored?.duration ?? Duration.zero;
+          return _PodcastCard(
+            podcast: podcast,
+            width: _cardWidth,
+            artSize: _artSize,
+            position: position,
+            duration: duration,
+            completed: stored?.completed ?? false,
+            started: stored?.started ?? false,
+            isCurrent: isCurrent,
+            isPlaying: isCurrent && _service.isPlaying,
+            onTap: () => _open(podcast),
+            onToggle: () => _toggle(podcast),
+          );
+        },
       ),
     );
   }
 }
 
+/// Cover-art tile in the dashboard's podcast carousel, showing how far into
+/// the episode the listener already is.
 class _PodcastCard extends StatelessWidget {
-  final _Podcast podcast;
-  final List<_Podcast> podcasts;
-  final int index;
+  final Podcast podcast;
+  final double width;
+  final double artSize;
+  final Duration position;
+  final Duration duration;
+  final bool completed;
+  final bool started;
+  final bool isCurrent;
+  final bool isPlaying;
+  final VoidCallback onTap;
+  final VoidCallback onToggle;
+
   const _PodcastCard({
     required this.podcast,
-    required this.podcasts,
-    required this.index,
+    required this.width,
+    required this.artSize,
+    required this.position,
+    required this.duration,
+    required this.completed,
+    required this.started,
+    required this.isCurrent,
+    required this.isPlaying,
+    required this.onTap,
+    required this.onToggle,
   });
-
-  void _playFrom() {
-    final tracks = <PodcastTrack>[];
-    int startIndex = 0;
-    for (var i = 0; i < podcasts.length; i++) {
-      final p = podcasts[i];
-      final url = p.audioUrl;
-      if (url == null || url.isEmpty) continue;
-      if (i == index) startIndex = tracks.length;
-      tracks.add(PodcastTrack(id: p.id, title: p.title, audioUrl: url));
-    }
-    if (tracks.isEmpty) return;
-    PodcastPlaybackService.instance.setQueue(tracks, startIndex);
-  }
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+    final fraction = duration.inMilliseconds > 0
+        ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
+        : 0.0;
+
     return GestureDetector(
-      onTap: () {
-        _playFrom();
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PodcastPlayerScreen(
-              podcastId: podcast.id,
-              initialTitle: podcast.title,
-              initialAudioUrl: podcast.audioUrl,
-            ),
-          ),
-        );
-      },
+      onTap: onTap,
       child: Container(
-        width: 240,
+        width: width,
         margin: const EdgeInsets.symmetric(horizontal: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-        decoration: BoxDecoration(
-          color: context.colors.surfaceAlt,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: context.colors.brand,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: SvgPicture.asset(
-                  'assets/images/icons/podcast.svg',
-                  width: 28,
-                  height: 28,
+            Stack(
+              children: [
+                PodcastArtwork(
+                  seed: podcast.title,
+                  imageUrl: podcast.imageUrl,
+                  size: artSize,
+                  borderRadius: 18,
+                  playing: isPlaying,
                 ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (podcast.isNew) ...[
-                    const NewBadge(),
-                    const SizedBox(height: 6),
-                  ],
-                  Text(
-                    podcast.title,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: context.colors.textPrimary,
-                      height: 1.3,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (podcast.formattedDuration.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      podcast.formattedDuration,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w400,
-                        color: context.colors.textSecondary,
+                if (podcast.isNew)
+                  const Positioned(top: 10, left: 0, child: NewBadge(onColored: true)),
+                Positioned(
+                  right: 8,
+                  bottom: 8,
+                  child: GestureDetector(
+                    onTap: onToggle,
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: colors.surface,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.25),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        size: 21,
+                        color: colors.textPrimary,
                       ),
                     ),
-                  ],
-                ],
+                  ),
+                ),
+                if (started || (isCurrent && fraction > 0))
+                  Positioned(
+                    left: 8,
+                    right: 8,
+                    bottom: 8,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(
+                        value: fraction,
+                        minHeight: 3,
+                        backgroundColor: Colors.white.withValues(alpha: 0.35),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          colors.accentYellow,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              podcast.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                height: 1.3,
+                color: colors.textPrimary,
               ),
             ),
+            const SizedBox(height: 4),
+            _meta(context, fraction),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _meta(BuildContext context, double fraction) {
+    final colors = context.colors;
+    if (isCurrent) {
+      return Row(
+        children: [
+          EqualizerBars(
+            color: colors.accentYellow,
+            height: 10,
+            playing: isPlaying,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            isPlaying ? 'Now playing' : 'Paused',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: colors.accentYellow,
+            ),
+          ),
+        ],
+      );
+    }
+    if (completed) {
+      return Row(
+        children: [
+          Icon(Icons.check_circle_rounded, size: 13, color: colors.success),
+          const SizedBox(width: 4),
+          Text(
+            'Played',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: colors.success,
+            ),
+          ),
+        ],
+      );
+    }
+    final label = started && duration > Duration.zero
+        ? formatRemainingLabel(duration - position)
+        : podcast.formattedDuration;
+    if (label.isEmpty) return const SizedBox(height: 14);
+    return Text(
+      label,
+      style: TextStyle(fontSize: 11.5, color: colors.textSecondary),
     );
   }
 }

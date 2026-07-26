@@ -249,7 +249,7 @@ class _PartChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? context.colors.textPrimary : context.colors.surfaceAlt,
+          color: selected ? context.colors.brand : context.colors.surfaceAlt,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
@@ -332,7 +332,7 @@ class _AudioBar extends StatelessWidget {
                 child: Container(
                   width: 42,
                   height: 42,
-                  decoration: BoxDecoration(color: context.colors.textPrimary, shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: context.colors.brand, shape: BoxShape.circle),
                   child: Icon(
                     playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
                     color: Colors.white,

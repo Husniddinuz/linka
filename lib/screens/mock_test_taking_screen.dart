@@ -300,7 +300,7 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: selected
-                                    ? context.colors.textPrimary
+                                    ? context.colors.brand
                                     : context.colors.border,
                                 width: selected ? 2.5 : 1,
                               ),
@@ -338,7 +338,7 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: selected
-                                  ? context.colors.textPrimary
+                                  ? context.colors.brand
                                   : context.colors.surfaceAlt,
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -554,12 +554,12 @@ class _SectionSelector extends StatelessWidget {
                   child: Container(
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: selected ? context.colors.textPrimary : Colors.white,
+                      color: selected ? context.colors.brand : context.colors.surface,
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
                         color: selected
-                            ? context.colors.textPrimary
-                            : const Color(0xFFDDDDDD),
+                            ? context.colors.brand
+                            : context.colors.border,
                         width: 1.5,
                       ),
                     ),
