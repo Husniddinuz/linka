@@ -48,14 +48,19 @@
                 <data android:scheme="linka"/>
             </intent-filter>
             <!-- Universal links: Telegram login (/tg-login?token=...) and shared
-                 tutor profiles (/tutor/<id>) on linkaapp.uz
+                 tutor profiles (/tutor/<id>) on linka-ielts.com (and the
+                 previous linkaapp.uz, kept for links already shared)
                  (verified against /.well-known/assetlinks.json) -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="linka-ielts.com" android:pathPrefix="/tg-login"/>
+                <data android:scheme="https" android:host="www.linka-ielts.com" android:pathPrefix="/tg-login"/>
                 <data android:scheme="https" android:host="linkaapp.uz" android:pathPrefix="/tg-login"/>
                 <data android:scheme="https" android:host="www.linkaapp.uz" android:pathPrefix="/tg-login"/>
+                <data android:scheme="https" android:host="linka-ielts.com" android:pathPrefix="/tutor/"/>
+                <data android:scheme="https" android:host="www.linka-ielts.com" android:pathPrefix="/tutor/"/>
                 <data android:scheme="https" android:host="linkaapp.uz" android:pathPrefix="/tutor/"/>
                 <data android:scheme="https" android:host="www.linkaapp.uz" android:pathPrefix="/tutor/"/>
             </intent-filter>

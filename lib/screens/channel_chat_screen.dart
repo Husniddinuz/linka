@@ -21,6 +21,7 @@ import '../theme/app_colors.dart';
 import '../widgets/skeleton.dart';
 import 'chats_screen.dart';
 import 'tutor_profile_screen.dart';
+import 'public_profile_screen.dart';
 
 // ─── Reply-to model ────────────────────────────────────────────────────────────
 
@@ -2083,6 +2084,35 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 
+  /// Opens whoever sent this message.
+  ///
+  /// A tutor goes to their bookable profile, which carries their rates and
+  /// availability; anyone else goes to their public social profile, where the
+  /// follow button is. `sender_id` is a user id, which is exactly what the
+  /// social endpoints are keyed on — no lookup needed.
+  static void _openSenderProfile(BuildContext context, _Message message) {
+    if (message.isTutor && message.tutorId != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TutorProfileScreen(tutorId: message.tutorId!),
+        ),
+      );
+      return;
+    }
+    if (message.senderId <= 0) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PublicProfileScreen(
+          userId: message.senderId,
+          initialName: message.senderName,
+          initialImage: message.senderAvatar,
+        ),
+      ),
+    );
+  }
+
   Widget _buildQuizLayout(BuildContext context) {
     return GestureDetector(
       onLongPress: () => _showActions(context),
@@ -2092,10 +2122,13 @@ class _MessageBubble extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             if (!hideTutorIdentity) ...[
-              _Avatar(
-                initials: message.senderInitials,
-                color: message.senderColor,
-                imageUrl: message.senderAvatar,
+              GestureDetector(
+                onTap: () => _openSenderProfile(context, message),
+                child: _Avatar(
+                  initials: message.senderInitials,
+                  color: message.senderColor,
+                  imageUrl: message.senderAvatar,
+                ),
               ),
               const SizedBox(width: 8),
             ],
@@ -2105,15 +2138,7 @@ class _MessageBubble extends StatelessWidget {
                 children: [
                   if (!hideTutorIdentity)
                     GestureDetector(
-                      onTap: message.isTutor && message.tutorId != null
-                          ? () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => TutorProfileScreen(
-                                      tutorId: message.tutorId!),
-                                ),
-                              )
-                          : null,
+                      onTap: () => _openSenderProfile(context, message),
                       child: Padding(
                         padding: const EdgeInsets.only(left: 4, bottom: 4),
                         child: Row(
@@ -2236,10 +2261,13 @@ class _MessageBubble extends StatelessWidget {
               isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
           children: [
             if (!isMine && !hideTutorIdentity) ...[
-              _Avatar(
-                initials: message.senderInitials,
-                color: message.senderColor,
-                imageUrl: message.senderAvatar,
+              GestureDetector(
+                onTap: () => _openSenderProfile(context, message),
+                child: _Avatar(
+                  initials: message.senderInitials,
+                  color: message.senderColor,
+                  imageUrl: message.senderAvatar,
+                ),
               ),
               const SizedBox(width: 8),
             ],
@@ -2250,16 +2278,7 @@ class _MessageBubble extends StatelessWidget {
                 children: [
                   if (!isMine && !hideTutorIdentity)
                     GestureDetector(
-                      onTap: message.isTutor && message.tutorId != null
-                          ? () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => TutorProfileScreen(
-                                    tutorId: message.tutorId!,
-                                  ),
-                                ),
-                              )
-                          : null,
+                      onTap: () => _openSenderProfile(context, message),
                       child: Padding(
                         padding: const EdgeInsets.only(left: 4, bottom: 4),
                         child: Row(

@@ -7,8 +7,28 @@ import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 import '../utils/format.dart';
 
+/// Post a story — the same picker, preview and upload for both kinds.
+///
+/// Which kind is decided by [audience], because the two write to different
+/// tables with different visibility:
+///
+/// - [StoryAudience.tutor] posts to the tutor story table, which every signed-in
+///   account can see. Tutors only.
+/// - [StoryAudience.followers] posts to the social story table, visible to the
+///   author's followers for 24 hours. Open to anyone, and the only kind a
+///   student can post.
+///
+/// One screen rather than two because the difference is the endpoint; a second
+/// copy is how one of them quietly stops streaming large files.
+enum StoryAudience { tutor, followers }
+
 class StoryUploadScreen extends StatefulWidget {
-  const StoryUploadScreen({super.key});
+  final StoryAudience audience;
+
+  const StoryUploadScreen({
+    super.key,
+    this.audience = StoryAudience.tutor,
+  });
 
   @override
   State<StoryUploadScreen> createState() => _StoryUploadScreenState();
@@ -143,7 +163,9 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
       // Stream the media straight from disk so large videos are never loaded
       // into memory whole (unlike the old base64-in-JSON approach).
       await ApiService.postMultipart(
-        '/tutor/stories/',
+        widget.audience == StoryAudience.followers
+            ? '/social/stories/'
+            : '/tutor/stories/',
         files: {'media_file': _media!},
         fields: {
           if (_descController.text.trim().isNotEmpty)

@@ -107,6 +107,7 @@ class TestSection {
     required this.title,
     required this.bodyHtml,
     required this.instructions,
+    required this.audioUrl,
     required this.questionGroups,
   });
 
@@ -115,6 +116,13 @@ class TestSection {
   final String title;
   final String bodyHtml;
   final String instructions;
+
+  /// This part's own recording — a listening test carries one per part, as
+  /// the real exam does. Empty on reading passages, and on listening tests
+  /// authored before per-part audio, which carry one whole-test file in
+  /// [MockTest.audioUrl] instead.
+  final String audioUrl;
+
   final List<QuestionGroup> questionGroups;
 
   factory TestSection.fromJson(Map<String, dynamic> json) => TestSection(
@@ -123,6 +131,7 @@ class TestSection {
     title: json['title']?.toString() ?? '',
     bodyHtml: json['body_html']?.toString() ?? '',
     instructions: json['instructions']?.toString() ?? '',
+    audioUrl: json['audio_url']?.toString() ?? '',
     questionGroups: QuestionGroup.listFromJson(json['question_groups'] as List?),
   );
 
@@ -148,7 +157,10 @@ class MockTest {
   final int number;
   final String title;
   final int durationSeconds;
-  final String audioUrl; // '' for reading
+  /// The legacy whole-test recording, '' for reading. Listening tests
+  /// authored with per-part audio put it on each [TestSection] instead —
+  /// read the section's first and fall back to this.
+  final String audioUrl;
   final int totalQuestions;
   final int sortOrder;
 

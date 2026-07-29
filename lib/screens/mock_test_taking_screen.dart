@@ -44,6 +44,10 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
   int _sectionIndex = 0;
   final Map<String, dynamic> _answers = {};
 
+  /// What the shared player currently holds, so switching parts back and
+  /// forth doesn't reload — and restart — a track that's already cued.
+  String _loadedAudioUrl = '';
+
   Timer? _timer;
 
   /// Ticks once a second; a ValueNotifier (not setState) so the countdown
@@ -94,16 +98,7 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
         _loading = false;
       });
       _startTimer();
-      if (_isListening) {
-        final audioUrl = data.audioUrl;
-        if (audioUrl.isNotEmpty) {
-          await PodcastPlaybackService.instance.loadAdHoc(
-            'mock-listening-${widget.testId}',
-            Uri.parse(audioUrl),
-            title: data.title.isNotEmpty ? data.title : 'Listening test',
-          );
-        }
-      }
+      await _syncAudio();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -133,6 +128,45 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
   }
 
   List<TestSection> get _sections => _test?.sections ?? const [];
+
+  /// Whether this test carries a recording per part, the way the exam does.
+  /// Tests authored before that have a single whole-test file on the test
+  /// itself, and are played from it unchanged.
+  bool get _hasPerPartAudio => _sections.any((s) => s.audioUrl.isNotEmpty);
+
+  /// The recording belonging to the part currently on screen — '' when this
+  /// part has none, which on a per-part test means exactly that part is
+  /// missing its audio, not that the test is silent.
+  String get _currentAudioUrl {
+    if (!_isListening) return '';
+    final sections = _sections;
+    if (!_hasPerPartAudio) return _test?.audioUrl ?? '';
+    if (sections.isEmpty) return '';
+    return sections[_sectionIndex.clamp(0, sections.length - 1)].audioUrl;
+  }
+
+  /// Cues the current part's recording. Called on load and on every part
+  /// switch; a no-op when the right track is already loaded.
+  Future<void> _syncAudio() async {
+    if (!_isListening) return;
+    final url = _currentAudioUrl;
+    if (url == _loadedAudioUrl) return;
+    _loadedAudioUrl = url;
+
+    final player = PodcastPlaybackService.instance;
+    if (url.isEmpty) {
+      await player.stop();
+      return;
+    }
+    final testTitle = _test?.title ?? '';
+    await player.loadAdHoc(
+      'mock-listening-${widget.testId}-$_sectionIndex',
+      Uri.parse(url),
+      title: _hasPerPartAudio
+          ? '${testTitle.isNotEmpty ? testTitle : 'Listening test'} — Part ${_sectionIndex + 1}'
+          : (testTitle.isNotEmpty ? testTitle : 'Listening test'),
+    );
+  }
 
   /// question id -> Question, flattened across every section so
   /// answered-progress can be reported against the real IELTS question
@@ -459,7 +493,10 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                 count: sections.length,
                 selectedIndex: _sectionIndex,
                 label: _isListening ? 'Part' : 'Passage',
-                onSelected: (i) => setState(() => _sectionIndex = i),
+                onSelected: (i) {
+                  setState(() => _sectionIndex = i);
+                  _syncAudio();
+                },
               ),
               Divider(height: 1, color: context.colors.border),
             ],
@@ -468,7 +505,14 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
       ),
       body: Column(
         children: [
-          if (_isListening) const _AudioBar(),
+          if (_isListening)
+            _AudioBar(
+              // A per-part test labels the bar so it's obvious the recording
+              // changes with the tab; a legacy whole-test file has no part to
+              // name, so it stays unlabelled as before.
+              partLabel: _hasPerPartAudio ? 'Part ${_sectionIndex + 1}' : null,
+              hasAudio: _currentAudioUrl.isNotEmpty,
+            ),
           Expanded(
             child: section == null
                 ? const Center(
@@ -962,11 +1006,35 @@ class _QuestionsView extends StatelessWidget {
 }
 
 class _AudioBar extends StatelessWidget {
-  const _AudioBar();
+  const _AudioBar({this.partLabel, this.hasAudio = true});
+
+  /// 'Part 2' on a test with a recording per part, null on a legacy
+  /// whole-test recording.
+  final String? partLabel;
+
+  /// False when the part on screen has no recording of its own.
+  final bool hasAudio;
 
   @override
   Widget build(BuildContext context) {
     final player = PodcastPlaybackService.instance;
+
+    if (!hasAudio) {
+      return Container(
+        width: double.infinity,
+        color: context.colors.surfaceAlt,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Text(
+          'No recording for this part yet.',
+          style: TextStyle(
+            fontFamily: 'SF Pro',
+            fontSize: 12.5,
+            color: context.colors.textSecondary,
+          ),
+        ),
+      );
+    }
+
     return Container(
       color: context.colors.surfaceAlt,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -976,6 +1044,18 @@ class _AudioBar extends StatelessWidget {
           final playing = player.isPlaying;
           return Row(
             children: [
+              if (partLabel != null) ...[
+                Text(
+                  partLabel!,
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                    color: context.colors.textSecondary,
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
               InkWell(
                 borderRadius: BorderRadius.circular(24),
                 onTap: player.togglePlay,

@@ -127,12 +127,25 @@ class _LinkaAppState extends State<LinkaApp> with WidgetsBindingObserver {
     }
   }
 
-  /// Telegram login deep link: https://linkaapp.uz/tg-login?token=... (universal
-  /// link) or linka://tg-login?token=... (custom-scheme fallback from the
+  /// Hosts that serve the Linka site and may therefore carry our deep links.
+  ///
+  /// `linka-ielts.com` is the current domain; `linkaapp.uz` is the previous one
+  /// and stays here indefinitely. Links already shared, and the Telegram bot's
+  /// replies to anyone running an older build, still point at it — dropping it
+  /// would turn those into browser tabs instead of app opens.
+  static const _siteHosts = {
+    'linka-ielts.com',
+    'www.linka-ielts.com',
+    'linkaapp.uz',
+    'www.linkaapp.uz',
+  };
+
+  /// Telegram login deep link: `https://<site>/tg-login?token=...` (universal
+  /// link) or `linka://tg-login?token=...` (custom-scheme fallback from the
   /// landing page).
   bool _isTelegramLoginLink(Uri uri) {
     final isWeb = (uri.scheme == 'https' || uri.scheme == 'http') &&
-        (uri.host == 'linkaapp.uz' || uri.host == 'www.linkaapp.uz') &&
+        _siteHosts.contains(uri.host) &&
         uri.path == '/tg-login';
     final isScheme = uri.scheme == 'linka' && uri.host == 'tg-login';
     return isWeb || isScheme;
@@ -209,9 +222,9 @@ class _LinkaAppState extends State<LinkaApp> with WidgetsBindingObserver {
     final host = uri.host;
     final segments = uri.pathSegments;
 
-    // Universal links: https://linkaapp.uz/tutor/<id>, ...
+    // Universal links: https://linka-ielts.com/tutor/<id>, ...
     if ((uri.scheme == 'https' || uri.scheme == 'http') &&
-        (host == 'linkaapp.uz' || host == 'www.linkaapp.uz')) {
+        _siteHosts.contains(host)) {
       if (segments.length >= 2 && segments[0] == 'tutor') {
         final tutorId = int.tryParse(segments[1]);
         if (tutorId != null) _openTutorProfile(tutorId);

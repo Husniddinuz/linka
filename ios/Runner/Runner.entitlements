@@ -6,6 +6,8 @@
 	<string>development</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
+		<string>applinks:linka-ielts.com</string>
+		<string>applinks:www.linka-ielts.com</string>
 		<string>applinks:linkaapp.uz</string>
 		<string>applinks:www.linkaapp.uz</string>
 	</array>

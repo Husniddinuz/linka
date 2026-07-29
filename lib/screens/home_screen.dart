@@ -46,7 +46,9 @@ import 'speaking_samples_list_screen.dart';
 import 'writing_samples_list_screen.dart';
 import 'courses_list_screen.dart';
 import '../models/course.dart';
+import '../models/social.dart';
 import '../services/course_service.dart';
+import '../services/social_service.dart';
 
 // ─── Data models ───────────────────────────────────────────────────────────────
 
@@ -56,13 +58,26 @@ class StoryData {
   final String mediaType; // "photo" or "video"
   final String? description;
   final bool isPin;
+
+  /// Which table the story came from.
+  ///
+  /// Ids are per-table — a tutor story, a Linka story and a followed student's
+  /// story can all be id 5 — so anything that remembers "seen" must key on
+  /// [viewKey] rather than on [id]. Keying on the bare id marked unrelated
+  /// stories as watched.
+  final StorySource source;
+
   const StoryData({
     required this.id,
     required this.mediaFile,
     required this.mediaType,
     this.description,
     this.isPin = false,
+    this.source = StorySource.tutor,
   });
+
+  /// Stable, collision-free key for [PrefsService.markStoryViewed].
+  String get viewKey => 'story_${source.name}_$id';
 }
 
 /// Groups raw story JSON list by tutor name into StoryTutor
@@ -111,6 +126,40 @@ List<StoryTutor> _groupStories(List<dynamic> raw) {
     return aPinned ? -1 : 1;
   });
   return tutors;
+}
+
+/// Turns the followed-accounts feed into rings, dropping the tutor rows the
+/// tutor feed already supplied. See `_loadStoryTutors`.
+List<StoryTutor> _groupFollowedStories(List<SocialFeedAuthor> authors) {
+  final rings = <StoryTutor>[];
+  for (final author in authors) {
+    final stories = author.stories
+        .where((s) => s.source == StorySource.social)
+        .map(
+          (s) => StoryData(
+            id: s.id,
+            mediaFile: s.mediaFile,
+            mediaType: s.mediaType,
+            description: s.description,
+            source: StorySource.social,
+          ),
+        )
+        .toList();
+    if (stories.isEmpty) continue;
+
+    rings.add(
+      StoryTutor(
+        // Booking runs off a tutor profile id, which the feed does not carry.
+        tutorId: 0,
+        userId: author.userId,
+        name: author.displayName,
+        image: author.profileImage,
+        isEnrollable: false,
+        stories: stories,
+      ),
+    );
+  }
+  return rings;
 }
 
 class _StoryTutorBuilder {
@@ -295,12 +344,37 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _viewedStories = viewed);
   }
 
+  /// The rail has two sources, in this order.
+  ///
+  /// `/tutors/stories/` is Linka's own stories plus every active tutor's, shown
+  /// to everyone. `/social/feed/stories/` is the accounts this user actually
+  /// chose to follow, plus their own.
+  ///
+  /// Only the feed's `social` rows are taken: it also carries stories from
+  /// followed *tutors*, but those are the same rows the first call already
+  /// returned, and keeping them would give every followed tutor two rings. When
+  /// the tutor story table is eventually folded into the social one, that filter
+  /// is what goes away.
   Future<void> _loadStoryTutors() async {
     try {
-      final list = await ApiService.getList('/tutors/stories/');
+      // Started together, awaited separately: `Future.wait` over two different
+      // element types erases both to `dynamic` and needs casts back.
+      final tutorRequest = ApiService.getList('/tutors/stories/');
+      final feedRequest = SocialService.storyFeed().catchError(
+        // A follow graph that fails to load should not take the tutor rail
+        // down with it.
+        (_) => <SocialFeedAuthor>[],
+      );
+
+      final tutorRows = await tutorRequest;
+      final feed = await feedRequest;
+
       if (!mounted) return;
       setState(() {
-        _storyTutors = _groupStories(list);
+        _storyTutors = [
+          ..._groupStories(tutorRows),
+          ..._groupFollowedStories(feed),
+        ];
         _loadingStories = false;
       });
     } catch (_) {
@@ -309,18 +383,27 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _onStoryViewed(String tutorId) async {
-    final tutor = _storyTutors.firstWhere(
-      (t) => '${t.tutorId}' == tutorId,
-      orElse: () => const StoryTutor(tutorId: 0, name: '', stories: []),
-    );
+  /// Marks a whole ring as seen — arriving at it marks all of its stories, the
+  /// same rule the web client applies.
+  ///
+  /// Takes the ring itself rather than an id: ids are per-table and no longer
+  /// identify a ring on their own. `StoryData.viewKey` carries the source, which
+  /// is what stops a tutor story and a followed student's story with the same id
+  /// from marking each other as watched.
+  Future<void> _onStoryViewed(StoryTutor tutor) async {
     for (final story in tutor.stories) {
-      await PrefsService.markStoryViewed('story_${story.id}');
+      await PrefsService.markStoryViewed(story.viewKey);
+      // Followers-only stories also have a read record on the server, so the
+      // ring agrees on this account's other devices. Fire-and-forget — the
+      // local mark above has already dimmed it.
+      if (story.source == StorySource.social) {
+        unawaited(SocialService.markSeen(story.id));
+      }
     }
     if (!mounted) return;
     setState(() {
       for (final story in tutor.stories) {
-        _viewedStories.add('story_${story.id}');
+        _viewedStories.add(story.viewKey);
       }
     });
   }
@@ -577,6 +660,10 @@ class _HomeScreenState extends State<HomeScreen> {
             isTutor: false,
             onLogoLongPress: _showTestUpdateDialog,
             onAvatarTap: () => setState(() => _selectedTab = 3),
+            // Posting a story is a student's only way into the social feed, so
+            // it lives on the surface they land on.
+            showAddStory: true,
+            onStoryPosted: _loadStoryTutors,
           ),
           Expanded(
             child: _isInitialLoading
@@ -916,11 +1003,24 @@ class _Header extends StatefulWidget {
   final bool isTutor;
   final VoidCallback? onLogoLongPress;
   final VoidCallback? onAvatarTap;
+
+  /// Reloads the stories row after a story is posted, so the author's own ring
+  /// appears without waiting for the next pull-to-refresh.
+  final VoidCallback? onStoryPosted;
+
+  /// Whether to offer the compose control.
+  ///
+  /// Off by default, which is what the tutor home relies on: tutors post from
+  /// their own Stories tab, and this header is not where that flow lives.
+  final bool showAddStory;
+
   const _Header({
     this.profileImage,
     this.isTutor = false,
     this.onLogoLongPress,
     this.onAvatarTap,
+    this.onStoryPosted,
+    this.showAddStory = false,
   });
 
   @override
@@ -978,12 +1078,23 @@ class _HeaderState extends State<_Header> {
             ),
           ),
 
-          // Add story button (tutors only)
-          if (widget.isTutor)
+          // Compose. The two roles post to different places: a tutor's story
+          // goes to the tutor feed, which the whole platform sees; a student's
+          // goes to the social feed, visible to their followers for 24 hours.
+          if (widget.showAddStory)
             GestureDetector(
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const StoryUploadScreen()),
-              ),
+              onTap: () async {
+                final posted = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => StoryUploadScreen(
+                      audience: widget.isTutor
+                          ? StoryAudience.tutor
+                          : StoryAudience.followers,
+                    ),
+                  ),
+                );
+                if (posted == true) widget.onStoryPosted?.call();
+              },
               child: Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: Icon(
@@ -1251,7 +1362,7 @@ class _StudentHomeSkeleton extends StatelessWidget {
 class _TutorsList extends StatelessWidget {
   final List<StoryTutor> tutors;
   final Set<String> viewedStories;
-  final void Function(String tutorId) onStoryViewed;
+  final void Function(StoryTutor tutor) onStoryViewed;
   const _TutorsList({
     required this.tutors,
     required this.viewedStories,
@@ -1270,7 +1381,7 @@ class _TutorsList extends StatelessWidget {
           tutorIndex: i,
           tutors: tutors,
           isStoryViewed: tutors[i].stories.every(
-            (s) => viewedStories.contains('story_${s.id}'),
+            (s) => viewedStories.contains(s.viewKey),
           ),
           onStoryViewed: onStoryViewed,
         ),
@@ -1283,7 +1394,7 @@ class _TutorItem extends StatelessWidget {
   final int tutorIndex;
   final List<StoryTutor> tutors;
   final bool isStoryViewed;
-  final void Function(String tutorId) onStoryViewed;
+  final void Function(StoryTutor tutor) onStoryViewed;
   const _TutorItem({
     required this.tutorIndex,
     required this.tutors,
@@ -1304,7 +1415,7 @@ class _TutorItem extends StatelessWidget {
             builder: (_) => StoryViewerScreen(
               tutors: tutors,
               initialTutorIndex: tutorIndex,
-              onTutorViewed: (id) => onStoryViewed('$id'),
+              onTutorViewed: onStoryViewed,
             ),
           ),
         );
@@ -3450,7 +3561,7 @@ class TutorHomeBody extends StatefulWidget {
   final List<StoryTutor> storyTutors;
   final Set<String> viewedStories;
   final bool loadingStories;
-  final void Function(String) onStoryViewed;
+  final void Function(StoryTutor) onStoryViewed;
   final String? tutorAccountStatus;
   final VoidCallback? onAvatarTap;
   // Re-pulls the tutor's account status (activation) on refresh, so an

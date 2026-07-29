@@ -1,10 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import '../models/social.dart';
+import '../services/social_service.dart';
+import '../services/user_service.dart';
+import '../widgets/app_notify.dart';
 import 'tutor_profile_screen.dart';
 import 'home_screen.dart';
+import 'public_profile_screen.dart';
 
 class StoryTutor {
   final int tutorId;
+
+  /// The author's **user** id, for opening their public profile and for
+  /// deciding whether these stories are the viewer's own. Null for Linka's
+  /// stories and for tutor-feed rows, which carry a tutor profile id only.
+  final int? userId;
+
   final String name;
   final String? image;
   final List<StoryData> stories;
@@ -18,6 +29,7 @@ class StoryTutor {
   final bool isLinka;
   const StoryTutor({
     required this.tutorId,
+    this.userId,
     required this.name,
     this.image,
     required this.stories,
@@ -30,7 +42,12 @@ class StoryViewerScreen extends StatefulWidget {
   final List<StoryTutor> tutors;
   final int initialTutorIndex;
   final int initialStoryIndex;
-  final void Function(int tutorId)? onTutorViewed;
+  /// Fired when a ring is reached, with the ring itself.
+  ///
+  /// Passes the [StoryTutor] rather than an id because ids are no longer unique
+  /// across the rail: followed accounts group under a user id and tutors under
+  /// a tutor profile id, so "tutorId 0" now matches several rings.
+  final void Function(StoryTutor tutor)? onTutorViewed;
 
   const StoryViewerScreen({
     super.key,
@@ -61,6 +78,71 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
   StoryTutor get _tutor => widget.tutors[_tutorIndex];
   StoryData get _current => _tutor.stories[_storyIndex];
+
+  /// True while a delete is in flight, so the control cannot be double-fired.
+  bool _deleting = false;
+
+  /// Only the author can take a story down, and only the followers-only kind:
+  /// tutor and Linka stories live in a different table with a different owner.
+  bool get _canDeleteCurrent =>
+      _current.source == StorySource.social &&
+      _tutor.userId != null &&
+      _tutor.userId == UserService.current?.id;
+
+  void _openAuthorProfile() {
+    final userId = _tutor.userId;
+    if (userId == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PublicProfileScreen(
+          userId: userId,
+          initialName: _tutor.name.replaceAll('\n', ' '),
+          initialImage: _tutor.image,
+        ),
+      ),
+    );
+  }
+
+  /// Deleting from the player rather than only from the profile screen: this is
+  /// where you are when you decide a story should come down, and sending you
+  /// elsewhere to do it is how a story you regret stays up for 24 hours.
+  ///
+  /// Confirmed first — it is destructive, immediate, and sits next to the close
+  /// button on a surface driven by taps.
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete this story?'),
+        content: const Text('It will disappear for everyone right away.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleting = true);
+    try {
+      await SocialService.deleteStory(_current.id);
+      if (!mounted) return;
+      // Closes rather than advancing: the rail behind is about to be rebuilt
+      // without this story, and advancing into a stale list is how the viewer
+      // ends up playing something that no longer exists.
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      AppNotify.show(context, message: 'Could not delete the story.');
+    }
+  }
 
   @override
   void initState() {
@@ -108,7 +190,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   }
 
   void _notifyTutorViewed() {
-    widget.onTutorViewed?.call(_tutor.tutorId);
+    widget.onTutorViewed?.call(_tutor);
   }
 
   void _initMedia() {
@@ -419,29 +501,66 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
               right: 16,
               child: Row(
                 children: [
-                  // Avatar — center crop for 2:3 aspect ratio
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
+                  // Avatar and name open the author's public profile — a ring
+                  // names somebody with an account, and this is the way to it.
+                  // Linka and tutor-feed rows carry no user id and stay inert.
+                  GestureDetector(
+                    onTap: _tutor.userId == null ? null : _openAuthorProfile,
+                    behavior: HitTestBehavior.opaque,
+                    child: Row(
+                      children: [
+                        // Avatar — center crop for 2:3 aspect ratio
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          child: ClipOval(child: _buildAvatar()),
+                        ),
+                        const SizedBox(width: 10),
+                      ],
                     ),
-                    child: ClipOval(child: _buildAvatar()),
                   ),
-                  const SizedBox(width: 10),
                   // Name
                   Expanded(
-                    child: Text(
-                      _tutor.name,
-                      style: const TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                    child: GestureDetector(
+                      onTap: _tutor.userId == null ? null : _openAuthorProfile,
+                      behavior: HitTestBehavior.opaque,
+                      child: Text(
+                        _tutor.name,
+                        style: const TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
+                  // Delete — only your own social stories. A tutor story comes
+                  // down from the tutor's own Stories tab, and Linka's are not
+                  // yours at all.
+                  if (_canDeleteCurrent) ...[
+                    GestureDetector(
+                      onTap: _deleting ? null : _confirmDelete,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
                   // Close
                   GestureDetector(
                     onTap: () => Navigator.of(context).pop(),

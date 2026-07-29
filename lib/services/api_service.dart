@@ -313,7 +313,13 @@ class ApiService {
   }
 
   /// Makes an authenticated DELETE request. Throws [ApiException] on failure.
-  static Future<void> delete(String path) async {
+  /// Makes an authenticated DELETE request.
+  ///
+  /// Returns the decoded response body, or an empty map when there is none —
+  /// several endpoints answer a delete with the state that resulted from it
+  /// (an unfollow returns the new follower count), and callers that do not care
+  /// can keep ignoring the result.
+  static Future<Map<String, dynamic>> delete(String path) async {
     var token = await TokenService.getAccessToken();
     var response = await _guard(() => http.delete(
       Uri.parse('$_baseUrl$path'),
@@ -334,7 +340,14 @@ class ApiService {
     }
 
     if (response.statusCode == 200 || response.statusCode == 204) {
-      return;
+      if (response.body.isEmpty) return const {};
+      try {
+        final data = jsonDecode(response.body);
+        return data is Map<String, dynamic> ? data : const {};
+      } catch (_) {
+        // A 200 with an unreadable body is still a successful delete.
+        return const {};
+      }
     }
 
     String errorMsg = 'Request failed (${response.statusCode})';
