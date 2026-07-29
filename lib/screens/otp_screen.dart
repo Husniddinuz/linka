@@ -243,11 +243,8 @@ class _OtpScreenState extends State<OtpScreen> {
               const SizedBox(height: 12),
 
               Text(
-                // Hedged for email on purpose: the server answers the same way
-                // whether or not the address has an account behind it, so
-                // promising a code that was never sent would be a lie.
                 _isEmail
-                    ? 'If ${widget.destination} is on a Linka account, a $_codeLength-digit code is on its way.'
+                    ? 'We sent a $_codeLength-digit code to ${widget.destination}'
                     : 'To confirm your phone number, send a $_codeLength-digit code to ${widget.destination}',
                 style: TextStyle(
                   color: context.colors.textTertiary,

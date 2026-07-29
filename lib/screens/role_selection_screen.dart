@@ -202,14 +202,15 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              // Text rather than a third button: email only signs you back into
-              // an account that already exists, so giving it equal weight to
-              // the two that can also register you would mislead new users.
+              // Text rather than a third button: it registers and signs in
+              // just like the two above, but phone remains the primary route
+              // for this market, so it gets quieter weight rather than less
+              // capability.
               Center(
                 child: TextButton(
                   onPressed: _selectedRole != null ? _loginWithEmail : null,
                   child: Text(
-                    'Sign in with email instead',
+                    'Continue with email instead',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,

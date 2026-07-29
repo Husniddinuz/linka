@@ -6,16 +6,14 @@ import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 
-/// Signing in with an email address.
+/// Signing up or signing in with an email address.
 ///
 /// The counterpart to [AuthScreen], and deliberately a separate screen rather
 /// than a tab inside it: the phone screen is built around a custom numeric
 /// keypad that fills the lower half, which an email field has no use for.
 ///
-/// This route can only sign you *in*. Accounts are created by phone, and the
-/// address has to be confirmed from My Profile first — so the copy below says
-/// as much, otherwise the only feedback a new user gets is a code that never
-/// arrives.
+/// An email is a full identity, the peer of a phone number — an account needs
+/// one or the other, not both — so this route registers as well as signs in.
 class EmailAuthScreen extends StatefulWidget {
   final String role;
 
@@ -138,7 +136,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
                         height: 1.2,
                       ),
                       children: [
-                        const TextSpan(text: 'Sign in with\nemail'),
+                        const TextSpan(text: 'Continue with\nemail'),
                         TextSpan(
                           text: '-',
                           style: TextStyle(color: colors.accentYellow),
@@ -150,8 +148,8 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
                   const SizedBox(height: 12),
 
                   Text(
-                    'Enter the address linked to your Linka account and we will '
-                    'email you a 6-digit code.',
+                    'Enter your email address and we will send you a 6-digit '
+                    'code.',
                     style: TextStyle(
                       color: colors.textTertiary,
                       fontSize: 14,
@@ -234,8 +232,11 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
                   const SizedBox(height: 20),
 
                   Text(
-                    'Email sign-in works once you have added your address in My '
-                    'Profile. New accounts still start with a phone number.',
+                    // Says nothing about adding a phone number afterwards:
+                    // there is no screen for that yet, and promising one is
+                    // worse than staying quiet.
+                    'If you have not used Linka before, this creates your '
+                    'account.',
                     style: TextStyle(
                       color: colors.textTertiary,
                       fontSize: 13,
