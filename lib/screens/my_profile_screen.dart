@@ -27,6 +27,7 @@ import 'saved_articles_screen.dart';
 import 'payment_topup_screen.dart';
 import 'public_offer_screen.dart';
 import 'blocked_users_screen.dart';
+import 'email_settings_screen.dart';
 import 'tutor_schedule_screen.dart';
 import 'tutor_speaking_samples_screen.dart';
 import 'tutor_writing_samples_screen.dart';
@@ -247,6 +248,22 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                         MaterialPageRoute(
                             builder: (_) => const BlockedUsersScreen()),
                       ),
+                    ),
+                    const _RowDivider(),
+                    _MenuRow(
+                      icon: Symbols.alternate_email_rounded,
+                      label: 'Email sign-in',
+                      // Returning from this screen can have linked or unlinked
+                      // an address, and the row does not show which — but
+                      // UserService.current has been refreshed, so anything
+                      // else on this screen reading it needs a rebuild.
+                      onTap: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) => const EmailSettingsScreen()),
+                        );
+                        if (mounted) setState(() {});
+                      },
                     ),
                   ],
                 ),

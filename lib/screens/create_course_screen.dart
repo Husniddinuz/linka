@@ -31,6 +31,9 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
 
   DateTime? _startDate;
   DateTime? _endDate;
+  /// False while the end date is still the one-month default, so moving the
+  /// start date keeps carrying it along; true once the tutor picks their own.
+  bool _endDateEdited = false;
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
   TutorSearchResult? _coTutor;
@@ -52,6 +55,21 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
 
   static int _minutes(TimeOfDay t) => t.hour * 60 + t.minute;
 
+  /// Explains the pre-filled window: courses are one month long by default,
+  /// and the tutor can shorten or extend it by picking another end date.
+  String get _durationHint {
+    final s = _startDate, e = _endDate;
+    if (s == null || e == null) {
+      return 'Courses run for one month by default — pick a start date and the '
+          'end date fills in.';
+    }
+    final days = e.difference(s).inDays + 1;
+    final label = days >= 28
+        ? '${(days / 30.44).round()} month(s)'
+        : (days >= 7 ? '${(days / 7).round()} week(s)' : '$days day(s)');
+    return 'Runs for $label. Change the end date for a longer or shorter course.';
+  }
+
   bool get _isEdit => widget.existing != null;
   bool get _termsLocked =>
       _isEdit && (widget.existing?.enrolledCount ?? 0) > 0;
@@ -69,6 +87,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
       _schedule.text = c.scheduleDetails;
       _startDate = c.startDate;
       _endDate = c.endDate;
+      _endDateEdited = true; // an existing course's window is the tutor's own
       _startTime = _parseTime(c.startTime);
       _endTime = _parseTime(c.endTime);
       if (c.coTutorId != null) {
@@ -144,11 +163,26 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
     setState(() {
       if (isStart) {
         _startDate = picked;
-        if (_endDate != null && _endDate!.isBefore(picked)) _endDate = picked;
+        // A course runs for one month unless the tutor says otherwise: the end
+        // date trails the start until they pick one themselves — and a start
+        // date moved past their choice resets it rather than going invalid.
+        if (!_endDateEdited || _endDate == null || _endDate!.isBefore(picked)) {
+          _endDate = _plusOneMonth(picked);
+        }
       } else {
         _endDate = picked;
+        _endDateEdited = true;
       }
     });
+  }
+
+  /// [day] one month later, clamped to the last day of the target month
+  /// (31 Jan → 28/29 Feb), matching `apps.courses.services.add_months`.
+  static DateTime _plusOneMonth(DateTime day) {
+    final year = day.month == 12 ? day.year + 1 : day.year;
+    final month = day.month == 12 ? 1 : day.month + 1;
+    final lastDayOfMonth = DateTime(year, month + 1, 0).day;
+    return DateTime(year, month, day.day < lastDayOfMonth ? day.day : lastDayOfMonth);
   }
 
   Future<void> _pickTime({required bool isStart}) async {
@@ -353,6 +387,14 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                 ),
               ],
             ),
+            if (!_termsLocked)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Text(
+                  _durationHint,
+                  style: TextStyle(fontSize: 12, color: colors.textTertiary),
+                ),
+              ),
             Row(
               children: [
                 Expanded(

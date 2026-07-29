@@ -25,9 +25,15 @@ class CourseService {
   /// Enroll (and pay from wallet). Throws [InsufficientBalanceException] when
   /// the wallet is short, so the caller can route to top-up; other failures
   /// surface as the usual [ApiException].
-  static Future<void> enroll(int courseId) async {
+  ///
+  /// Returns the slug of the course's chat channel — paying is what admits the
+  /// student to it, so the UI can offer to open the chat straight away.
+  static Future<String?> enroll(int courseId) async {
     try {
-      await ApiService.post('/courses/$courseId/enroll/', {});
+      final res = await ApiService.post('/courses/$courseId/enroll/', {});
+      final payload = (res['data'] as Map<String, dynamic>?) ?? res;
+      final slug = payload['chat_channel_slug']?.toString() ?? '';
+      return slug.isEmpty ? null : slug;
     } on ApiException catch (e) {
       if (e.message.toLowerCase().contains('insufficient')) {
         throw InsufficientBalanceException(e.message);

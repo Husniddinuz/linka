@@ -8,6 +8,8 @@ import '../services/course_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/cached_avatar.dart';
 import '../widgets/course_card.dart';
+import 'channel_chat_screen.dart';
+import 'chats_screen.dart';
 import 'lesson_meeting_screen.dart';
 import 'payment_topup_screen.dart';
 
@@ -86,10 +88,21 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
 
     setState(() => _enrolling = true);
     try {
-      await CourseService.enroll(course.id);
+      final chatSlug = await CourseService.enroll(course.id);
       if (!mounted) return;
-      _showSnack('Enrolled — see you in class!');
       await _load();
+      if (!mounted) return;
+      if (chatSlug != null) {
+        // The seat comes with the cohort's chat — offer it right away rather
+        // than leaving the student to find the tile further down the page.
+        _showSnack(
+          'Enrolled — see you in class!',
+          actionLabel: 'Open chat',
+          onAction: () => _openChat(_course ?? course),
+        );
+      } else {
+        _showSnack('Enrolled — see you in class!');
+      }
     } on InsufficientBalanceException {
       if (!mounted) return;
       await _promptTopUp();
@@ -166,8 +179,37 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     if (mounted) _load();
   }
 
-  void _showSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  void _showSnack(String msg, {String? actionLabel, VoidCallback? onAction}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        action: (actionLabel != null && onAction != null)
+            ? SnackBarAction(label: actionLabel, onPressed: onAction)
+            : null,
+      ),
+    );
+  }
+
+  /// Opens the cohort's private chat. The channel is a normal chat channel —
+  /// it is simply absent from the global list, so the screen is handed a
+  /// locally-built [ChatChannel] instead of one fetched from `/chats/`.
+  void _openChat(Course course) {
+    final slug = course.chatChannelSlug;
+    if (slug == null || slug.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChannelChatScreen(
+          channel: ChatChannel(
+            id: slug,
+            name: course.title,
+            emoji: '🎓',
+            tileColor: _accent,
+            type: ChannelType.text,
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openLink(String url) async {
@@ -269,7 +311,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                 const SizedBox(height: 18),
                 _InfoRow(
                   icon: Symbols.calendar_month_rounded,
-                  label: course.dateRangeLabel,
+                  label: course.durationLabel.isEmpty
+                      ? course.dateRangeLabel
+                      : '${course.durationLabel} · ${course.dateRangeLabel}',
                   colors: colors,
                 ),
                 if (course.sessionTimeLabel.isNotEmpty)
@@ -309,6 +353,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                     course: course,
                     colors: colors,
                     onOpenLink: _openLink,
+                    onOpenChat: () => _openChat(course),
                   ),
                 ],
               ],
@@ -550,10 +595,12 @@ class _RoomSection extends StatelessWidget {
   final Course course;
   final AppColors colors;
   final void Function(String url) onOpenLink;
+  final VoidCallback onOpenChat;
   const _RoomSection({
     required this.course,
     required this.colors,
     required this.onOpenLink,
+    required this.onOpenChat,
   });
 
   @override
@@ -598,6 +645,52 @@ class _RoomSection extends StatelessWidget {
               ),
             ],
           ),
+          // The cohort's private chat — present for everyone with a paid seat
+          // and for the tutors, absent (slug withheld by the API) otherwise.
+          if (course.hasChat) ...[
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: onOpenChat,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: colors.border),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Symbols.forum_rounded, size: 18, color: colors.textPrimary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Course chat',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: colors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Private group chat for this course',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colors.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, size: 20, color: colors.textTertiary),
+                  ],
+                ),
+              ),
+            ),
+          ],
           // Optional extra link (e.g. materials), only if the tutor/admin set one.
           if (course.sharedLink.isNotEmpty) ...[
             const SizedBox(height: 10),

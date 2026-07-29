@@ -138,11 +138,14 @@ class CourseCard extends StatelessWidget {
     return '${course.seatsLeft} of ${course.maxStudents} left';
   }
 
+  /// "1 month · 15 Aug – 15 Sep · 16:00" — the length leads, since that is what
+  /// a student comparing courses is really weighing.
   String get _dateLabel {
-    if (course.startTime != null && course.dateRangeLabel.isNotEmpty) {
-      return '${course.dateRangeLabel} · ${course.startTime}';
-    }
-    return course.dateRangeLabel;
+    return [
+      if (course.durationLabel.isNotEmpty) course.durationLabel,
+      if (course.dateRangeLabel.isNotEmpty) course.dateRangeLabel,
+      if (course.startTime != null) course.startTime!,
+    ].join(' · ');
   }
 }
 

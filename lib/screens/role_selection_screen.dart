@@ -6,6 +6,7 @@ import '../services/app_feature_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 import 'auth_screen.dart';
+import 'email_auth_screen.dart';
 
 const _telegramBlue = Color(0xFF229ED9);
 
@@ -24,6 +25,15 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => AuthScreen(role: _selectedRole!),
+      ),
+    );
+  }
+
+  void _loginWithEmail() {
+    if (_selectedRole == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EmailAuthScreen(role: _selectedRole!),
       ),
     );
   }
@@ -191,7 +201,26 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 12),
+              // Text rather than a third button: email only signs you back into
+              // an account that already exists, so giving it equal weight to
+              // the two that can also register you would mislead new users.
+              Center(
+                child: TextButton(
+                  onPressed: _selectedRole != null ? _loginWithEmail : null,
+                  child: Text(
+                    'Sign in with email instead',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: _selectedRole != null
+                          ? context.colors.textPrimary
+                          : context.colors.textTertiary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
             ],
           ),
         ),

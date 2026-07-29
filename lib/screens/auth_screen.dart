@@ -72,8 +72,8 @@ class _AuthScreenState extends State<AuthScreen> {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => OtpScreen(
-            phone: '+998 $_formattedPhone',
-            fullPhone: _fullPhone,
+            destination: '+998 $_formattedPhone',
+            identifier: _fullPhone,
             verifyId: result['verifyID'] as String,
             role: widget.role,
           ),

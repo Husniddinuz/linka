@@ -9,16 +9,34 @@ import '../services/token_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 
+/// Which channel carried the code. Everything past "a code was sent" is the
+/// same for both, so the two flows share this screen and differ only in the
+/// endpoints it calls, the number of digits, and the wording.
+enum OtpChannel {
+  /// 5 digits over SMS. Creates the account if the number is new.
+  sms,
+
+  /// 6 digits by email, into an account that already exists.
+  email,
+}
+
 class OtpScreen extends StatefulWidget {
-  final String phone;
-  final String fullPhone;
+  final OtpChannel channel;
+
+  /// What the user reads back: a formatted phone number, or an email address.
+  final String destination;
+
+  /// What a resend is addressed to: the E.164 number, or the email address.
+  final String identifier;
+
   final String verifyId;
   final String role;
 
   const OtpScreen({
     super.key,
-    required this.phone,
-    required this.fullPhone,
+    this.channel = OtpChannel.sms,
+    required this.destination,
+    required this.identifier,
     required this.verifyId,
     required this.role,
   });
@@ -29,12 +47,20 @@ class OtpScreen extends StatefulWidget {
 
 class _OtpScreenState extends State<OtpScreen> {
   String _code = '';
-  int _secondsLeft = 57;
+  late int _secondsLeft = _resendSeconds;
   Timer? _timer;
   late String _verifyId = widget.verifyId;
   bool _submitting = false;
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
+
+  bool get _isEmail => widget.channel == OtpChannel.email;
+
+  /// Email codes are 6 digits against SMS's 5 — an extra digit against a window
+  /// that is five times longer.
+  int get _codeLength => _isEmail ? 6 : 5;
+
+  int get _resendSeconds => _isEmail ? 60 : 57;
 
   @override
   void initState() {
@@ -65,7 +91,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
   void _onChanged(String value) {
     setState(() => _code = value);
-    if (value.length == 5) {
+    if (value.length == _codeLength) {
       Future.delayed(const Duration(milliseconds: 300), _submit);
     }
   }
@@ -73,11 +99,19 @@ class _OtpScreenState extends State<OtpScreen> {
   Future<void> _resend() async {
     if (_secondsLeft > 0) return;
     try {
-      final result = await AuthService.sendOtp(widget.fullPhone, userType: widget.role);
+      final result = _isEmail
+          ? await AuthService.sendEmailOtp(
+              widget.identifier,
+              userType: widget.role,
+            )
+          : await AuthService.sendOtp(
+              widget.identifier,
+              userType: widget.role,
+            );
       if (!mounted) return;
       setState(() {
         _verifyId = result['verifyID'] as String;
-        _secondsLeft = 57;
+        _secondsLeft = _resendSeconds;
         _code = '';
       });
       _controller.clear();
@@ -92,10 +126,15 @@ class _OtpScreenState extends State<OtpScreen> {
     if (!mounted || _submitting) return;
     setState(() => _submitting = true);
     try {
-      final result = await AuthService.verifyOtp(
-        verifyId: _verifyId,
-        otpCode: _code,
-      );
+      final result = _isEmail
+          ? await AuthService.verifyEmailOtp(
+              verifyId: _verifyId,
+              otpCode: _code,
+            )
+          : await AuthService.verifyOtp(
+              verifyId: _verifyId,
+              otpCode: _code,
+            );
 
       await TokenService.saveTokens(
         access: result['accessToken'] as String,
@@ -204,7 +243,12 @@ class _OtpScreenState extends State<OtpScreen> {
               const SizedBox(height: 12),
 
               Text(
-                'To confirm your phone number, send a 5-digit code to ${widget.phone}',
+                // Hedged for email on purpose: the server answers the same way
+                // whether or not the address has an account behind it, so
+                // promising a code that was never sent would be a lie.
+                _isEmail
+                    ? 'If ${widget.destination} is on a Linka account, a $_codeLength-digit code is on its way.'
+                    : 'To confirm your phone number, send a $_codeLength-digit code to ${widget.destination}',
                 style: TextStyle(
                   color: context.colors.textTertiary,
                   fontSize: 14,
@@ -231,7 +275,7 @@ class _OtpScreenState extends State<OtpScreen> {
                         keyboardType: TextInputType.number,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(5),
+                          LengthLimitingTextInputFormatter(_codeLength),
                         ],
                         onChanged: _onChanged,
                         showCursor: false,
@@ -250,7 +294,7 @@ class _OtpScreenState extends State<OtpScreen> {
                     IgnorePointer(
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(5, (i) {
+                        children: List.generate(_codeLength, (i) {
                           final filled = i < _code.length;
                           return Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 10),

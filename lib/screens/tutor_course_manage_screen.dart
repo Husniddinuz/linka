@@ -6,6 +6,8 @@ import '../services/api_service.dart';
 import '../services/course_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/cached_avatar.dart';
+import 'channel_chat_screen.dart';
+import 'chats_screen.dart';
 import 'create_course_screen.dart';
 import 'lesson_meeting_screen.dart';
 
@@ -218,6 +220,7 @@ class _TutorCourseManageScreenState extends State<TutorCourseManageScreen> {
         const SizedBox(height: 6),
         Text(
           [
+            if (course.durationLabel.isNotEmpty) course.durationLabel,
             course.dateRangeLabel,
             if (course.sessionTimeLabel.isNotEmpty) course.sessionTimeLabel,
             course.priceLabel,
@@ -275,6 +278,23 @@ class _TutorCourseManageScreenState extends State<TutorCourseManageScreen> {
         if (!course.isCancelled) ...[
           const SizedBox(height: 16),
           _joinButton(course, colors),
+          if (course.hasChat) ...[
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () => _openChat(course),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                side: BorderSide(color: colors.border),
+                foregroundColor: colors.textPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: const Icon(Symbols.forum_rounded, size: 20),
+              label: const Text('Course chat',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            ),
+          ],
         ],
         const SizedBox(height: 24),
         _SectionTitle('STUDENTS', colors),
@@ -311,6 +331,27 @@ class _TutorCourseManageScreenState extends State<TutorCourseManageScreen> {
                 style: TextStyle(fontWeight: FontWeight.w700)),
           ),
       ],
+    );
+  }
+
+  /// The cohort's private chat. Same channel the students see — the course's
+  /// tutors are members of it by virtue of teaching, not of paying.
+  void _openChat(Course course) {
+    final slug = course.chatChannelSlug;
+    if (slug == null || slug.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChannelChatScreen(
+          channel: ChatChannel(
+            id: slug,
+            name: course.title,
+            emoji: '🎓',
+            tileColor: context.colors.accentBlue,
+            type: ChannelType.text,
+          ),
+        ),
+      ),
     );
   }
 

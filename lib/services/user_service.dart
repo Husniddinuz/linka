@@ -79,6 +79,14 @@ class UserService {
 class UserMe {
   final int id;
   final String phone;
+
+  /// The address this account can also sign in with, or null.
+  ///
+  /// Accounts are always created by phone; an email is attached afterwards
+  /// from My Profile and only counts once its code has been redeemed. So null
+  /// means "never linked", not "not loaded yet".
+  final String? email;
+
   final String role;
   final bool isTeacher;
   final bool isStudent;
@@ -90,6 +98,7 @@ class UserMe {
   const UserMe({
     required this.id,
     required this.phone,
+    this.email,
     required this.role,
     required this.isTeacher,
     required this.isStudent,
@@ -103,6 +112,7 @@ class UserMe {
     return UserMe(
       id: (json['id'] as num?)?.toInt() ?? 0,
       phone: json['phone']?.toString() ?? '',
+      email: json['email']?.toString(),
       role: json['role']?.toString() ?? 'student',
       isTeacher: json['is_teacher'] as bool? ?? false,
       isStudent: json['is_student'] as bool? ?? false,

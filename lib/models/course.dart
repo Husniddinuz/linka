@@ -63,6 +63,7 @@ class Course {
     required this.isOwner,
     required this.isPrimaryTutor,
     required this.isCancelled,
+    required this.chatChannelSlug,
     required this.sharedLink,
     required this.announcements,
   });
@@ -97,6 +98,13 @@ class Course {
   final bool isCancelled;
 
   bool get hasCoTutor => coTutorId != null;
+
+  /// Slug of the cohort's private chat channel, or null when the caller may
+  /// not open it — the backend only fills it in for paid students and the
+  /// course's tutors, so this doubles as the "may I chat?" flag.
+  final String? chatChannelSlug;
+
+  bool get hasChat => (chatChannelSlug ?? '').isNotEmpty;
 
   /// Detail-only: the meeting/group link, empty unless enrolled or owner.
   final String sharedLink;
@@ -135,6 +143,25 @@ class Course {
       return '${s.day}–${e.day} ${_monthAbbr[s.month]}';
     }
     return '${_fmtDay(s)} – ${_fmtDay(e)}';
+  }
+
+  /// How long the course runs, in the coarsest honest unit: "1 month",
+  /// "2 months", "3 weeks", "5 days". Courses are one month by default, so
+  /// this is usually the single word a student is scanning for.
+  String get durationLabel {
+    final s = startDate, e = endDate;
+    if (s == null || e == null) return '';
+    final days = e.difference(s).inDays + 1; // inclusive of both end days
+    if (days < 1) return '';
+    if (days >= 28) {
+      final months = (days / 30.44).round().clamp(1, 120);
+      return months == 1 ? '1 month' : '$months months';
+    }
+    if (days >= 7) {
+      final weeks = (days / 7).round();
+      return weeks == 1 ? '1 week' : '$weeks weeks';
+    }
+    return days == 1 ? '1 day' : '$days days';
   }
 
   static String _fmtDay(DateTime d) => '${d.day} ${_monthAbbr[d.month]}';
@@ -184,6 +211,10 @@ class Course {
         isOwner: json['is_owner'] as bool? ?? false,
         isPrimaryTutor: json['is_primary_tutor'] as bool? ?? false,
         isCancelled: json['is_cancelled'] as bool? ?? false,
+        chatChannelSlug:
+            (json['chat_channel_slug']?.toString().isEmpty ?? true)
+                ? null
+                : json['chat_channel_slug'].toString(),
         sharedLink: json['shared_link']?.toString() ?? '',
         announcements:
             CourseAnnouncement.listFromJson(json['announcements'] as List?),
