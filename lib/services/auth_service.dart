@@ -78,7 +78,7 @@ class AuthService {
     }
 
     throw AuthException(
-      data['message']?.toString() ?? 'Failed to send the email',
+      authErrorMessage(data) ?? 'Failed to send the email',
     );
   }
 
@@ -101,7 +101,7 @@ class AuthService {
       return data;
     }
 
-    throw AuthException(data['message']?.toString() ?? 'Invalid code');
+    throw AuthException(authErrorMessage(data) ?? 'Invalid code');
   }
 
   /// Starts attaching [email] to the signed-in account: mails a code and
@@ -129,7 +129,7 @@ class AuthService {
     }
 
     throw AuthException(
-      data['message']?.toString() ?? 'Could not send the confirmation email',
+      authErrorMessage(data) ?? 'Could not send the confirmation email',
     );
   }
 
@@ -156,7 +156,7 @@ class AuthService {
       return data['email']?.toString() ?? '';
     }
 
-    throw AuthException(data['message']?.toString() ?? 'Invalid code');
+    throw AuthException(authErrorMessage(data) ?? 'Invalid code');
   }
 
   /// Unlinks the account's email. The phone number is untouched, so this only
@@ -239,4 +239,19 @@ class AuthException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// The best user-facing message a failed auth response carries.
+///
+/// Most of this API answers with `{"message": ...}`, but DRF's own throttling
+/// short-circuits before the view runs and answers `{"detail": ...}` instead.
+/// Without this, every rate-limited request fell through to the generic
+/// "failed to send" fallback — which tells the user to check an address that
+/// was never the problem.
+String? authErrorMessage(Map<String, dynamic> data) {
+  final message = data['message']?.toString();
+  if (message != null && message.isNotEmpty) return message;
+  final detail = data['detail']?.toString();
+  if (detail != null && detail.isNotEmpty) return detail;
+  return null;
 }
