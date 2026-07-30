@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
+import 'article_pdf_screen.dart';
 
 class ArticleDetailScreen extends StatefulWidget {
   final int articleId;
@@ -14,6 +15,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   bool _loading = true;
   String _title = '';
   String _body = '';
+  String? _pdfUrl;
 
   @override
   void initState() {
@@ -26,9 +28,13 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
       final data = await ApiService.get('/content/articles/${widget.articleId}/');
       if (!mounted) return;
       final article = data['data'] as Map<String, dynamic>? ?? data;
+      // Null on the articles that are body-only, which is most of them — the
+      // attachment card only appears for the ones that carry a handout.
+      final pdf = article['pdf_url'] as String?;
       setState(() {
         _title = article['title'] as String? ?? '';
         _body = _stripHtml(article['body'] as String? ?? '');
+        _pdfUrl = (pdf != null && pdf.isNotEmpty) ? pdf : null;
         _loading = false;
       });
     } catch (_) {
@@ -97,10 +103,97 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                       height: 1.6,
                     ),
                   ),
+                  // Below the body, not above it: the PDF supplements the
+                  // article rather than replacing it, and a card offered
+                  // first is a card taken instead of reading the page.
+                  if (_pdfUrl != null) ...[
+                    const SizedBox(height: 28),
+                    _PdfCard(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ArticlePdfScreen(
+                            url: _pdfUrl!,
+                            title: _title,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 32),
                 ],
               ),
             ),
+    );
+  }
+}
+
+/// The tap target that opens the attachment. A row rather than a bare link so
+/// that it reads as a second thing to do with the article, and so the icon
+/// says "PDF" before the label is read.
+class _PdfCard extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _PdfCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: colors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: colors.accentBlue.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.picture_as_pdf_outlined,
+                color: colors.accentBlue,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Attached PDF',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'The full handout, exactly as it is printed.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colors.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: colors.textTertiary, size: 22),
+          ],
+        ),
+      ),
     );
   }
 }

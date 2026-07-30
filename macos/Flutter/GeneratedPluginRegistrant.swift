@@ -20,6 +20,7 @@ import just_audio
 import livekit_client
 import package_info_plus
 import path_provider_foundation
+import pdfium_flutter
 import record_darwin
 import share_plus
 import shared_preferences_foundation
@@ -44,6 +45,7 @@ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   LiveKitPlugin.register(with: registry.registrar(forPlugin: "LiveKitPlugin"))
   FPPPackageInfoPlusPlugin.register(with: registry.registrar(forPlugin: "FPPPackageInfoPlusPlugin"))
   PathProviderPlugin.register(with: registry.registrar(forPlugin: "PathProviderPlugin"))
+  PDFiumFlutterPlugin.register(with: registry.registrar(forPlugin: "PDFiumFlutterPlugin"))
   RecordPlugin.register(with: registry.registrar(forPlugin: "RecordPlugin"))
   SharePlusMacosPlugin.register(with: registry.registrar(forPlugin: "SharePlusMacosPlugin"))
   SharedPreferencesPlugin.register(with: registry.registrar(forPlugin: "SharedPreferencesPlugin"))

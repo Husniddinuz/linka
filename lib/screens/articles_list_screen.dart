@@ -190,6 +190,11 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
                                 final id = article['id'] as int;
                                 final isNew = article['is_new'] as bool? ?? false;
                                 final isSaved = _savedArticleIds.contains(id);
+                                // A handout is worth flagging on the card: it
+                                // is a reason to open this one over the next,
+                                // and a reason to open it somewhere printable.
+                                final hasPdf =
+                                    (article['pdf_url'] as String?)?.isNotEmpty ?? false;
                                 final accent = _accents[i % _accents.length];
 
                                 return GestureDetector(
@@ -301,14 +306,27 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
                                                     color: Colors.white.withValues(alpha: 0.20),
                                                     borderRadius: BorderRadius.circular(20),
                                                   ),
-                                                  child: const Text(
-                                                    'ARTICLE',
-                                                    style: TextStyle(
-                                                      fontSize: 9,
-                                                      fontWeight: FontWeight.w700,
-                                                      color: Colors.white,
-                                                      letterSpacing: 0.8,
-                                                    ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      if (hasPdf) ...[
+                                                        const Icon(
+                                                          Icons.picture_as_pdf_outlined,
+                                                          size: 10,
+                                                          color: Colors.white,
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                      ],
+                                                      Text(
+                                                        hasPdf ? 'PDF' : 'ARTICLE',
+                                                        style: const TextStyle(
+                                                          fontSize: 9,
+                                                          fontWeight: FontWeight.w700,
+                                                          color: Colors.white,
+                                                          letterSpacing: 0.8,
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ),
                                               ),
