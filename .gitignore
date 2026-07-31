@@ -46,3 +46,17 @@ app.*.map.json
 
 # APNs / signing keys — never commit private keys
 *.p8
+
+# Store listing artwork and device screenshots (kept locally, not in the repo)
+/AppIcons/
+/previews/
+/screenshots/
+/iPhones */
+/screenshots */
+
+# Local sample media used for manual testing
+/speaking_sample.mp3
+/speaking_sample.srt
+/audio_*.srt
+/tutor_sample.png
+/new-logo.jpg
