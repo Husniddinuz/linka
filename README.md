@@ -56,12 +56,5 @@ lib/
   theme/      colours, typography, theming
   widgets/    shared UI components
 landing/      marketing landing page
-docs/         backend integration notes
 test/         widget and unit tests
 ```
-
-## Documentation
-
-- [`API.md`](API.md) — REST API reference
-- [`FLUTTER_SPEAKING_AND_DAILY.md`](FLUTTER_SPEAKING_AND_DAILY.md) — speaking matchmaking and Daily.co video flows
-- [`docs/backend/media-upload-streaming.md`](docs/backend/media-upload-streaming.md) — media upload and streaming
