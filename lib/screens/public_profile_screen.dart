@@ -7,6 +7,7 @@ import '../services/user_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/cached_avatar.dart';
+import 'chats_screen.dart' show openDirectConversation;
 import 'home_screen.dart' show StoryData;
 import 'story_viewer_screen.dart';
 import 'tutor_profile_screen.dart';
@@ -14,9 +15,10 @@ import 'tutor_profile_screen.dart';
 /// Anyone's public account: their bio, their counts, and the follow button that
 /// decides whether their stories are readable.
 ///
-/// Reached by tapping a sender in a channel or a ring in the stories row — there
-/// is no people search, because finding each other through chat is how the
-/// product is meant to work.
+/// Reached by tapping a sender in a channel, a ring in the stories row, or a
+/// hit in the "new message" search on the chats screen — which is the only
+/// people search in the app, and exists to start a private thread rather than
+/// to browse.
 ///
 /// [userId] is a **user** id (`UserMe.id`), not a student or tutor profile id.
 class PublicProfileScreen extends StatefulWidget {
@@ -320,6 +322,30 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
               onTap: _toggleFollow,
             ),
           ),
+          // Private threads are student-to-student: a tutor's profile keeps
+          // its booking path and does not offer one.
+          if (!profile.isTutor) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => openDirectConversation(
+                  context,
+                  userId: profile.userId,
+                ),
+                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                label: const Text('Message'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colors.textPrimary,
+                  side: BorderSide(color: colors.border),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
 
         // A tutor's public account is also a shopfront; this page should not be
@@ -468,6 +494,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                       .then((_) {
                         if (mounted) _load();
                       }),
+              onMessage: person.isTutor ||
+                      person.userId == UserService.current?.id ||
+                      (UserService.current?.isTeacher ?? false)
+                  ? null
+                  : () => openDirectConversation(
+                        context,
+                        userId: person.userId,
+                      ),
             ),
           ),
       ],
@@ -514,7 +548,11 @@ class _PersonRow extends StatelessWidget {
   final SocialUserCard person;
   final VoidCallback? onTap;
 
-  const _PersonRow({required this.person, this.onTap});
+  /// Opens a private thread with this person, when one is on offer. Null on
+  /// your own row and on a tutor's — private threads are student-to-student.
+  final VoidCallback? onMessage;
+
+  const _PersonRow({required this.person, this.onTap, this.onMessage});
 
   @override
   Widget build(BuildContext context) {
@@ -552,6 +590,17 @@ class _PersonRow extends StatelessWidget {
             ),
             if (person.isFollowing)
               Icon(Symbols.check_rounded, size: 18, color: colors.textTertiary),
+            if (onMessage != null)
+              IconButton(
+                onPressed: onMessage,
+                tooltip: 'Message',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  size: 18,
+                  color: colors.accentBlue,
+                ),
+              ),
           ],
         ),
       ),

@@ -2,10 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import '../models/social.dart';
 import '../services/chat_service.dart';
+import '../services/social_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/skeleton.dart';
 import 'channel_chat_screen.dart';
+import 'plus_subscription_screen.dart';
 
 // ─── Models ────────────────────────────────────────────────────────────────────
 
@@ -95,6 +98,149 @@ class ChatChannel {
   }
 }
 
+/// A private one-to-one thread.
+///
+/// Deliberately not a [ChatChannel]: a channel is a room with a name everyone
+/// shares, and this is a person whose name depends on who is looking. What the
+/// two do share is the channel slug in [channelId] — every message endpoint and
+/// the WebSocket take it, so the thread opens in the same screen as `#general`.
+class DirectConversation {
+  final int id;
+  final String channelId;
+  final int otherUserId;
+  final String displayName;
+  final String? avatarUrl;
+
+  /// True when *either* side has blocked the other. The server does not say
+  /// which, and the effect here is the same either way: the composer closes.
+  final bool isBlocked;
+
+  final int unreadCount;
+  final String? lastMessage;
+  final DateTime? lastMessageAt;
+  final bool lastMessageIsVoice;
+  final bool lastMessageIsImage;
+  final bool lastMessageIsDeleted;
+  final DateTime? createdAt;
+
+  const DirectConversation({
+    required this.id,
+    required this.channelId,
+    required this.otherUserId,
+    required this.displayName,
+    this.avatarUrl,
+    this.isBlocked = false,
+    this.unreadCount = 0,
+    this.lastMessage,
+    this.lastMessageAt,
+    this.lastMessageIsVoice = false,
+    this.lastMessageIsImage = false,
+    this.lastMessageIsDeleted = false,
+    this.createdAt,
+  });
+
+  factory DirectConversation.fromJson(Map<String, dynamic> json) {
+    final other = json['other_user'] as Map<String, dynamic>? ?? const {};
+    final lastMsg = json['last_message'] as Map<String, dynamic>?;
+    return DirectConversation(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      channelId: json['channel_id']?.toString() ?? '',
+      otherUserId: (other['user_id'] as num?)?.toInt() ?? 0,
+      displayName: other['display_name']?.toString() ?? 'Linka user',
+      avatarUrl: ChatService.absoluteUrl(other['profile_image'] as String?),
+      isBlocked: json['is_blocked'] as bool? ?? false,
+      unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
+      lastMessage: lastMsg?['text'] as String?,
+      lastMessageAt: ChatChannel._parseDate(lastMsg?['sent_at'] as String?),
+      lastMessageIsVoice: lastMsg?['is_voice'] as bool? ?? false,
+      lastMessageIsImage: lastMsg?['is_image'] as bool? ?? false,
+      lastMessageIsDeleted: lastMsg?['is_deleted'] as bool? ?? false,
+      createdAt: ChatChannel._parseDate(json['created_at'] as String?),
+    );
+  }
+
+  /// The inert channel the thread's messages hang off. A conversation has no
+  /// channel row of its own to show — no emoji, no tile colour, no type — so
+  /// these are placeholders; [DirectThread] is what the screen actually reads.
+  ChatChannel get asChannel => ChatChannel(
+        id: channelId,
+        name: displayName,
+        emoji: '💬',
+        tileColor: const Color(0xFF5B7FD4),
+        type: ChannelType.text,
+        unreadCount: unreadCount,
+      );
+
+  DirectThread get asThread => DirectThread(
+        otherUserId: otherUserId,
+        displayName: displayName,
+        isBlocked: isBlocked,
+      );
+}
+
+/// What the chat screen needs to know to render a thread as a conversation
+/// rather than a channel.
+class DirectThread {
+  final int otherUserId;
+  final String displayName;
+  final bool isBlocked;
+
+  const DirectThread({
+    required this.otherUserId,
+    required this.displayName,
+    required this.isBlocked,
+  });
+}
+
+/// Opens the private thread with [userId], or says why it cannot be opened.
+///
+/// The single entry point for every place a conversation can start — a public
+/// profile, a message author in a channel, a follower row, the compose search —
+/// so the Plus prompt and the refusal read the same wherever the tap came from.
+///
+/// Only *starting* a thread costs Plus. Reopening one already in existence does
+/// not, so this is also the right call for a lapsed subscriber returning to a
+/// conversation they began while subscribed.
+Future<void> openDirectConversation(
+  BuildContext context, {
+  required int userId,
+}) async {
+  try {
+    final raw = await ChatService.startConversation(userId: userId);
+    if (!context.mounted) return;
+    final conversation = DirectConversation.fromJson(raw);
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChannelChatScreen(
+          channel: conversation.asChannel,
+          direct: conversation.asThread,
+        ),
+      ),
+    );
+  } on ConversationRefused catch (e) {
+    if (!context.mounted) return;
+    // The only refusal worth a detour. Every other one — a tutor, a hidden
+    // account, someone who has blocked you — is a dead end the server
+    // deliberately does not distinguish, so it gets a plain message.
+    if (e.needsPlus) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PlusSubscriptionScreen()),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(e.message)),
+    );
+  } catch (e) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(e.toString())),
+    );
+  }
+}
+
 // ─── Screen ────────────────────────────────────────────────────────────────────
 
 class ChatsScreen extends StatefulWidget {
@@ -107,6 +253,7 @@ class ChatsScreen extends StatefulWidget {
 
 class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
   List<ChatChannel> _channels = [];
+  List<DirectConversation> _conversations = [];
   bool _loading = true;
   String? _error;
   bool _disposed = false;
@@ -246,10 +393,21 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
       });
     }
     try {
-      final raw = await ChatService.fetchChannels();
+      // Both lists in one pass so a pull-to-refresh does not settle twice.
+      // The conversation list is allowed to fail on its own — a tutor account
+      // has no private threads and the endpoint refuses it, which must not
+      // take the community channels down with it.
+      final results = await Future.wait([
+        ChatService.fetchChannels(),
+        ChatService.fetchConversations().catchError(
+          (_) => <Map<String, dynamic>>[],
+        ),
+      ]);
       if (mounted) {
         setState(() {
-          _channels = raw.map(ChatChannel.fromJson).toList();
+          _channels = results[0].map(ChatChannel.fromJson).toList();
+          _conversations =
+              results[1].map(DirectConversation.fromJson).toList();
           _loading = false;
         });
       }
@@ -310,14 +468,29 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     return RefreshIndicator(
       onRefresh: _loadChannels,
       color: context.colors.accentBlue,
-      child: ListView.builder(
-        itemCount: _channels.length,
-        itemBuilder: (_, i) => _ChannelTile(
-          channel: _channels[i],
-          showDivider: i < _channels.length - 1,
-          onReturn: _loadChannels,
-          typingText: _channelTyping[_channels[i].id],
-        ),
+      child: ListView(
+        // Always scrollable, or a short list on a tall screen has nothing to
+        // pull against and the refresh gesture is unreachable.
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          for (var i = 0; i < _channels.length; i++)
+            _ChannelTile(
+              channel: _channels[i],
+              showDivider: i < _channels.length - 1,
+              onReturn: _loadChannels,
+              typingText: _channelTyping[_channels[i].id],
+            ),
+          if (_conversations.isNotEmpty) ...[
+            _SectionHeader(title: 'Private messages'),
+            for (var i = 0; i < _conversations.length; i++)
+              _ConversationTile(
+                conversation: _conversations[i],
+                showDivider: i < _conversations.length - 1,
+                onReturn: _loadChannels,
+              ),
+          ],
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
@@ -374,6 +547,203 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
               ),
             ),
           ],
+          const Spacer(),
+          // The one place to start a thread with someone you have not spoken
+          // to — the other entry points all begin from a person already on
+          // screen (a profile, a message author, a follower row).
+          IconButton(
+            onPressed: () async {
+              final userId = await showModalBottomSheet<int>(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: context.colors.surface,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                builder: (_) => const _ComposeSheet(),
+              );
+              if (!mounted) return;
+              if (userId != null) {
+                await openDirectConversation(context, userId: userId);
+              }
+              if (mounted) _loadChannels(silent: true);
+            },
+            tooltip: 'New message',
+            icon: Icon(
+              Icons.edit_square,
+              size: 22,
+              color: context.colors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Compose: find someone to write to ─────────────────────────────────────────
+
+class _ComposeSheet extends StatefulWidget {
+  const _ComposeSheet();
+
+  @override
+  State<_ComposeSheet> createState() => _ComposeSheetState();
+}
+
+class _ComposeSheetState extends State<_ComposeSheet> {
+  final _controller = TextEditingController();
+  List<SocialUserCard> _results = const [];
+  bool _searching = false;
+  bool _searched = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _run() async {
+    final term = _controller.text.trim();
+    if (term.length < 2 || _searching) return;
+    setState(() => _searching = true);
+    try {
+      final found = await SocialService.search(term);
+      if (!mounted) return;
+      setState(() {
+        // Tutors come back from this search because it is shared with the
+        // follow graph, where they belong. Private threads are
+        // student-to-student, so offering one here would only be refused.
+        _results = found.where((person) => !person.isTutor).toList();
+      });
+    } catch (_) {
+      if (mounted) setState(() => _results = const []);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _searching = false;
+          _searched = true;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'New message',
+            style: TextStyle(
+              fontFamily: 'SF Pro',
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: context.colors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Only Linka Plus members can start a new conversation. '
+            'Anyone can reply to one.',
+            style: TextStyle(
+              fontFamily: 'SF Pro',
+              fontSize: 12,
+              color: context.colors.textTertiary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            textInputAction: TextInputAction.search,
+            onSubmitted: (_) => _run(),
+            style: TextStyle(color: context.colors.textPrimary),
+            decoration: InputDecoration(
+              hintText: 'Search by name',
+              hintStyle: TextStyle(color: context.colors.textTertiary),
+              filled: true,
+              fillColor: context.colors.surfaceAlt,
+              suffixIcon: IconButton(
+                icon: _searching
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.search_rounded),
+                color: context.colors.textSecondary,
+                onPressed: _run,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_searched && _results.isEmpty && !_searching)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                'Nobody found by that name.',
+                style: TextStyle(color: context.colors.textSecondary),
+              ),
+            ),
+          if (_results.isNotEmpty)
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.4,
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _results.length,
+                separatorBuilder: (context, index) =>
+                    Divider(height: 1, color: context.colors.border),
+                itemBuilder: (_, i) {
+                  final person = _results[i];
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: _Avatar(
+                      url: ChatService.absoluteUrl(person.profileImage),
+                      name: person.displayName,
+                      size: 40,
+                    ),
+                    title: Text(
+                      person.displayName,
+                      style: TextStyle(
+                        fontFamily: 'SF Pro',
+                        fontWeight: FontWeight.w600,
+                        color: context.colors.textPrimary,
+                      ),
+                    ),
+                    subtitle: person.subtitle == null
+                        ? null
+                        : Text(
+                            person.subtitle!,
+                            style:
+                                TextStyle(color: context.colors.textSecondary),
+                          ),
+                    trailing: Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 20,
+                      color: context.colors.accentBlue,
+                    ),
+                    // Hands the chosen id back rather than opening the thread
+                    // itself: this context dies with the sheet, and the push
+                    // and any error snackbar have to outlive it.
+                    onTap: () => Navigator.pop(context, person.userId),
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );
@@ -714,23 +1084,244 @@ class _ChannelTile extends StatelessWidget {
     );
   }
 
-  String _timeLabel(DateTime dt) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final d = DateTime(dt.year, dt.month, dt.day);
-    final diff = today.difference(d).inDays;
+  String _timeLabel(DateTime dt) => _chatTimeLabel(dt);
+}
 
-    if (diff == 0) {
-      final h = dt.hour.toString().padLeft(2, '0');
-      final m = dt.minute.toString().padLeft(2, '0');
-      return '$h:$m';
+/// Time today, "Yesterday", the weekday within the last week, then a numeric
+/// date. Shared by the channel and conversation rows so the two lists on the
+/// same screen cannot climb different ladders.
+String _chatTimeLabel(DateTime dt) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final d = DateTime(dt.year, dt.month, dt.day);
+  final diff = today.difference(d).inDays;
+
+  if (diff == 0) {
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+  if (diff == 1) return 'Yesterday';
+  if (diff <= 6) {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return days[dt.weekday - 1];
+  }
+  return '${dt.day}/${dt.month}';
+}
+
+// ─── Private conversations ─────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontFamily: 'SF Pro',
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.6,
+          color: context.colors.textSecondary,
+        ),
+      ),
+    );
+  }
+}
+
+class _ConversationTile extends StatelessWidget {
+  final DirectConversation conversation;
+  final bool showDivider;
+  final VoidCallback? onReturn;
+  const _ConversationTile({
+    required this.conversation,
+    this.showDivider = true,
+    this.onReturn,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () async {
+        // Straight to the thread: it already exists, so there is nothing to
+        // ask the server and no Plus check to fail.
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChannelChatScreen(
+              channel: conversation.asChannel,
+              direct: conversation.asThread,
+            ),
+          ),
+        );
+        onReturn?.call();
+      },
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                _Avatar(
+                  url: conversation.avatarUrl,
+                  name: conversation.displayName,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    conversation.displayName,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontFamily: 'SF Pro',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: context.colors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                if (conversation.isBlocked) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.block_rounded,
+                                    size: 14,
+                                    color: context.colors.textTertiary,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (conversation.lastMessageAt != null)
+                            Text(
+                              _chatTimeLabel(conversation.lastMessageAt!),
+                              style: TextStyle(
+                                fontFamily: 'SF Pro',
+                                fontSize: 12,
+                                color: conversation.unreadCount > 0
+                                    ? context.colors.accentBlue
+                                    : context.colors.textTertiary,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _preview(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'SF Pro',
+                                fontSize: 14,
+                                fontStyle: conversation.lastMessageIsDeleted
+                                    ? FontStyle.italic
+                                    : FontStyle.normal,
+                                color: context.colors.textSecondary,
+                              ),
+                            ),
+                          ),
+                          if (conversation.unreadCount > 0) ...[
+                            const SizedBox(width: 8),
+                            _UnreadBadge(count: conversation.unreadCount),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (showDivider)
+            Padding(
+              padding: const EdgeInsets.only(left: 82),
+              child: Divider(height: 1, color: context.colors.border),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _preview() {
+    if (conversation.lastMessageIsDeleted) return 'Message deleted';
+    if (conversation.lastMessageIsVoice) return '🎧 Voice message';
+    if (conversation.lastMessageIsImage) return '🖼 Image';
+    final text = conversation.lastMessage;
+    if (text == null || text.isEmpty) return 'No messages yet';
+    return text;
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  final String? url;
+  final String name;
+  final double size;
+  const _Avatar({required this.url, required this.name, this.size = 54});
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = _initials(name);
+    return Container(
+      width: size,
+      height: size,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: context.colors.surfaceAlt,
+        shape: BoxShape.circle,
+      ),
+      child: url == null
+          ? Center(
+              child: Text(
+                initials,
+                style: TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: size * 0.34,
+                  fontWeight: FontWeight.w700,
+                  color: context.colors.textSecondary,
+                ),
+              ),
+            )
+          : Image.network(
+              url!,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stack) => Center(
+                child: Text(
+                  initials,
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: size * 0.34,
+                    fontWeight: FontWeight.w700,
+                    color: context.colors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+
+  static String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+    if (parts.isEmpty) return 'U';
+    if (parts.length == 1) {
+      final first = parts.first;
+      return (first.length >= 2 ? first.substring(0, 2) : first).toUpperCase();
     }
-    if (diff == 1) return 'Yesterday';
-    if (diff <= 6) {
-      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return days[dt.weekday - 1];
-    }
-    return '${dt.day}/${dt.month}';
+    return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 }
 

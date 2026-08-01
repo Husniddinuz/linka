@@ -63,6 +63,17 @@ class SocialService {
   static Future<List<SocialUserCard>> following(int userId) =>
       _cards('/social/users/$userId/following/');
 
+  /// Accounts matching [query] by name.
+  ///
+  /// Upstream already drops hidden, deleted and pending-tutor accounts and
+  /// excludes the caller's own row. Below two characters it does not search at
+  /// all, so the round trip is skipped rather than sent to be refused.
+  static Future<List<SocialUserCard>> search(String query) async {
+    final term = query.trim();
+    if (term.length < 2) return const [];
+    return _cards('/social/users/search/?q=${Uri.encodeQueryComponent(term)}');
+  }
+
   static Future<List<SocialUserCard>> _cards(String path) async {
     final json = await ApiService.get(path);
     final results = json['results'];

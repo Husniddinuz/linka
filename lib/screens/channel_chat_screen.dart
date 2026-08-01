@@ -270,7 +270,19 @@ class ChannelChatScreen extends StatefulWidget {
   // When the screen is opened from a push notification, pass the message_id
   // to scroll to that message after the initial load.
   final String? initialScrollToId;
-  const ChannelChatScreen({super.key, required this.channel, this.initialScrollToId});
+  // Set when this is a one-to-one thread rather than a community channel.
+  //
+  // The messages are the same in both — same endpoints, same socket — so this
+  // only retitles the bar with the other person's name and closes the composer
+  // when either side has blocked the other. The history stays visible while
+  // blocked, deliberately: it is what a report is made of.
+  final DirectThread? direct;
+  const ChannelChatScreen({
+    super.key,
+    required this.channel,
+    this.initialScrollToId,
+    this.direct,
+  });
 
   @override
   State<ChannelChatScreen> createState() => _ChannelChatScreenState();
@@ -1577,7 +1589,10 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
   Widget build(BuildContext context) {
     final isVoiceOnly = widget.channel.type == ChannelType.voiceOnly;
     final isAnnouncement = widget.channel.type == ChannelType.announcement;
-    final canPost = _currentUserIsTutor || widget.channel.studentCanPost;
+    // A block outranks everything else, which is why it is checked last: in a
+    // direct thread the composer closes for the blocker and the blocked alike.
+    final canPost = (widget.direct?.isBlocked != true) &&
+        (_currentUserIsTutor || widget.channel.studentCanPost);
 
     return Scaffold(
       backgroundColor: context.colors.background,
@@ -1627,7 +1642,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
             if (isAnnouncement)
               _AnnouncementBar()
             else if (!canPost)
-              const _ReadOnlyBanner()
+              _ReadOnlyBanner(blocked: widget.direct?.isBlocked == true)
             else ...[
               if (_replyingTo != null)
                 _ReplyBar(
@@ -1739,6 +1754,19 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
                   onBlock: !msg.isMine && !_isTutorOnlyChannel
                       ? () => _confirmBlock(msg)
                       : null,
+                  // Absent inside a private thread — you are already in the
+                  // one this would open — and absent for tutor senders and
+                  // tutor viewers, who are out of scope for the feature.
+                  onMessagePrivately: widget.direct == null &&
+                          !msg.isMine &&
+                          !msg.isTutor &&
+                          !_currentUserIsTutor &&
+                          !_isTutorOnlyChannel
+                      ? () => openDirectConversation(
+                            context,
+                            userId: msg.senderId,
+                          )
+                      : null,
                   hideTutorIdentity: _isTutorOnlyChannel,
                   isPinned: _pinnedMessage?.id == msg.id,
                   onPin: _currentUserIsTutor ? () => _pinMessage(msg) : null,
@@ -1777,7 +1805,10 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${widget.channel.emoji}  ${widget.channel.name}',
+            // A person, not a room: no emoji tile and no leading hash.
+            widget.direct != null
+                ? widget.direct!.displayName
+                : '${widget.channel.emoji}  ${widget.channel.name}',
             style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 16,
@@ -1786,11 +1817,15 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
             ),
           ),
           Text(
-            widget.channel.type == ChannelType.voiceOnly
-                ? 'Voice only'
-                : widget.channel.type == ChannelType.announcement
-                    ? 'Announcements'
-                    : 'Community channel',
+            widget.direct != null
+                ? (widget.direct!.isBlocked
+                    ? 'Blocked'
+                    : 'Private conversation')
+                : widget.channel.type == ChannelType.voiceOnly
+                    ? 'Voice only'
+                    : widget.channel.type == ChannelType.announcement
+                        ? 'Announcements'
+                        : 'Community channel',
             style: TextStyle(
               fontFamily: 'SF Pro',
               fontSize: 12,
@@ -1949,6 +1984,11 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback? onDelete;
   final VoidCallback? onReport;
   final VoidCallback? onBlock;
+
+  /// Opens a private thread with this message's author. Null inside a thread
+  /// that already is one, on your own messages, and on a tutor's — private
+  /// threads are student-to-student.
+  final VoidCallback? onMessagePrivately;
   final bool quizSubmitting;
   final int? quizPendingOptionId;
   final void Function(int)? onQuizOptionTap;
@@ -1967,6 +2007,7 @@ class _MessageBubble extends StatelessWidget {
     this.onDelete,
     this.onReport,
     this.onBlock,
+    this.onMessagePrivately,
     this.playerTotalSeconds,
     this.downloadProgress,
     this.voicePlayer,
@@ -1994,7 +2035,16 @@ class _MessageBubble extends StatelessWidget {
     final canBlock = onBlock != null;
     final canPin = !message.isDeleted && !isPinned && onPin != null;
     final canUnpin = isPinned && onUnpin != null;
-    if (!canReply && !canDelete && !canReport && !canBlock && !canPin && !canUnpin) return;
+    final canMessage = onMessagePrivately != null && !message.isDeleted;
+    if (!canReply &&
+        !canDelete &&
+        !canReport &&
+        !canBlock &&
+        !canPin &&
+        !canUnpin &&
+        !canMessage) {
+      return;
+    }
 
     showModalBottomSheet<void>(
       context: context,
@@ -2028,6 +2078,26 @@ class _MessageBubble extends StatelessWidget {
                 onTap: () {
                   Navigator.pop(context);
                   onUnpin!();
+                },
+              ),
+            // Above Reply: deciding to take a conversation private happens
+            // while reading the message, which is where the tap came from.
+            if (canMessage)
+              ListTile(
+                leading: Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  color: context.colors.textPrimary,
+                ),
+                title: Text(
+                  'Message privately',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    color: context.colors.textPrimary,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  onMessagePrivately!();
                 },
               ),
             if (canReply)
@@ -3493,7 +3563,11 @@ class _AnnouncementBar extends StatelessWidget {
 // ─── Read-only banner (student in restricted channel) ─────────────────────────
 
 class _ReadOnlyBanner extends StatelessWidget {
-  const _ReadOnlyBanner();
+  /// Shown instead of the composer when a direct thread is closed by a block.
+  /// Says the thread is shut, never which side shut it — naming the blocker
+  /// would hand a harasser a delivery receipt.
+  final bool blocked;
+  const _ReadOnlyBanner({this.blocked = false});
 
   @override
   Widget build(BuildContext context) {
@@ -3511,14 +3585,23 @@ class _ReadOnlyBanner extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.lock_outline_rounded, size: 14, color: context.colors.textTertiary),
+          Icon(
+            blocked ? Icons.block_rounded : Icons.lock_outline_rounded,
+            size: 14,
+            color: context.colors.textTertiary,
+          ),
           const SizedBox(width: 6),
-          Text(
-            'Only tutors can post in this channel',
-            style: TextStyle(
-              fontFamily: 'SF Pro',
-              fontSize: 12,
-              color: context.colors.textTertiary,
+          Flexible(
+            child: Text(
+              blocked
+                  ? 'This conversation is closed. Neither of you can send messages here.'
+                  : 'Only tutors can post in this channel',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 12,
+                color: context.colors.textTertiary,
+              ),
             ),
           ),
         ],

@@ -7,6 +7,25 @@ import 'api_constants.dart';
 import 'api_service.dart';
 import 'token_service.dart';
 
+/// A refusal to open a private conversation.
+///
+/// [code] is what the UI branches on: `plus_required` is the only value that
+/// should lead to the subscription screen. Every other refusal arrives as
+/// `unavailable` — the server deliberately collapses "they are a tutor", "their
+/// account is hidden" and "they have blocked you" into one answer, so that this
+/// call cannot be used to detect a block or enumerate accounts.
+class ConversationRefused extends ApiException {
+  final String code;
+
+  const ConversationRefused(
+    super.message, {
+    required this.code,
+    required super.statusCode,
+  });
+
+  bool get needsPlus => code == 'plus_required';
+}
+
 class ChatService {
   static Map<String, String> _headers(String? token) => {
         'Content-Type': 'application/json',
@@ -300,6 +319,63 @@ class ChatService {
     final results = data['results'];
     if (results is! List) return [];
     return results.cast<Map<String, dynamic>>();
+  }
+
+  // ─── Direct conversations ──────────────────────────────────────────────────
+  //
+  // A private one-to-one thread. Only the *list* is new: each row carries a
+  // `channel_id` slug, and from there the thread uses the same message
+  // endpoints, the same WebSocket and the same screen as a community channel.
+
+  static Future<List<Map<String, dynamic>>> fetchConversations() async {
+    final data = await _get('/chats/conversations/');
+    final results = data['results'];
+    if (results is! List) return [];
+    return results.cast<Map<String, dynamic>>();
+  }
+
+  /// Opens (or reopens) the thread with [userId] and returns its row.
+  ///
+  /// Throws [ConversationRefused] rather than a bare [ApiException] so the
+  /// caller can tell the one refusal worth an upgrade prompt — no Linka Plus —
+  /// from the ones that are dead ends. Reopening a thread that already exists
+  /// never needs Plus, so a lapsed subscriber keeps what they started.
+  static Future<Map<String, dynamic>> startConversation({
+    required int userId,
+  }) async {
+    final token = await TokenService.getAccessToken();
+    final http.Response response;
+    try {
+      response = await http.post(
+        Uri.parse('$chatApiBaseUrl/chats/conversations/'),
+        headers: _headers(token),
+        body: jsonEncode({'user_id': userId}),
+      );
+    } on SocketException {
+      throw const ApiException('No internet connection', statusCode: 0);
+    }
+
+    Map<String, dynamic> body;
+    try {
+      body = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      body = <String, dynamic>{};
+    }
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final conversation = body['conversation'];
+      if (conversation is Map<String, dynamic>) return conversation;
+      throw ApiException(
+        'Unexpected response format (${response.statusCode})',
+        statusCode: response.statusCode,
+      );
+    }
+
+    throw ConversationRefused(
+      body['detail']?.toString() ?? 'Could not open the conversation',
+      code: body['code']?.toString() ?? 'unavailable',
+      statusCode: response.statusCode,
+    );
   }
 
   /// Converts a relative server path (e.g. /media/photo.jpg) to an absolute
