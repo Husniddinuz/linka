@@ -334,6 +334,35 @@ class ChatService {
     return results.cast<Map<String, dynamic>>();
   }
 
+  /// Removes the thread [conversationId] from *this* user's chat list.
+  ///
+  /// One-sided and non-destructive: the other participant keeps their copy and
+  /// nothing leaves the database, so deleting a thread cannot be used to erase
+  /// the messages a report was filed against. The caller loses everything sent
+  /// before the call, and the thread stays gone until the other side writes
+  /// again — at which point it comes back holding only what is new.
+  ///
+  /// Takes the conversation id, not the channel slug: the slug is the shared
+  /// thing, and this only ever touches one side of it.
+  static Future<void> deleteConversation(int conversationId) async {
+    final token = await TokenService.getAccessToken();
+    final http.Response response;
+    try {
+      response = await http.delete(
+        Uri.parse('$chatApiBaseUrl/chats/conversations/$conversationId/'),
+        headers: _headers(token),
+      );
+    } on SocketException {
+      throw const ApiException('No internet connection', statusCode: 0);
+    }
+    if (response.statusCode != 204 && response.statusCode != 200) {
+      throw ApiException(
+        'Could not delete the chat (${response.statusCode})',
+        statusCode: response.statusCode,
+      );
+    }
+  }
+
   /// Opens (or reopens) the thread with [userId] and returns its row.
   ///
   /// Throws [ConversationRefused] rather than a bare [ApiException] so the

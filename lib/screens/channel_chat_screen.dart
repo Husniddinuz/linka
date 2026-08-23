@@ -1835,11 +1835,114 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
           ),
         ],
       ),
+      actions: [
+        // Only a private thread is yours to delete. A community channel is a
+        // shared room — there is nothing personal in it to remove.
+        if (widget.direct != null)
+          PopupMenuButton<String>(
+            icon: Icon(
+              Icons.more_vert_rounded,
+              size: 20,
+              color: context.colors.textSecondary,
+            ),
+            color: context.colors.surface,
+            onSelected: (value) {
+              if (value == 'delete') _confirmDeleteConversation();
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.delete_outline_rounded,
+                      size: 20,
+                      color: context.colors.error,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Delete chat',
+                      style: TextStyle(
+                        fontFamily: 'SF Pro',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: context.colors.error,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+      ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
         child: Divider(height: 1, color: context.colors.border),
       ),
     );
+  }
+
+  /// Deletes this thread for the reader alone, then leaves the screen — there
+  /// is nothing left here to look at, and the list behind is about to reload.
+  Future<void> _confirmDeleteConversation() async {
+    final direct = widget.direct;
+    if (direct == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: context.colors.surface,
+        title: Text(
+          'Delete this chat?',
+          style: TextStyle(
+            fontFamily: 'SF Pro',
+            fontWeight: FontWeight.w700,
+            color: context.colors.textPrimary,
+          ),
+        ),
+        content: Text(
+          'It will be removed from your chats along with its history. '
+          '${direct.displayName} keeps their copy of the conversation.',
+          style: TextStyle(
+            fontFamily: 'SF Pro',
+            fontSize: 14,
+            height: 1.4,
+            color: context.colors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: context.colors.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              'Delete',
+              style: TextStyle(
+                color: context.colors.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ChatService.deleteConversation(direct.conversationId);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    }
   }
 }
 

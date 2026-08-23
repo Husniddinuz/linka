@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/social.dart';
+import '../services/api_service.dart';
 import '../services/chat_service.dart';
 import '../services/social_service.dart';
+import '../services/user_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/skeleton.dart';
 import 'channel_chat_screen.dart';
@@ -172,6 +174,7 @@ class DirectConversation {
       );
 
   DirectThread get asThread => DirectThread(
+        conversationId: id,
         otherUserId: otherUserId,
         displayName: displayName,
         isBlocked: isBlocked,
@@ -181,11 +184,15 @@ class DirectConversation {
 /// What the chat screen needs to know to render a thread as a conversation
 /// rather than a channel.
 class DirectThread {
+  /// The conversation row's id — not the channel slug. Carried so the thread
+  /// screen can offer the same delete as the list does.
+  final int conversationId;
   final int otherUserId;
   final String displayName;
   final bool isBlocked;
 
   const DirectThread({
+    required this.conversationId,
     required this.otherUserId,
     required this.displayName,
     required this.isBlocked,
@@ -251,12 +258,21 @@ class ChatsScreen extends StatefulWidget {
   State<ChatsScreen> createState() => _ChatsScreenState();
 }
 
-class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
+class _ChatsScreenState extends State<ChatsScreen>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   List<ChatChannel> _channels = [];
   List<DirectConversation> _conversations = [];
   bool _loading = true;
   String? _error;
   bool _disposed = false;
+
+  late final TabController _tabController;
+  int _tabIndex = 0;
+
+  /// False for accounts with no private inbox at all — tutors, whose threads
+  /// endpoint refuses them outright. They get the channel list on its own,
+  /// with no switcher and no permanently empty Direct tab.
+  bool _directAvailable = true;
 
   int _onlineCount = 0;
   WebSocketChannel? _presenceWs;
@@ -271,8 +287,18 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _tabController = TabController(length: 2, vsync: this)
+      ..addListener(_onTabChanged);
     _loadChannels();
     if (widget.isActive) _connectPresence();
+  }
+
+  /// The segmented control paints its own selection and the header shows the
+  /// compose button on one tab only, so both have to follow a swipe as well as
+  /// a tap.
+  void _onTabChanged() {
+    if (!mounted || _tabController.index == _tabIndex) return;
+    setState(() => _tabIndex = _tabController.index);
   }
 
   @override
@@ -300,6 +326,8 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
   void dispose() {
     _disposed = true;
     WidgetsBinding.instance.removeObserver(this);
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
     _disconnectPresence();
     super.dispose();
   }
@@ -393,23 +421,44 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
       });
     }
     try {
+      // Tutors have no private inbox, and asking for one only earns a 403.
+      // The cached flag answers before the network does, so the switcher does
+      // not appear for a frame and then vanish.
+      final isTeacher = UserService.current?.isTeacher ??
+          await UserService.getCachedIsTeacher() ??
+          false;
+      var directAvailable = !isTeacher;
+
       // Both lists in one pass so a pull-to-refresh does not settle twice.
-      // The conversation list is allowed to fail on its own — a tutor account
-      // has no private threads and the endpoint refuses it, which must not
-      // take the community channels down with it.
-      final results = await Future.wait([
-        ChatService.fetchChannels(),
-        ChatService.fetchConversations().catchError(
-          (_) => <Map<String, dynamic>>[],
-        ),
-      ]);
+      // The conversation list is allowed to fail on its own — it must not take
+      // the community channels down with it. Only a 403 means "this account
+      // has no private inbox"; every other failure is transient and leaves the
+      // tab in place rather than silently removing it.
+      final channelsFuture = ChatService.fetchChannels();
+      final conversationsFuture = directAvailable
+          ? ChatService.fetchConversations().catchError((Object e) {
+              if (e is ApiException && e.statusCode == 403) {
+                directAvailable = false;
+              }
+              return <Map<String, dynamic>>[];
+            })
+          : Future.value(<Map<String, dynamic>>[]);
+      final channels = await channelsFuture;
+      final conversations = await conversationsFuture;
+
       if (mounted) {
         setState(() {
-          _channels = results[0].map(ChatChannel.fromJson).toList();
+          _channels = channels.map(ChatChannel.fromJson).toList();
           _conversations =
-              results[1].map(DirectConversation.fromJson).toList();
+              conversations.map(DirectConversation.fromJson).toList();
+          _directAvailable = directAvailable;
           _loading = false;
         });
+        // Nothing to switch to any more — do not strand the user on a tab
+        // that is no longer rendered.
+        if (!directAvailable && _tabController.index != 0) {
+          _tabController.index = 0;
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -465,13 +514,52 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
         ),
       );
     }
-    return RefreshIndicator(
-      onRefresh: _loadChannels,
-      color: context.colors.accentBlue,
-      child: ListView(
-        // Always scrollable, or a short list on a tall screen has nothing to
-        // pull against and the refresh gesture is unreachable.
-        physics: const AlwaysScrollableScrollPhysics(),
+    // Nothing to switch between: the channel list gets the whole screen.
+    if (!_directAvailable) return _buildChannelList();
+
+    return Column(
+      children: [
+        _ChatSegments(
+          selected: _tabIndex,
+          onSelect: _tabController.animateTo,
+          labels: [
+            _ChatSegmentLabel(
+              'Channels',
+              Icons.forum_rounded,
+              'Community',
+              _channels.fold(0, (sum, c) => sum + c.unreadCount),
+            ),
+            _ChatSegmentLabel(
+              'Direct',
+              Icons.person_rounded,
+              'Private',
+              _conversations.fold(0, (sum, c) => sum + c.unreadCount),
+            ),
+          ],
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [_buildChannelList(), _buildDirectList()],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The community rooms — the same list for everyone, joined by default.
+  Widget _buildChannelList() {
+    if (_channels.isEmpty) {
+      return _refreshable(
+        const _EmptyState(
+          icon: Icons.forum_outlined,
+          title: 'No channels yet',
+          message: 'Community channels will appear here once they open.',
+        ),
+      );
+    }
+    return _refreshable(
+      Column(
         children: [
           for (var i = 0; i < _channels.length; i++)
             _ChannelTile(
@@ -480,19 +568,157 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
               onReturn: _loadChannels,
               typingText: _channelTyping[_channels[i].id],
             ),
-          if (_conversations.isNotEmpty) ...[
-            _SectionHeader(title: 'Private messages'),
-            for (var i = 0; i < _conversations.length; i++)
-              _ConversationTile(
-                conversation: _conversations[i],
-                showDivider: i < _conversations.length - 1,
-                onReturn: _loadChannels,
-              ),
-          ],
-          const SizedBox(height: 24),
         ],
       ),
     );
+  }
+
+  /// One-to-one threads. Kept apart from the channels because they are a
+  /// different kind of thing to read: a room you drop into versus a person
+  /// waiting on a reply, which a single scroll kept burying.
+  Widget _buildDirectList() {
+    if (_conversations.isEmpty) {
+      return _refreshable(
+        _EmptyState(
+          icon: Icons.chat_bubble_outline_rounded,
+          title: 'No private messages',
+          message: 'Write to someone and the thread will live here.',
+          actionLabel: 'New message',
+          onAction: _startNewConversation,
+        ),
+      );
+    }
+    final tiles = <Widget>[];
+    for (var i = 0; i < _conversations.length; i++) {
+      // Bound to the row, not to its index: the list shrinks under a delete,
+      // and an index captured in a callback would point at the wrong thread.
+      final conversation = _conversations[i];
+      tiles.add(
+        _ConversationTile(
+          conversation: conversation,
+          showDivider: i < _conversations.length - 1,
+          onReturn: _loadChannels,
+          onDelete: () => _confirmAndDeleteConversation(conversation),
+          onDeleted: () => _removeConversation(conversation),
+        ),
+      );
+    }
+    return _refreshable(Column(children: tiles));
+  }
+
+  /// Pull-to-refresh around a list body, empty states included — a student
+  /// whose inbox looks wrong reaches for the same gesture either way.
+  Widget _refreshable(Widget body) {
+    return RefreshIndicator(
+      onRefresh: _loadChannels,
+      color: context.colors.accentBlue,
+      child: ListView(
+        // Always scrollable, or a short list on a tall screen has nothing to
+        // pull against and the refresh gesture is unreachable.
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [body, const SizedBox(height: 24)],
+      ),
+    );
+  }
+
+  /// Asks, then deletes — for this user only.
+  ///
+  /// Returns true when the row should leave the list, which is also what
+  /// `Dismissible.confirmDismiss` wants, so a swipe and a long-press can share
+  /// the whole path. A refusal from the server leaves the row where it was
+  /// rather than hiding a thread that still exists.
+  Future<bool> _confirmAndDeleteConversation(DirectConversation c) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: context.colors.surface,
+        title: Text(
+          'Delete this chat?',
+          style: TextStyle(
+            fontFamily: 'SF Pro',
+            fontWeight: FontWeight.w700,
+            color: context.colors.textPrimary,
+          ),
+        ),
+        // Says plainly what it does *not* do. Deleting here is one-sided, and
+        // a user who thinks it wipes the other person's copy would be making
+        // this decision on a false premise.
+        content: Text(
+          'It will be removed from your chats along with its history. '
+          '${c.displayName} keeps their copy of the conversation.',
+          style: TextStyle(
+            fontFamily: 'SF Pro',
+            fontSize: 14,
+            height: 1.4,
+            color: context.colors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: context.colors.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              'Delete',
+              style: TextStyle(
+                color: context.colors.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return false;
+
+    try {
+      await ChatService.deleteConversation(c.id);
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+      return false;
+    }
+  }
+
+  void _removeConversation(DirectConversation c) {
+    if (!mounted) return;
+    setState(() {
+      _conversations =
+          _conversations.where((other) => other.id != c.id).toList();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Chat deleted')),
+    );
+  }
+
+  /// Opens the person search, then the thread it picks.
+  Future<void> _startNewConversation() async {
+    final userId = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const _ComposeSheet(),
+    );
+    if (!mounted) return;
+    if (userId != null) {
+      await openDirectConversation(context, userId: userId);
+      if (!mounted) return;
+      // The new thread lands in Direct, so land the user there too.
+      _tabController.animateTo(1);
+    }
+    if (mounted) _loadChannels(silent: true);
   }
 
   Widget _buildHeader() {
@@ -550,31 +776,18 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
           const Spacer(),
           // The one place to start a thread with someone you have not spoken
           // to — the other entry points all begin from a person already on
-          // screen (a profile, a message author, a follower row).
-          IconButton(
-            onPressed: () async {
-              final userId = await showModalBottomSheet<int>(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: context.colors.surface,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                builder: (_) => const _ComposeSheet(),
-              );
-              if (!mounted) return;
-              if (userId != null) {
-                await openDirectConversation(context, userId: userId);
-              }
-              if (mounted) _loadChannels(silent: true);
-            },
-            tooltip: 'New message',
-            icon: Icon(
-              Icons.edit_square,
-              size: 22,
-              color: context.colors.textSecondary,
+          // screen (a profile, a message author, a follower row). Shown only
+          // over the Direct tab, where a new thread would land.
+          if (_directAvailable && _tabIndex == 1)
+            IconButton(
+              onPressed: _startNewConversation,
+              tooltip: 'New message',
+              icon: Icon(
+                Icons.edit_square,
+                size: 22,
+                color: context.colors.textSecondary,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -1109,43 +1322,361 @@ String _chatTimeLabel(DateTime dt) {
   return '${dt.day}/${dt.month}';
 }
 
-// ─── Private conversations ─────────────────────────────────────────────────────
+// ─── Channels / Direct switcher ────────────────────────────────────────────────
 
-class _SectionHeader extends StatelessWidget {
+class _ChatSegmentLabel {
+  const _ChatSegmentLabel(this.title, this.icon, this.caption, this.unread);
   final String title;
-  const _SectionHeader({required this.title});
+  final IconData icon;
+  final String caption;
+  final int unread;
+}
+
+/// Community channels on one side, private threads on the other.
+///
+/// A filled pill rather than an underlined TabBar, matching the switcher on the
+/// writing prompt list and built from theme tokens so it survives dark mode.
+/// Each side carries its own unread total, so the list you are *not* looking at
+/// can still say it needs you — which the old single scroll could only do by
+/// making you scroll past every channel to find out.
+class _ChatSegments extends StatelessWidget {
+  const _ChatSegments({
+    required this.selected,
+    required this.onSelect,
+    required this.labels,
+  });
+
+  final int selected;
+  final ValueChanged<int> onSelect;
+  final List<_ChatSegmentLabel> labels;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      child: Text(
-        title.toUpperCase(),
-        style: TextStyle(
-          fontFamily: 'SF Pro',
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.6,
-          color: context.colors.textSecondary,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: colors.surfaceAlt,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            for (var i = 0; i < labels.length; i++)
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => onSelect(i),
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    decoration: BoxDecoration(
+                      color: selected == i ? colors.brand : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              labels[i].icon,
+                              size: 15,
+                              color: selected == i
+                                  ? colors.onBrand
+                                  : colors.textSecondary,
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                labels[i].title,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: selected == i
+                                      ? colors.onBrand
+                                      : colors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            if (labels[i].unread > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                constraints:
+                                    const BoxConstraints(minWidth: 18),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: selected == i
+                                      ? colors.onBrand.withValues(alpha: 0.22)
+                                      : colors.accentBlue,
+                                  borderRadius: BorderRadius.circular(9),
+                                ),
+                                child: Text(
+                                  labels[i].unread > 99
+                                      ? '99+'
+                                      : '${labels[i].unread}',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontFamily: 'SF Pro',
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: selected == i
+                                        ? colors.onBrand
+                                        : Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          labels[i].caption,
+                          style: TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w500,
+                            color: selected == i
+                                ? colors.onBrand.withValues(alpha: 0.75)
+                                : colors.textTertiary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
 }
 
+// ─── Empty tab ─────────────────────────────────────────────────────────────────
+
+/// What a tab shows instead of a list. Splitting the lists made empty states
+/// reachable for the first time: before, an inbox with no private threads just
+/// ended after the channels and said nothing.
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(40, 72, 40, 24),
+      child: Column(
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: colors.surfaceAlt,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 28, color: colors.textTertiary),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'SF Pro',
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: colors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'SF Pro',
+              fontSize: 13,
+              height: 1.4,
+              color: colors.textSecondary,
+            ),
+          ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: onAction,
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.brand,
+                foregroundColor: colors.onBrand,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.edit_square, size: 18),
+              label: Text(
+                actionLabel!,
+                style: const TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Private conversations ─────────────────────────────────────────────────────
+
 class _ConversationTile extends StatelessWidget {
   final DirectConversation conversation;
   final bool showDivider;
   final VoidCallback? onReturn;
+
+  /// Runs the confirm-and-delete, and reports whether the row should go.
+  final Future<bool> Function()? onDelete;
+
+  /// Called once the row is actually gone, to drop it from the list.
+  final VoidCallback? onDeleted;
+
   const _ConversationTile({
     required this.conversation,
     this.showDivider = true,
     this.onReturn,
+    this.onDelete,
+    this.onDeleted,
   });
 
   @override
   Widget build(BuildContext context) {
+    final row = _buildRow(context);
+    if (onDelete == null) return row;
+    // Swipe to reveal Delete, the way every other chat list on the phone
+    // behaves; the long-press menu on the row is the same action for anyone
+    // who does not think to swipe.
+    return Dismissible(
+      key: ValueKey('conversation-${conversation.id}'),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async => await onDelete!.call(),
+      onDismissed: (_) => onDeleted?.call(),
+      background: _deleteBackground(context),
+      child: row,
+    );
+  }
+
+  Widget _deleteBackground(BuildContext context) {
+    return Container(
+      color: context.colors.error,
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: 24),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.delete_outline_rounded, size: 20, color: Colors.white),
+          SizedBox(width: 6),
+          Text(
+            'Delete',
+            style: TextStyle(
+              fontFamily: 'SF Pro',
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The long-press menu. Holds only the one action, but is the discoverable
+  /// half of the pair — a swipe nobody tries is not a feature.
+  Future<void> _showMenu(BuildContext context) async {
+    final chosen = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
+              child: Row(
+                children: [
+                  _Avatar(
+                    url: conversation.avatarUrl,
+                    name: conversation.displayName,
+                    size: 36,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      conversation.displayName,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: 'SF Pro',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: context.colors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.delete_outline_rounded,
+                color: context.colors.error,
+              ),
+              title: Text(
+                'Delete chat',
+                style: TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: context.colors.error,
+                ),
+              ),
+              onTap: () => Navigator.pop(sheetContext, true),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (chosen != true) return;
+    if (await onDelete!.call()) onDeleted?.call();
+  }
+
+  Widget _buildRow(BuildContext context) {
     return InkWell(
+      onLongPress: onDelete == null ? null : () => _showMenu(context),
       onTap: () async {
         // Straight to the thread: it already exists, so there is nothing to
         // ask the server and no Plus check to fail.
