@@ -10,6 +10,18 @@ typedef UploadProgressCallback = void Function(int sent, int total);
 
 class ApiService {
   static const _baseUrl = apiBaseUrl;
+
+  /// Resolves a request target.
+  ///
+  /// Paths are relative to `/api/v1` as they always have been. A caller that
+  /// passes a full URL gets it through untouched, which is how the AI coach
+  /// reaches `/ai/` — it sits beside `/api/v1` on the same host rather than
+  /// under it, and everything else here (the 401 retry, the refresh that
+  /// several callers share, the network-failure hook) is worth more than a
+  /// second HTTP client that would have none of it.
+  static Uri _uri(String path) =>
+      Uri.parse(path.startsWith('http') ? path : '$_baseUrl$path');
+
   static Future<String?>? _refreshFuture;
 
   /// Invoked when an authenticated request returns 401 and token refresh
@@ -88,7 +100,7 @@ class ApiService {
   static Future<Map<String, dynamic>> get(String path) async {
     var token = await TokenService.getAccessToken();
     var response = await _guard(() => http.get(
-      Uri.parse('$_baseUrl$path'),
+      _uri(path),
       headers: _headers(token),
     ));
 
@@ -97,7 +109,7 @@ class ApiService {
       final newToken = await _tryRefreshToken();
       if (newToken != null) {
         response = await http.get(
-          Uri.parse('$_baseUrl$path'),
+          _uri(path),
           headers: _headers(newToken),
         );
       }
@@ -123,7 +135,7 @@ class ApiService {
   static Future<List<dynamic>> getList(String path) async {
     var token = await TokenService.getAccessToken();
     var response = await _guard(() => http.get(
-      Uri.parse('$_baseUrl$path'),
+      _uri(path),
       headers: _headers(token),
     ));
 
@@ -131,7 +143,7 @@ class ApiService {
       final newToken = await _tryRefreshToken();
       if (newToken != null) {
         response = await http.get(
-          Uri.parse('$_baseUrl$path'),
+          _uri(path),
           headers: _headers(newToken),
         );
       }
@@ -161,8 +173,8 @@ class ApiService {
 
     Future<http.StreamedResponse> send(String? t) {
       final request = onProgress != null
-          ? _ProgressRequest('PUT', Uri.parse('$_baseUrl$path'), onProgress)
-          : http.Request('PUT', Uri.parse('$_baseUrl$path'));
+          ? _ProgressRequest('PUT', _uri(path), onProgress)
+          : http.Request('PUT', _uri(path));
       request.headers.addAll(_headers(t));
       request.body = encodedBody;
       return http.Client().send(request);
@@ -219,8 +231,8 @@ class ApiService {
 
     Future<http.StreamedResponse> send(String? t) {
       final request = onProgress != null
-          ? _ProgressRequest('POST', Uri.parse('$_baseUrl$path'), onProgress)
-          : http.Request('POST', Uri.parse('$_baseUrl$path'));
+          ? _ProgressRequest('POST', _uri(path), onProgress)
+          : http.Request('POST', _uri(path));
       request.headers.addAll(_headers(t));
       request.body = encodedBody;
       return http.Client().send(request);
@@ -270,7 +282,7 @@ class ApiService {
     final encodedBody = jsonEncode(body);
     var token = await TokenService.getAccessToken();
     var response = await _guard(() => http.patch(
-      Uri.parse('$_baseUrl$path'),
+      _uri(path),
       headers: _headers(token),
       body: encodedBody,
     ));
@@ -279,7 +291,7 @@ class ApiService {
       final newToken = await _tryRefreshToken();
       if (newToken != null) {
         response = await http.patch(
-          Uri.parse('$_baseUrl$path'),
+          _uri(path),
           headers: _headers(newToken),
           body: encodedBody,
         );
@@ -322,7 +334,7 @@ class ApiService {
   static Future<Map<String, dynamic>> delete(String path) async {
     var token = await TokenService.getAccessToken();
     var response = await _guard(() => http.delete(
-      Uri.parse('$_baseUrl$path'),
+      _uri(path),
       headers: _headers(token),
     ));
 
@@ -330,7 +342,7 @@ class ApiService {
       final newToken = await _tryRefreshToken();
       if (newToken != null) {
         response = await http.delete(
-          Uri.parse('$_baseUrl$path'),
+          _uri(path),
           headers: _headers(newToken),
         );
       }
@@ -400,8 +412,8 @@ class ApiService {
     Future<http.StreamedResponse> send(String? t) async {
       final request = onProgress != null
           ? _ProgressMultipartRequest(
-              method, Uri.parse('$_baseUrl$path'), onProgress)
-          : http.MultipartRequest(method, Uri.parse('$_baseUrl$path'));
+              method, _uri(path), onProgress)
+          : http.MultipartRequest(method, _uri(path));
       if (t != null) request.headers['Authorization'] = 'Bearer $t';
       request.fields.addAll(fields);
       for (final entry in files.entries) {

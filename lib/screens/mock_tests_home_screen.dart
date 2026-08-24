@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
+import 'ai_coach_screen.dart';
 import 'ielts_booking_screen.dart';
 import 'mock_test_history_screen.dart';
 import 'mock_test_list_screen.dart';
@@ -107,6 +108,18 @@ class _MockTestsHomeScreenState extends State<MockTestsHomeScreen> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const TutorsScreen(showBackButton: true)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Sits under Speaking because it answers the same want at the hours
+          // when no tutor is free, which is most of them.
+          _SkillButton(
+            icon: Icons.auto_awesome_rounded,
+            title: 'AI Coach',
+            subtitle: 'Talk out loud · scored sound by sound',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AiCoachScreen()),
             ),
           ),
           const SizedBox(height: 12),
