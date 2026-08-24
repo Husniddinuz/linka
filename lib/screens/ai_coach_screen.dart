@@ -233,6 +233,26 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
   String _personaTagline(CoachPersona persona) =>
       _personaCopy[persona.slug]?.$2 ?? persona.tagline;
 
+  /// The coach's last line, shown under the character: in a spoken
+  /// conversation this is the part you would otherwise have to scroll for.
+  String? get _lastSaid {
+    for (var index = _entries.length - 1; index >= 0; index--) {
+      final entry = _entries[index];
+      if (entry is _CoachEntry) return entry.text;
+    }
+    return null;
+  }
+
+  /// What is happening, in the words the student needs.
+  String get _status {
+    if (_mode == CoachMode.text) return 'Type when you are ready';
+    if (!_liveOpen) return 'Opening the microphone…';
+    if (_voiceLevel > 0) return 'Speaking';
+    if (_stage != null) return 'Working on it…';
+    if (_hearing) return 'Hearing you…';
+    return 'Listening — just start talking';
+  }
+
   CoachMood get _mood {
     // What the student is doing outranks what the coach is doing: they are the
     // one who needs to see themselves being heard.
@@ -816,7 +836,13 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           level: _level,
           mood: _mood,
           voiceLevel: _voiceLevel,
-          micLevel: _micLevel,
+          // What the rings answer: the microphone while the student talks, the
+          // coach's own voice while it replies — whichever is making sound.
+          activity: _voiceLevel > 0
+              ? _voiceLevel
+              : (_mode == CoachMode.voice && _liveOpen ? _micLevel : 0),
+          status: _status,
+          lastSaid: _lastSaid,
         ),
         Expanded(
           child: ListView.builder(
@@ -906,6 +932,12 @@ class _CentredNote extends StatelessWidget {
 /// The character, and what it is doing. It sits above the conversation rather
 /// than beside it: this is the one thing on the screen meant to feel like a
 /// person, so it gets the room to read as one.
+/// The stage.
+///
+/// With the microphone open there is nothing to press and no take to review,
+/// so the screen has one job: show that someone is listening. The character
+/// gets the middle and the size to read as a person; the transcript is what
+/// happened, and it goes below.
 class _Stage extends StatelessWidget {
   const _Stage({
     required this.persona,
@@ -914,7 +946,9 @@ class _Stage extends StatelessWidget {
     required this.level,
     required this.mood,
     required this.voiceLevel,
-    required this.micLevel,
+    required this.activity,
+    required this.status,
+    required this.lastSaid,
   });
 
   final String persona;
@@ -923,117 +957,161 @@ class _Stage extends StatelessWidget {
   final String level;
   final CoachMood mood;
   final double voiceLevel;
-  final double micLevel;
 
-  String get _status => switch (mood) {
-        CoachMood.listening => 'Listening',
-        CoachMood.thinking => 'Thinking',
-        CoachMood.speaking => 'Speaking',
-        CoachMood.idle => 'Ready when you are',
-      };
+  /// 0–1, whichever of the two voices is making sound right now.
+  final double activity;
+  final String status;
+  final String? lastSaid;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        gradient: RadialGradient(
+          center: Alignment.topCenter,
+          radius: 1.1,
           colors: [accent.withValues(alpha: 0.16), colors.background],
         ),
         border: Border(bottom: BorderSide(color: colors.border)),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 72,
-            height: 72,
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(20),
-              // While the student talks the ring answers the microphone: the
-              // coach visibly hearing them.
-              border: Border.all(
-                color: mood == CoachMood.listening
-                    ? accent
-                    : Colors.transparent,
-                width: mood == CoachMood.listening ? 1 + micLevel * 4 : 0,
-              ),
-            ),
-            alignment: Alignment.bottomCenter,
-            child: CoachAvatar(
-              persona: persona,
-              accent: accent,
-              mood: mood,
-              level: voiceLevel,
-              size: 68,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // Two rings on the live level. In this mode they are the whole
+          // feedback loop — there is no waveform to watch and no button held
+          // down to prove the microphone is on.
+          SizedBox(
+            width: 168,
+            height: 168,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                Text(
-                  name,
-                  style: TextStyle(
-                    fontFamily: 'SF Pro',
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: colors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
+                _Ring(color: accent.withValues(alpha: 0.14),
+                    scale: 1 + activity * 0.28, size: 168),
+                _Ring(color: accent.withValues(alpha: 0.20),
+                    scale: 1 + activity * 0.14, size: 148),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  width: 130,
+                  height: 130,
+                  clipBehavior: Clip.antiAlias,
+                  alignment: Alignment.bottomCenter,
                   decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(999),
+                    color: accent.withValues(alpha: 0.26),
+                    shape: BoxShape.circle,
                   ),
-                  child: Text(
-                    level,
-                    style: TextStyle(
-                      fontFamily: 'SF Pro',
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: colors.textPrimary,
-                    ),
+                  child: CoachAvatar(
+                    persona: persona,
+                    accent: accent,
+                    mood: mood,
+                    level: voiceLevel,
+                    size: 126,
                   ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    if (mood != CoachMood.idle) ...[
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: accent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    Text(
-                      _status,
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: colors.textTertiary,
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),
           ),
+
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                name,
+                style: TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: colors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.20),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  level,
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (mood != CoachMood.idle) ...[
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                status,
+                style: TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: colors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+
+          // What the coach just said, big enough to read at arm's length — the
+          // spoken line is the conversation in this mode, and the transcript
+          // below is the record of it.
+          if (lastSaid != null && lastSaid!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              lastSaid!,
+              textAlign: TextAlign.center,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 15,
+                height: 1.45,
+                color: colors.textPrimary,
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+/// One of the stage's breathing rings.
+class _Ring extends StatelessWidget {
+  const _Ring({required this.color, required this.scale, required this.size});
+
+  final Color color;
+  final double scale;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      // Fast enough to track a voice, slow enough not to strobe.
+      duration: const Duration(milliseconds: 120),
+      scale: scale,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
     );
   }
