@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import '../models/ai_coach.dart';
 import 'api_constants.dart';
 import 'api_service.dart';
@@ -67,20 +65,11 @@ class AiCoachService {
     await ApiService.post('$_base/session/$sessionId/end/', const {});
   }
 
-  /// One spoken turn. Accepts webm, ogg, mp3, m4a and wav; the app records
-  /// AAC in an `.m4a`.
-  static Future<CoachTurn> sendVoiceTurn({
-    required int sessionId,
-    required File take,
-  }) async {
-    final data = await ApiService.postMultipart(
-      '$_base/turn/$sessionId/',
-      files: {'file': take},
-    );
-    return CoachTurn.fromJson(data);
-  }
-
   /// One typed turn — the way in when speaking aloud is not an option.
+  ///
+  /// Spoken turns do not come through here: they stream over the socket in
+  /// [CoachSocket] as they are said. The `POST /ai/turn/{id}/` upload endpoint
+  /// still exists server-side and is the fallback if streaming ever has to go.
   /// `pronunciation` always comes back null here: there is no audio to score.
   static Future<CoachTurn> sendTextTurn({
     required int sessionId,

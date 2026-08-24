@@ -6,28 +6,30 @@ import 'dart:math' as math;
 import 'package:audioplayers/audioplayers.dart' as ap;
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
 
 import '../models/ai_coach.dart';
 import '../services/ai_coach_service.dart';
 import '../services/api_service.dart';
+import '../services/coach_socket.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/coach_avatar.dart';
 import '../widgets/coach_pronunciation.dart';
 import '../widgets/mock_test_styles.dart';
 
-/// How long a take may run.
-///
-/// The server's own ceiling is 55s and Azure refuses anything over a minute,
-/// so a longer take comes back with `pronunciation: null` — losing the one
-/// thing this screen exists for. Better to stop the recording than to silently
-/// drop the score.
+/// The server's own ceiling on one turn. Azure refuses anything over a minute,
+/// so past this a turn comes back with `pronunciation: null` — losing the one
+/// thing this screen exists for. The server enforces it; the screen only has
+/// to be able to explain it.
 const _maxTurnSeconds = 55;
 
-/// Below this the file has no answer in it. The server rejects the same size,
-/// so catching it here saves a round trip and a confusing 400.
-const _minRecordingBytes = 2000;
+/// How you answer.
+///
+/// `voice` is a live socket: the microphone stays open and the server decides
+/// when a sentence has ended, so it behaves the same here as on the web and
+/// neither client needs a voice-activity detector of its own. `text` is the
+/// way in from a quiet room, a refused microphone, or a bad connection.
+enum CoachMode { voice, text }
 
 const _levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
@@ -85,14 +87,14 @@ class _CoachEntry extends _Entry {
 }
 
 class _StudentEntry extends _Entry {
-  _StudentEntry({this.text, this.takePath, this.seconds = 0});
+  _StudentEntry({this.text, this.seconds = 0});
 
   /// What they typed, or null for a spoken turn — the server deliberately does
   /// not send back a transcript of the student's own words.
   final String? text;
 
-  /// The take itself, the only record of a spoken turn on this screen.
-  final String? takePath;
+  /// How long they spoke. Nothing was recorded to a file: the turn went out as
+  /// it was spoken, so its length is all there is to show of it.
   final int seconds;
 
   bool pending = true;
@@ -117,15 +119,13 @@ class AiCoachScreen extends StatefulWidget {
 }
 
 class _AiCoachScreenState extends State<AiCoachScreen> {
-  final _recorder = AudioRecorder();
   final _player = ap.AudioPlayer();
   final _scroll = ScrollController();
   final _typed = TextEditingController();
 
-  StreamSubscription<Amplitude>? _amplitudeSub;
   StreamSubscription<void>? _completeSub;
-  Timer? _recordTimer;
   Timer? _mouthTimer;
+  CoachSocket? _socket;
 
   List<CoachPersona> _personas = const [];
   CoachStats? _stats;
@@ -140,9 +140,12 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
   final List<_Entry> _entries = [];
   bool _starting = false;
   bool _sending = false;
-  bool _recording = false;
-  bool _typing = false;
-  int _elapsed = 0;
+  CoachMode _mode = CoachMode.voice;
+  bool _liveOpen = false;
+  /// The server has heard speech and is waiting for it to end.
+  bool _hearing = false;
+  /// `transcribing` or `replying`, while the coach works on the last turn.
+  String? _stage;
   double _micLevel = 0;
   double _voiceLevel = 0;
   final _random = math.Random();
@@ -156,11 +159,9 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
 
   @override
   void dispose() {
-    _recordTimer?.cancel();
     _mouthTimer?.cancel();
-    _amplitudeSub?.cancel();
     _completeSub?.cancel();
-    _recorder.dispose();
+    unawaited(_socket?.dispose());
     _player.dispose();
     _scroll.dispose();
     _typed.dispose();
@@ -235,9 +236,10 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
   CoachMood get _mood {
     // What the student is doing outranks what the coach is doing: they are the
     // one who needs to see themselves being heard.
-    if (_recording) return CoachMood.listening;
-    if (_sending) return CoachMood.thinking;
+    if (_hearing) return CoachMood.listening;
+    if (_sending || _stage != null) return CoachMood.thinking;
     if (_voiceLevel > 0) return CoachMood.speaking;
+    if (_mode == CoachMode.voice && _liveOpen) return CoachMood.listening;
     return CoachMood.idle;
   }
 
@@ -261,6 +263,9 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           ]);
         _starting = false;
       });
+      // The greeting plays while the microphone opens behind it: by the time
+      // the coach has finished saying hello, the conversation is live.
+      unawaited(_applyMode());
       if (audioPath != null) await _playReply(audioPath);
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -276,17 +281,13 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
   Future<void> _end() async {
     final id = _sessionId;
     await _stopPlayback();
-    _recordTimer?.cancel();
-    await _amplitudeSub?.cancel();
-    if (await _recorder.isRecording()) await _recorder.stop();
+    await _disconnectVoice();
     if (!mounted) return;
     setState(() {
       _sessionId = null;
       _entries.clear();
-      _recording = false;
       _sending = false;
-      _elapsed = 0;
-      _typing = false;
+      _stage = null;
       _typed.clear();
     });
     if (id != null) {
@@ -350,86 +351,187 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
         _ => 'That turn did not go through. Try again.',
       };
 
-  // ─── Speaking and listening ─────────────────────────────────────────────
+  // ─── The live conversation ──────────────────────────────────────────────
 
-  Future<void> _startRecording() async {
-    if (!await _recorder.hasPermission()) {
-      if (mounted) {
-        AppNotify.show(
-          context,
-          message: 'Microphone permission is required to talk to the coach.',
-        );
+  /// Turns one socket frame into what the screen shows.
+  ///
+  /// The order the server sends these in is deliberate and worth keeping in
+  /// mind: `reply` arrives before `corrections`, because the analysis takes
+  /// about six seconds against the reply's one and a half. Nothing here waits
+  /// for the corrections — they land in a card under a turn the student has
+  /// already heard answered, and they do not arrive at all when the analysis
+  /// found nothing.
+  Future<void> _onSocketEvent(Map<String, dynamic> event) async {
+    if (!mounted) return;
+    switch (event['type']) {
+      case 'ready':
+        setState(() => _liveOpen = true);
+
+      case 'speech_started':
+        // They have started talking over the coach; stop it rather than let
+        // both voices run.
+        await _stopPlayback();
+        if (!mounted) return;
+        setState(() => _hearing = true);
+
+      case 'speech_ended':
+        setState(() {
+          _hearing = false;
+          _entries.add(_StudentEntry(
+            seconds: ((event['ms'] as num?) ?? 0) ~/ 1000,
+          ));
+        });
+        _scrollToEnd();
+
+      case 'processing':
+        setState(() => _stage = event['stage']?.toString());
+        _syncMute();
+
+      case 'pronunciation':
+        _updateLastStudent((entry) {
+          // The frame is the score with a tag on it; the card wants the score.
+          entry.pronunciation = Pronunciation.fromJson(event);
+        });
+
+      case 'reply':
+        final audioPath = await _writeReplyAudio(event['audio'] as String?);
+        if (!mounted) return;
+        setState(() {
+          _stage = null;
+          _updateLastStudent((entry) => entry.pending = false, rebuild: false);
+          // Cleared here rather than after playback starts: between the two is
+          // a window where the coach is about to speak and the microphone is
+          // still open on its own voice.
+          _entries.add(_CoachEntry(
+            text: event['text']?.toString() ?? '',
+            audioPath: audioPath,
+          ));
+        });
+        _scrollToEnd();
+        if (audioPath != null) await _playReply(audioPath);
+        unawaited(_refreshStats());
+
+      case 'corrections':
+        _updateLastStudent((entry) {
+          entry.corrections = ((event['items'] as List?) ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map(Correction.fromJson)
+              .toList();
+        });
+        unawaited(_refreshStats());
+
+      case 'cancelled':
+        setState(() => _hearing = false);
+
+      case 'error':
+        // The message is Russian prose from the server and belongs in a log,
+        // not in front of a student reading the app in Uzbek.
+        setState(() => _stage = null);
+        _updateLastStudent((entry) {
+          entry.pending = false;
+          entry.error = 'That did not come through — say it again, a little '
+              'louder.';
+        });
+    }
+  }
+
+  /// Applies a change to the turn the student most recently took.
+  ///
+  /// The score, the corrections and the failure all arrive as separate frames
+  /// after it, seconds apart and in a fixed order, and every one of them
+  /// belongs to that same turn — so they are folded into it by position rather
+  /// than by an id the socket protocol does not carry.
+  void _updateLastStudent(
+    void Function(_StudentEntry entry) change, {
+    bool rebuild = true,
+  }) {
+    for (var index = _entries.length - 1; index >= 0; index--) {
+      final entry = _entries[index];
+      if (entry is! _StudentEntry) continue;
+      if (rebuild) {
+        setState(() => change(entry));
+      } else {
+        change(entry);
       }
       return;
     }
+  }
 
-    // The coach's own voice would otherwise come back through the microphone
-    // and land in the next turn as if the student had said it.
-    await _stopPlayback();
-
-    final dir = await getTemporaryDirectory();
-    final path =
-        '${dir.path}/ai_coach_turn_${DateTime.now().millisecondsSinceEpoch}.m4a';
-    await _recorder.start(
-      const RecordConfig(encoder: AudioEncoder.aacLc, sampleRate: 44100),
-      path: path,
+  Future<void> _connectVoice(int sessionId) async {
+    if (_socket != null) return;
+    final socket = CoachSocket(
+      onEvent: (event) => unawaited(_onSocketEvent(event)),
+      onLevel: (level) {
+        if (mounted) setState(() => _micLevel = level);
+      },
+      onClosed: (code) {
+        if (!mounted) return;
+        _socket = null;
+        setState(() {
+          _liveOpen = false;
+          _hearing = false;
+          _stage = null;
+        });
+        // 4404 is a conversation that has ended and 4401 a token that has;
+        // both mean this screen cannot go on. Anything else is the network,
+        // and typing still works over it.
+        if (code == 4404) {
+          setState(() => _sessionId = null);
+          AppNotify.show(context,
+              message: 'This conversation has closed. Start a new one.');
+        } else {
+          setState(() => _mode = CoachMode.text);
+          AppNotify.show(context,
+              message: 'The connection dropped. Switched you to typing.');
+        }
+      },
     );
+
+    final ok = await socket.connect(sessionId);
+    if (!ok) {
+      await socket.dispose();
+      if (!mounted) return;
+      // No microphone is not a dead end: the same conversation takes typing.
+      setState(() => _mode = CoachMode.text);
+      AppNotify.show(context,
+          message: 'Microphone permission is required to talk to the coach.');
+      return;
+    }
+    if (!mounted) {
+      await socket.dispose();
+      return;
+    }
+    _socket = socket;
+  }
+
+  Future<void> _disconnectVoice() async {
+    final socket = _socket;
+    _socket = null;
+    await socket?.dispose();
     if (!mounted) return;
     setState(() {
-      _recording = true;
-      _elapsed = 0;
+      _liveOpen = false;
+      _hearing = false;
       _micLevel = 0;
-    });
-
-    _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      setState(() => _elapsed++);
-      if (_elapsed >= _maxTurnSeconds) _stopRecording();
-    });
-
-    _amplitudeSub = _recorder
-        .onAmplitudeChanged(const Duration(milliseconds: 120))
-        .listen((amplitude) {
-      if (!mounted) return;
-      // `current` is dBFS: 0 is clipping, -45 or below is effectively silence.
-      setState(
-        () => _micLevel = ((amplitude.current + 45) / 45).clamp(0.0, 1.0),
-      );
     });
   }
 
-  Future<void> _stopRecording() async {
-    _recordTimer?.cancel();
-    _recordTimer = null;
-    await _amplitudeSub?.cancel();
-    _amplitudeSub = null;
-
-    final seconds = _elapsed;
-    final path = await _recorder.stop();
-    if (!mounted) return;
-    setState(() {
-      _recording = false;
-      _micLevel = 0;
-      _elapsed = 0;
-    });
-
-    final id = _sessionId;
-    if (path == null || id == null) return;
-
-    final file = File(path);
-    if (!file.existsSync() || await file.length() < _minRecordingBytes) {
-      if (mounted) {
-        AppNotify.show(context, message: 'That was too short to send.');
-      }
+  /// Voice is the default, so the socket opens with the conversation and
+  /// closes with it or with a switch to typing.
+  Future<void> _applyMode() async {
+    if (_sessionId == null || _mode == CoachMode.text) {
+      await _disconnectVoice();
       return;
     }
+    await _connectVoice(_sessionId!);
+  }
 
-    final entry = _StudentEntry(takePath: path, seconds: seconds);
-    setState(() => _entries.add(entry));
-    await _submit(
-      entry,
-      () => AiCoachService.sendVoiceTurn(sessionId: id, take: file),
-    );
+  /// The microphone stops sending while the coach is working or speaking. The
+  /// server already ignores input while it is busy, so this is about the meter
+  /// — a level still moving while the coach thinks says the student is being
+  /// heard when they are not.
+  void _syncMute() {
+    _socket?.setMuted(_voiceLevel > 0 || _stage != null);
   }
 
   Future<void> _sendTyped() async {
@@ -488,6 +590,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
   /// about being a rhythm — it never claims to match a syllable.
   void _startMouth() {
     _mouthTimer?.cancel();
+    _syncMute();
     _mouthTimer = Timer.periodic(const Duration(milliseconds: 90), (_) {
       if (!mounted) return;
       setState(() {
@@ -502,6 +605,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     _mouthTimer = null;
     if (!mounted) return;
     setState(() => _voiceLevel = 0);
+    _syncMute();
   }
 
   void _scrollToEnd() {
@@ -737,31 +841,39 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           ),
         ),
         _Composer(
-          recording: _recording,
+          mode: _mode,
+          liveOpen: _liveOpen,
+          hearing: _hearing,
+          working: _stage != null,
+          speaking: _voiceLevel > 0,
           sending: _sending,
-          typing: _typing,
-          elapsed: _elapsed,
           micLevel: _micLevel,
           controller: _typed,
-          onToggleTyping: () => setState(() => _typing = !_typing),
-          onRecord: () => _recording ? _stopRecording() : _startRecording(),
+          onMode: (mode) {
+            if (mode == _mode) return;
+            setState(() => _mode = mode);
+            unawaited(_applyMode());
+          },
+          onDone: () => _socket?.commit(),
           onSend: _sendTyped,
         ),
         SizedBox(height: MediaQuery.of(context).padding.bottom > 0 ? 0 : 8),
-        if (!_recording)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: Text(
-              'Speak for up to $_maxTurnSeconds seconds a turn. '
-              'Past that the pronunciation score is lost.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 10.5,
-                color: colors.textTertiary,
-              ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          child: Text(
+            _mode == CoachMode.voice
+                ? 'The coach hears when you stop, so there is nothing to '
+                    'press. Up to $_maxTurnSeconds seconds a turn.'
+                : 'Typed turns are answered out loud, but there is no '
+                    'pronunciation score without your voice.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'SF Pro',
+              fontSize: 10.5,
+              color: colors.textTertiary,
             ),
           ),
+        ),
       ],
     );
   }
@@ -1095,11 +1207,18 @@ class _StudentBubble extends StatelessWidget {
             CoachPronunciationCard(pronunciation: entry.pronunciation!),
           ] else if (!entry.pending &&
               entry.error == null &&
-              entry.takePath != null) ...[
+              entry.text == null) ...[
             const SizedBox(height: 6),
             Text(
-              'No pronunciation score for this one — it was too long, or the '
-              'scorer was unavailable.',
+              // Why there is no score, where it can be known. A turn that ran
+              // past the limit is the one case the client can explain; saying
+              // "too long" about a two-second answer is worse than saying
+              // nothing.
+              entry.seconds >= _maxTurnSeconds
+                  ? 'No pronunciation score — that turn ran past the '
+                      '$_maxTurnSeconds-second limit.'
+                  : 'No pronunciation score for this turn — scoring was '
+                      'unavailable.',
               textAlign: TextAlign.right,
               style: TextStyle(
                 fontFamily: 'SF Pro',
@@ -1364,166 +1483,167 @@ class _TypingDotsState extends State<_TypingDots>
   }
 }
 
+/// How you answer, and what is happening while you do.
+///
+/// Two modes rather than a microphone button next to a text field: a live
+/// conversation and a written one are different things to be in, and the
+/// screen should say which one you are in.
 class _Composer extends StatelessWidget {
   const _Composer({
-    required this.recording,
+    required this.mode,
+    required this.liveOpen,
+    required this.hearing,
+    required this.working,
+    required this.speaking,
     required this.sending,
-    required this.typing,
-    required this.elapsed,
     required this.micLevel,
     required this.controller,
-    required this.onToggleTyping,
-    required this.onRecord,
+    required this.onMode,
+    required this.onDone,
     required this.onSend,
   });
 
-  final bool recording;
+  final CoachMode mode;
+  final bool liveOpen;
+  final bool hearing;
+  final bool working;
+  final bool speaking;
   final bool sending;
-  final bool typing;
-  final int elapsed;
   final double micLevel;
   final TextEditingController controller;
-  final VoidCallback onToggleTyping;
-  final VoidCallback onRecord;
+  final ValueChanged<CoachMode> onMode;
+  final VoidCallback onDone;
   final VoidCallback onSend;
+
+  String get _status {
+    if (!liveOpen) return 'Opening the microphone…';
+    if (speaking) return 'Speaking';
+    if (working) return 'Working on it…';
+    if (hearing) return 'Hearing you…';
+    return 'Listening — just start talking';
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    if (typing && !recording) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          8,
-          16,
-          8 + MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: Row(
-          children: [
-            IconButton(
-              onPressed: onToggleTyping,
-              icon: Icon(Icons.mic_rounded, color: colors.textSecondary),
-            ),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                enabled: !sending,
-                maxLength: 1000,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => onSend(),
-                style: TextStyle(
-                  fontFamily: 'SF Pro',
-                  fontSize: 14,
-                  color: colors.textPrimary,
-                ),
-                decoration: InputDecoration(
-                  counterText: '',
-                  isDense: true,
-                  hintText: 'Type your answer…',
-                  hintStyle: TextStyle(
-                    fontFamily: 'SF Pro',
-                    fontSize: 14,
-                    color: colors.textTertiary,
-                  ),
-                  filled: true,
-                  fillColor: colors.surfaceAlt,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(999),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ),
-            IconButton(
-              onPressed: sending ? null : onSend,
-              icon: Icon(Icons.send_rounded, color: colors.brand),
-            ),
-          ],
-        ),
-      );
-    }
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-      child: Row(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        8 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
         children: [
-          if (!recording)
-            IconButton(
-              onPressed: sending ? null : onToggleTyping,
-              icon: Icon(Icons.keyboard_alt_outlined,
-                  color: colors.textSecondary),
-              tooltip: 'Type instead',
-            )
-          else
-            SizedBox(
-              width: 48,
-              child: Text(
-                '0:${elapsed.toString().padLeft(2, '0')}',
-                style: TextStyle(
-                  fontFamily: 'SF Pro',
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: colors.error,
-                ),
-              ),
-            ),
-          Expanded(
-            child: Center(
-              child: GestureDetector(
-                onTap: sending ? null : onRecord,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 120),
-                  width: 68,
-                  height: 68,
-                  decoration: BoxDecoration(
-                    color: sending
-                        ? colors.textTertiary
-                        : recording
-                            ? colors.error
-                            : colors.brand,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      // The halo grows with the microphone level, so a dead
-                      // input is visible before the take is sent rather than
-                      // after it comes back unheard.
-                      if (recording)
-                        BoxShadow(
-                          color: colors.error.withValues(alpha: 0.28),
-                          blurRadius: 0,
-                          spreadRadius: 4 + micLevel * 14,
+          Row(
+            children: [
+              _ModeSwitch(mode: mode, onMode: onMode),
+              const SizedBox(width: 12),
+              if (mode == CoachMode.voice)
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _status,
+                              style: TextStyle(
+                                fontFamily: 'SF Pro',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            // The meter is the proof the microphone is live. A
+                            // flat one here is a dead input, visible before a
+                            // whole answer has been spoken into it.
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(999),
+                              child: LinearProgressIndicator(
+                                value: liveOpen ? micLevel.clamp(0.0, 1.0) : 0,
+                                minHeight: 4,
+                                backgroundColor: colors.surfaceAlt,
+                                valueColor:
+                                    AlwaysStoppedAnimation(colors.success),
+                              ),
+                            ),
+                          ],
                         ),
+                      ),
+                      const SizedBox(width: 10),
+                      // The silence detector works on loudness, so a noisy
+                      // room needs a way to say "I have finished".
+                      TextButton(
+                        onPressed: hearing ? onDone : null,
+                        style: TextButton.styleFrom(
+                          foregroundColor: colors.textSecondary,
+                          disabledForegroundColor: colors.textTertiary
+                              .withValues(alpha: 0.5),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        child: const Text(
+                          "I'm done",
+                          style: TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                  child: Icon(
-                    recording ? Icons.stop_rounded : Icons.mic_rounded,
-                    color: colors.onBrand,
-                    size: 30,
+                )
+              else
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: controller,
+                          enabled: !sending,
+                          maxLength: 1000,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => onSend(),
+                          style: TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontSize: 14,
+                            color: colors.textPrimary,
+                          ),
+                          decoration: InputDecoration(
+                            counterText: '',
+                            isDense: true,
+                            hintText: 'Type your answer…',
+                            hintStyle: TextStyle(
+                              fontFamily: 'SF Pro',
+                              fontSize: 14,
+                              color: colors.textTertiary,
+                            ),
+                            filled: true,
+                            fillColor: colors.surfaceAlt,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(999),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: sending ? null : onSend,
+                        icon: Icon(Icons.send_rounded, color: colors.brand),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 48,
-            child: recording
-                ? Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      '/ $_maxTurnSeconds' 's',
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: colors.textTertiary,
-                      ),
-                    ),
-                  )
-                : null,
+            ],
           ),
         ],
       ),
@@ -1531,12 +1651,68 @@ class _Composer extends StatelessWidget {
   }
 }
 
-/// What the coach has noticed across every conversation, busiest first.
-///
-/// It sits on the setup screen rather than behind a tab because it is the
-/// reason to start another conversation: the entries are generalisations —
-/// `/θ/`, `past simple` — and seeing "9 times" next to one is what turns a
-/// corrected sentence into something worth drilling.
+class _ModeSwitch extends StatelessWidget {
+  const _ModeSwitch({required this.mode, required this.onMode});
+
+  final CoachMode mode;
+  final ValueChanged<CoachMode> onMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: colors.surfaceAlt,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final option in CoachMode.values)
+            GestureDetector(
+              onTap: () => onMode(option),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: option == mode ? colors.surface : Colors.transparent,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      option == CoachMode.voice
+                          ? Icons.mic_rounded
+                          : Icons.keyboard_alt_outlined,
+                      size: 14,
+                      color: option == mode
+                          ? colors.textPrimary
+                          : colors.textSecondary,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      option == CoachMode.voice ? 'Voice' : 'Text',
+                      style: TextStyle(
+                        fontFamily: 'SF Pro',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: option == mode
+                            ? colors.textPrimary
+                            : colors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MistakesCard extends StatelessWidget {
   const _MistakesCard({required this.stats});
 
