@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/mock_test_styles.dart';
+import 'ai_coach_screen.dart';
 import 'mock_test_history_screen.dart';
 import 'mock_test_list_screen.dart';
 import 'tutors_screen.dart';
@@ -71,6 +72,18 @@ class MockExamsScreen extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const TutorsScreen(showBackButton: true)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Under Speaking: it answers the same want at the hours when no
+          // tutor is free, which is most of them.
+          _ExamTypeButton(
+            icon: Icons.auto_awesome_rounded,
+            title: 'AI Coach',
+            subtitle: 'Talk out loud · scored sound by sound',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AiCoachScreen()),
             ),
           ),
         ],
