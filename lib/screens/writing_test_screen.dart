@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
+import '../widgets/writing_grading_progress.dart';
+import '../widgets/writing_report.dart';
 import 'plus_subscription_screen.dart';
 import 'writing_result_screen.dart';
 import '../theme/app_colors.dart';
@@ -52,6 +54,14 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
   }
 
   int get _minWords => (widget.prompt['min_words'] as num?)?.toInt() ?? 150;
+
+  /// The app bar names the paper, not the question: `title` carries the whole
+  /// task statement, which is a paragraph and only ever showed as an ellipsis
+  /// up here. The question itself leads the task card below.
+  String get _screenTitle {
+    final taskNumber = (widget.prompt['task_number'] as num?)?.toInt();
+    return taskNumber == null ? 'Writing task' : 'Writing Task $taskNumber';
+  }
 
   bool get _isPlus => _quota?['is_plus'] == true;
   int? get _remaining => (_quota?['remaining'] as num?)?.toInt();
@@ -165,12 +175,29 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
   @override
   Widget build(BuildContext context) {
     final belowMin = _wordCount < _minWords;
-    final imageUrl = widget.prompt['image_url'] as String?;
+
+    // Marking takes 30-60 seconds, so the editor gives way to the progress
+    // panel rather than sitting behind a disabled button: the essay is already
+    // on its way to the server, and leaving an editable field on screen only
+    // invites edits that cannot reach this submission. The controller keeps
+    // the draft throughout, so a failed submit drops the student back into it
+    // exactly as they left it.
+    if (_submitting) {
+      return Scaffold(
+        backgroundColor: context.wr.page,
+        appBar: mtAppBar(context, title: _screenTitle),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+          children: const [WritingGradingProgress()],
+        ),
+      );
+    }
+
     return Scaffold(
-      backgroundColor: context.colors.background,
+      backgroundColor: context.wr.page,
       appBar: mtAppBar(
         context,
-        title: widget.prompt['title']?.toString() ?? 'Writing task',
+        title: _screenTitle,
         actions: [
           if (_quota != null)
             Padding(
@@ -214,66 +241,9 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
                 ConstrainedBox(
                   constraints: BoxConstraints(maxHeight: maxCardHeight),
                   child: SingleChildScrollView(
-                    child: Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                      padding: const EdgeInsets.all(14),
-                      decoration: mtSoftCard(context, color: context.colors.surfaceAlt, radius: 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (imageUrl != null && imageUrl.isNotEmpty) ...[
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                width: double.infinity,
-                                color: Colors.white,
-                                constraints: const BoxConstraints(maxHeight: 220),
-                                child: Image.network(
-                                  imageUrl,
-                                  fit: BoxFit.contain,
-                                  loadingBuilder: (context, child, progress) {
-                                    if (progress == null) return child;
-                                    return Padding(
-                                      padding: EdgeInsets.symmetric(vertical: 40),
-                                      child: Center(
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: context.colors.accentYellow,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      Padding(
-                                        padding: EdgeInsets.symmetric(vertical: 24),
-                                        child: Center(
-                                          child: Text(
-                                            'Could not load chart image',
-                                            style: TextStyle(
-                                              fontFamily: 'SF Pro',
-                                              color: context.colors.textTertiary,
-                                              fontSize: 12.5,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                          Text(
-                            widget.prompt['prompt_html']?.toString() ?? '',
-                            style: TextStyle(
-                              fontFamily: 'SF Pro',
-                              fontSize: 14,
-                              height: 1.5,
-                              color: context.colors.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      child: WTaskCard(prompt: widget.prompt),
                     ),
                   ),
                 ),
@@ -282,10 +252,9 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Container(
                       width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: context.colors.surfaceAlt,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+                      // The sheet of paper being written on, in the same card
+                      // language as the task above it.
+                      decoration: wCardDecoration(context, radius: 14),
                       child: Stack(
                         children: [
                           TextField(
@@ -322,8 +291,9 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
                                 width: 34,
                                 height: 34,
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: context.colors.surface,
                                   borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: context.colors.border),
                                   boxShadow: [
                                     BoxShadow(
                                       color: Colors.black.withValues(alpha: 0.08),

@@ -148,7 +148,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
                   const SizedBox(height: 12),
 
                   Text(
-                    'Enter your email address and we will send you a 6-digit '
+                    'Enter your email address and we will send you a 5-digit '
                     'code.',
                     style: TextStyle(
                       color: colors.textTertiary,

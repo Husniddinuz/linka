@@ -25,6 +25,16 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color errorBg;
   final Color shadow;
 
+  /// The AI coach's room. It is a cloud of lit dots, and light needs a dark
+  /// room: the same sphere on a white card is grey grit. So these three are
+  /// deliberately identical in both themes — a room the student steps into,
+  /// the way a video call is dark whatever the rest of the app is doing.
+  /// [coachGlow] is the near, hot end of a dot; the far end is the persona's
+  /// own accent, which the API sends.
+  final Color coachStage;
+  final Color coachStageEdge;
+  final Color coachGlow;
+
   const AppColors({
     required this.background,
     required this.surface,
@@ -42,6 +52,9 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.error,
     required this.errorBg,
     required this.shadow,
+    required this.coachStage,
+    required this.coachStageEdge,
+    required this.coachGlow,
   });
 
   static const light = AppColors(
@@ -61,6 +74,9 @@ class AppColors extends ThemeExtension<AppColors> {
     error: Color(0xFFE74C3C),
     errorBg: Color(0xFFFCECEC),
     shadow: Color(0xFF000000),
+    coachStage: Color(0xFF0A0F1E),
+    coachStageEdge: Color(0xFF141C33),
+    coachGlow: Color(0xFFFFFFFF),
   );
 
   static const dark = AppColors(
@@ -80,6 +96,9 @@ class AppColors extends ThemeExtension<AppColors> {
     error: Color(0xFFFF6B6B),
     errorBg: Color(0xFF3A2020),
     shadow: Color(0xFF000000),
+    coachStage: Color(0xFF0A0F1E),
+    coachStageEdge: Color(0xFF141C33),
+    coachGlow: Color(0xFFFFFFFF),
   );
 
   @override
@@ -100,6 +119,9 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? error,
     Color? errorBg,
     Color? shadow,
+    Color? coachStage,
+    Color? coachStageEdge,
+    Color? coachGlow,
   }) {
     return AppColors(
       background: background ?? this.background,
@@ -118,6 +140,9 @@ class AppColors extends ThemeExtension<AppColors> {
       error: error ?? this.error,
       errorBg: errorBg ?? this.errorBg,
       shadow: shadow ?? this.shadow,
+      coachStage: coachStage ?? this.coachStage,
+      coachStageEdge: coachStageEdge ?? this.coachStageEdge,
+      coachGlow: coachGlow ?? this.coachGlow,
     );
   }
 
@@ -141,6 +166,9 @@ class AppColors extends ThemeExtension<AppColors> {
       error: Color.lerp(error, other.error, t)!,
       errorBg: Color.lerp(errorBg, other.errorBg, t)!,
       shadow: Color.lerp(shadow, other.shadow, t)!,
+      coachStage: Color.lerp(coachStage, other.coachStage, t)!,
+      coachStageEdge: Color.lerp(coachStageEdge, other.coachStageEdge, t)!,
+      coachGlow: Color.lerp(coachGlow, other.coachGlow, t)!,
     );
   }
 }

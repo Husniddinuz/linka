@@ -7,9 +7,12 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:path_provider/path_provider.dart';
 import '../services/api_service.dart';
+import '../services/mock_test_service.dart';
 import '../services/share_service.dart';
 import '../widgets/cached_avatar.dart';
 import '../widgets/mock_test_styles.dart';
+import '../widgets/writing_report.dart';
+import 'writing_progress_screen.dart';
 
 class WritingResultScreen extends StatefulWidget {
   const WritingResultScreen({super.key, required this.attempt});
@@ -26,10 +29,43 @@ class _WritingResultScreenState extends State<WritingResultScreen> {
   String? _studentName;
   String? _avatarUrl;
 
+  /// The attempt as rendered. Starts as whatever was handed in and is replaced
+  /// by the full record once [_loadFullReport] has it — see below.
+  late Map<String, dynamic> _attempt = widget.attempt;
+  bool _loadingReport = false;
+
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    _loadFullReport();
+  }
+
+  /// Fetches the attempt in full when we were handed a row from the attempts
+  /// list, which omits `analysis` (a full review runs to several KB and the
+  /// list would otherwise download one per essay just to draw titles).
+  ///
+  /// The submit response and the detail endpoint both carry it, so this is a
+  /// no-op on the path straight from a submission.
+  Future<void> _loadFullReport() async {
+    if (_attempt['analysis'] != null) return;
+    final id = (_attempt['id'] as num?)?.toInt();
+    if (id == null) return;
+
+    setState(() => _loadingReport = true);
+    try {
+      final full = await MockTestService.fetchWritingAttempt(id);
+      if (!mounted) return;
+      setState(() {
+        _attempt = full;
+        _loadingReport = false;
+      });
+    } catch (_) {
+      // Non-fatal: the bands, the feedback and the essay are already on
+      // screen, so the report simply stays at that level of detail.
+      if (!mounted) return;
+      setState(() => _loadingReport = false);
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -63,8 +99,8 @@ class _WritingResultScreenState extends State<WritingResultScreen> {
       final file = File('${dir.path}/linka_writing_result.png');
       await file.writeAsBytes(bytes, flush: true);
 
-      final overall = _toDouble(widget.attempt['overall_band']);
-      final prompt = (widget.attempt['prompt'] as Map?) ?? const {};
+      final overall = wToDouble(_attempt['overall_band']);
+      final prompt = (_attempt['prompt'] as Map?) ?? const {};
       await ShareService.shareWritingResultImage(
         imageFile: file,
         overallBand: overall.toStringAsFixed(1),
@@ -84,24 +120,29 @@ class _WritingResultScreenState extends State<WritingResultScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final attempt = widget.attempt;
+    final attempt = _attempt;
     final status = attempt['status']?.toString() ?? 'pending';
     final failed = status == 'failed';
-    final overall = _toDouble(attempt['overall_band']);
+    final overall = wToDouble(attempt['overall_band']);
     final tier = _bandTier(overall);
     final prompt = (attempt['prompt'] as Map?) ?? const {};
     final essayText = attempt['essay_text']?.toString() ?? '';
     final wordCount = (attempt['word_count'] as num?)?.toInt() ?? 0;
 
     return Scaffold(
-      backgroundColor: _Palette.bg,
+      backgroundColor: context.wr.page,
       appBar: mtAppBar(context, title: 'Writing Result'),
       body: failed
           ? _FailedView(attempt: attempt)
           : Stack(
               fit: StackFit.expand,
               children: [
-                _GradedView(attempt: attempt, onShare: _handleShare, sharing: _sharing),
+                _GradedView(
+                  attempt: attempt,
+                  onShare: _handleShare,
+                  sharing: _sharing,
+                  loadingReport: _loadingReport,
+                ),
                 // Kept mounted off-screen (rather than Offstage, which
                 // skips painting) so it always has a fresh frame ready to
                 // capture the moment the share button is tapped.
@@ -113,10 +154,10 @@ class _WritingResultScreenState extends State<WritingResultScreen> {
                     child: _InstagramStoryCard(
                       overall: overall,
                       tier: tier,
-                      task: _toDouble(attempt['task_achievement']),
-                      coherence: _toDouble(attempt['coherence_cohesion']),
-                      lexical: _toDouble(attempt['lexical_resource']),
-                      grammar: _toDouble(attempt['grammar_accuracy']),
+                      task: wToDouble(attempt['task_achievement']),
+                      coherence: wToDouble(attempt['coherence_cohesion']),
+                      lexical: wToDouble(attempt['lexical_resource']),
+                      grammar: wToDouble(attempt['grammar_accuracy']),
                       taskNumber: (prompt['task_number'] as num?)?.toInt(),
                       wordCount: wordCount,
                       readingLevel: _readingLevel(essayText, wordCount),
@@ -138,6 +179,7 @@ class _FailedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final wr = context.wr;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -147,19 +189,19 @@ class _FailedView extends StatelessWidget {
             Container(
               width: 64,
               height: 64,
-              decoration: BoxDecoration(color: _Palette.red.withValues(alpha: 0.1), shape: BoxShape.circle),
-              child: const Icon(Icons.error_outline_rounded, size: 32, color: _Palette.red),
+              decoration: BoxDecoration(color: wr.bad.withValues(alpha: 0.12), shape: BoxShape.circle),
+              child: Icon(Icons.error_outline_rounded, size: 32, color: wr.bad),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Grading is unavailable right now',
-              style: TextStyle(fontFamily: 'SF Pro', fontWeight: FontWeight.w700, color: _Palette.primary),
+              style: TextStyle(fontFamily: 'SF Pro', fontWeight: FontWeight.w700, color: wr.text),
             ),
             const SizedBox(height: 8),
             Text(
               attempt['error_message']?.toString() ?? 'Please try again later.',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontFamily: 'SF Pro', color: _Palette.textGrey, fontSize: 13.5),
+              style: TextStyle(fontFamily: 'SF Pro', color: wr.muted, fontSize: 13.5),
             ),
           ],
         ),
@@ -169,18 +211,24 @@ class _FailedView extends StatelessWidget {
 }
 
 class _GradedView extends StatelessWidget {
-  const _GradedView({required this.attempt, required this.onShare, required this.sharing});
+  const _GradedView({
+    required this.attempt,
+    required this.onShare,
+    required this.sharing,
+    required this.loadingReport,
+  });
+
   final Map<String, dynamic> attempt;
   final VoidCallback onShare;
   final bool sharing;
 
+  /// True while the full `analysis` is still being fetched, which happens when
+  /// this screen was opened from the attempts list (that endpoint omits it).
+  final bool loadingReport;
+
   @override
   Widget build(BuildContext context) {
-    final overall = _toDouble(attempt['overall_band']);
-    final task = _toDouble(attempt['task_achievement']);
-    final coherence = _toDouble(attempt['coherence_cohesion']);
-    final lexical = _toDouble(attempt['lexical_resource']);
-    final grammar = _toDouble(attempt['grammar_accuracy']);
+    final overall = wToDouble(attempt['overall_band']);
     final feedback = attempt['feedback']?.toString() ?? '';
     final prompt = (attempt['prompt'] as Map?) ?? const {};
     final taskNumber = (prompt['task_number'] as num?)?.toInt();
@@ -189,71 +237,241 @@ class _GradedView extends StatelessWidget {
     final essayText = attempt['essay_text']?.toString() ?? '';
     final tier = _bandTier(overall);
 
+    // Every part of the review is independently optional: `analysis` is empty
+    // for attempts graded before the diagnostic shipped, and the grader can
+    // legitimately return nothing for a section — a mistake-free essay has no
+    // corrections. So each section renders only if it has something to say,
+    // and the screen degrades to the bands and the essay.
+    final analysis = (attempt['analysis'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+    final criteria = (analysis['criteria'] as Map?)?.cast<String, dynamic>();
+    final stats = (analysis['stats'] as Map?)?.cast<String, dynamic>();
+    final errors = wMapList(analysis['errors']);
+    final nextSteps = wMapList(analysis['next_steps']);
+    final grammarTopics = wMapList(analysis['grammar_topics']);
+    final vocabulary = wMapList(analysis['vocabulary_upgrades']);
+    final observedHabits = wMapList(analysis['habits']);
+    final countedHabits = stats == null ? const <Map<String, dynamic>>[] : wMapList(stats['habits']);
+
+    final summary = (analysis['summary']?.toString() ?? '').trim();
+    final coachText = summary.isNotEmpty
+        ? summary
+        : feedback.isNotEmpty
+            ? feedback
+            : 'No detailed feedback was returned for this attempt.';
+
+    // One running stagger for the whole report rather than hand-numbered
+    // delays, so inserting a section never re-times the ones below it.
+    var step = 0;
+    Duration nextDelay() => Duration(milliseconds: 60 * step++);
+
+    final children = <Widget>[
+      WFadeSlideIn(child: _HeroCard(overall: overall, tier: tier, onShare: onShare, sharing: sharing)),
+    ];
+
+    void section(String title, Widget body, {String? subtitle}) {
+      children
+        ..add(const SizedBox(height: 26))
+        ..add(WFadeSlideIn(delay: nextDelay(), child: wSectionTitle(context, title, subtitle: subtitle)))
+        ..add(const SizedBox(height: 12))
+        ..add(WFadeSlideIn(delay: nextDelay(), child: body));
+    }
+
+    // What the question actually was. `prompt.title` carries the task
+    // statement, and a report reopened weeks later is unreadable without it —
+    // "Task achievement 6.0" means nothing if you cannot see what the task
+    // was. The chart comes along as a strip rather than at writing size: the
+    // essay is already written, and it opens full screen on a tap.
+    if ((prompt['title']?.toString() ?? '').isNotEmpty) {
+      children
+        ..add(const SizedBox(height: 20))
+        ..add(WFadeSlideIn(
+          delay: nextDelay(),
+          child: WTaskCard(prompt: prompt.cast<String, dynamic>(), maxImageHeight: 170),
+        ));
+    }
+
+    // No section heading above the coach card: the card is titled "AI Coach"
+    // itself, and two identical labels one above the other read as a mistake.
+    children
+      ..add(const SizedBox(height: 26))
+      ..add(WFadeSlideIn(delay: nextDelay(), child: _AiCoachCard(feedback: coachText)));
+
+    if (nextSteps.isNotEmpty) {
+      section('What to Work On Next', WNextSteps(steps: nextSteps));
+    }
+
+    // The four criteria. With a review they carry the grader's own verdict on
+    // this essay; without one they fall back to the public band descriptor for
+    // the score, which is general guidance rather than a claim about the text.
+    children
+      ..add(const SizedBox(height: 26))
+      ..add(WFadeSlideIn(delay: nextDelay(), child: wSectionTitle(context, 'Score Breakdown')))
+      ..add(const SizedBox(height: 12));
+    for (final key in wCriterionKeys) {
+      final detail = (criteria?[key] as Map?)?.cast<String, dynamic>();
+      final band = detail != null ? wToDouble(detail['band']) : wToDouble(attempt[key]);
+      children
+        ..add(_CriterionCard(
+          title: wCriterionNames[key]!,
+          icon: wCriterionIcons[key]!,
+          score: band,
+          descriptor: _descriptorFor(key, band),
+          verdict: detail?['verdict']?.toString(),
+          strengths: wStringList(detail?['strengths']),
+          improvements: wStringList(detail?['improvements']),
+          delay: nextDelay(),
+        ))
+        ..add(const SizedBox(height: 12));
+    }
+    children.removeLast();
+
+    section(
+      'Skill Radar',
+      _RadarCard(
+        task: wToDouble(attempt['task_achievement']),
+        coherence: wToDouble(attempt['coherence_cohesion']),
+        lexical: wToDouble(attempt['lexical_resource']),
+        grammar: wToDouble(attempt['grammar_accuracy']),
+      ),
+    );
+
+    if (countedHabits.isNotEmpty || observedHabits.isNotEmpty) {
+      section(
+        'Patterns In This Essay',
+        WHabitsSection(counted: countedHabits, observed: observedHabits),
+        subtitle: 'Repetition an examiner notices immediately — and the easiest marks to win back.',
+      );
+    }
+
+    if (grammarTopics.isNotEmpty) {
+      section(
+        'Grammar To Revise',
+        WGrammarTopics(topics: grammarTopics),
+        subtitle: 'The rules behind the mistakes in this essay. Revise the top one first.',
+      );
+    }
+
+    section(
+      'Your Essay',
+      WAnnotatedEssay(essayText: essayText, errors: errors, wordCount: wordCount),
+    );
+
+    if (errors.isNotEmpty) {
+      section(
+        'Corrections',
+        Column(
+          children: [
+            for (var i = 0; i < errors.length; i++) ...[
+              if (i > 0) const SizedBox(height: 10),
+              WCorrectionCard(error: errors[i], index: i),
+            ],
+          ],
+        ),
+      );
+    }
+
+    if (vocabulary.isNotEmpty) {
+      section('Stronger Word Choices', WVocabularyUpgrades(upgrades: vocabulary));
+    }
+
+    // The counted shape of the writing. Prefer the server's numbers when the
+    // review carries them — they are what the habits above were counted from,
+    // so a student checking the claim reads the same figures the grader did.
+    section(
+      'Essay Statistics',
+      stats != null
+          ? WStatsStrip(stats: stats)
+          : _EssayStatsGrid(
+              wordCount: wordCount,
+              essayText: essayText,
+              taskNumber: taskNumber,
+              minWords: minWords,
+            ),
+    );
+
+    if (loadingReport) {
+      children
+        ..add(const SizedBox(height: 22))
+        ..add(const _ReportLoadingRow());
+    }
+
+    children
+      ..add(const SizedBox(height: 30))
+      ..add(WFadeSlideIn(
+        delay: nextDelay(),
+        child: Column(
+          children: [
+            MtPrimaryButton(label: 'Practice Another Essay', onPressed: () => Navigator.pop(context)),
+            const SizedBox(height: 10),
+            _SecondaryButton(
+              label: 'See What You Keep Repeating',
+              icon: Icons.insights_rounded,
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const WritingProgressScreen()),
+              ),
+            ),
+          ],
+        ),
+      ));
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+      children: children,
+    );
+  }
+}
+
+/// Shown under the report while the full review is still on its way — the
+/// bands are already on screen by then, so this is a footnote rather than a
+/// blocking spinner.
+class _ReportLoadingRow extends StatelessWidget {
+  const _ReportLoadingRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final wr = context.wr;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _FadeSlideIn(child: _HeroCard(overall: overall, tier: tier, onShare: onShare, sharing: sharing)),
-        const SizedBox(height: 26),
-        _FadeSlideIn(delay: const Duration(milliseconds: 80), child: _sectionTitle('Score Breakdown')),
-        const SizedBox(height: 12),
-        _CriterionCard(
-          title: 'Task Achievement',
-          icon: Icons.flag_rounded,
-          score: task,
-          descriptor: _descriptorFor('task', task),
-          delay: const Duration(milliseconds: 120),
-        ),
-        const SizedBox(height: 12),
-        _CriterionCard(
-          title: 'Coherence & Cohesion',
-          icon: Icons.hub_rounded,
-          score: coherence,
-          descriptor: _descriptorFor('coherence', coherence),
-          delay: const Duration(milliseconds: 180),
-        ),
-        const SizedBox(height: 12),
-        _CriterionCard(
-          title: 'Lexical Resource',
-          icon: Icons.menu_book_rounded,
-          score: lexical,
-          descriptor: _descriptorFor('lexical', lexical),
-          delay: const Duration(milliseconds: 240),
-        ),
-        const SizedBox(height: 12),
-        _CriterionCard(
-          title: 'Grammatical Range & Accuracy',
-          icon: Icons.rule_rounded,
-          score: grammar,
-          descriptor: _descriptorFor('grammar', grammar),
-          delay: const Duration(milliseconds: 300),
-        ),
-        const SizedBox(height: 26),
-        _FadeSlideIn(delay: const Duration(milliseconds: 340), child: _sectionTitle('Skill Radar')),
-        const SizedBox(height: 12),
-        _FadeSlideIn(
-          delay: const Duration(milliseconds: 380),
-          child: _RadarCard(task: task, coherence: coherence, lexical: lexical, grammar: grammar),
-        ),
-        const SizedBox(height: 26),
-        _FadeSlideIn(delay: const Duration(milliseconds: 420), child: _sectionTitle('AI Coach')),
-        const SizedBox(height: 12),
-        _FadeSlideIn(
-          delay: const Duration(milliseconds: 460),
-          child: _AiCoachCard(feedback: feedback.isEmpty ? 'No detailed feedback was returned for this attempt.' : feedback),
-        ),
-        const SizedBox(height: 26),
-        _FadeSlideIn(delay: const Duration(milliseconds: 500), child: _sectionTitle('Essay Statistics')),
-        const SizedBox(height: 12),
-        _FadeSlideIn(
-          delay: const Duration(milliseconds: 540),
-          child: _EssayStatsGrid(wordCount: wordCount, essayText: essayText, taskNumber: taskNumber, minWords: minWords),
-        ),
-        const SizedBox(height: 30),
-        _FadeSlideIn(
-          delay: const Duration(milliseconds: 580),
-          child: MtPrimaryButton(label: 'Practice Another Essay', onPressed: () => Navigator.pop(context)),
+        SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: wr.accent)),
+        const SizedBox(width: 10),
+        Text(
+          'Loading your full report…',
+          style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, fontWeight: FontWeight.w600, color: wr.muted),
         ),
       ],
+    );
+  }
+}
+
+/// Outlined counterpart to [MtPrimaryButton], for the second action under a
+/// report where both destinations are worth offering.
+class _SecondaryButton extends StatelessWidget {
+  const _SecondaryButton({required this.label, required this.icon, required this.onPressed});
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final wr = context.wr;
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 18, color: wr.text),
+        label: Text(
+          label,
+          style: TextStyle(fontFamily: 'SF Pro', fontSize: 15, fontWeight: FontWeight.w600, color: wr.text),
+        ),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          side: BorderSide(color: wr.line, width: 1.5),
+          backgroundColor: wr.card,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
     );
   }
 }
@@ -279,10 +497,10 @@ class _HeroCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [_Palette.primary, _Palette.primaryLight],
+          colors: [WPalette.primary, WPalette.primaryLight],
         ),
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [BoxShadow(color: _Palette.primary.withValues(alpha: 0.35), blurRadius: 28, offset: const Offset(0, 14))],
+        boxShadow: [BoxShadow(color: WPalette.primary.withValues(alpha: 0.35), blurRadius: 28, offset: const Offset(0, 14))],
       ),
       child: Column(
         children: [
@@ -439,7 +657,7 @@ class _InstagramStoryCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF181A32), _Palette.primary, _Palette.primaryLight],
+          colors: [Color(0xFF181A32), WPalette.primary, WPalette.primaryLight],
         ),
       ),
       child: Padding(
@@ -501,7 +719,7 @@ class _InstagramStoryCard extends StatelessWidget {
                   children: [
                     _SideStat(
                       icon: Icons.assignment_rounded,
-                      color: _Palette.purple,
+                      color: WPalette.purple,
                       value: taskNumber != null ? 'Task $taskNumber' : 'Writing',
                       caption: 'IELTS section',
                     ),
@@ -536,7 +754,7 @@ class _InstagramStoryCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _SideStat(icon: Icons.trending_up_rounded, color: _Palette.green, value: _levelLabel(overall), caption: 'level of English'),
+                    _SideStat(icon: Icons.trending_up_rounded, color: WPalette.green, value: _levelLabel(overall), caption: 'level of English'),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -559,13 +777,13 @@ class _InstagramStoryCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Expanded(child: _MiniSkillCard(label: 'Task', score: task, color: _Palette.blue, icon: Icons.flag_rounded)),
+                    Expanded(child: _MiniSkillCard(label: 'Task', score: task, color: WPalette.blue, icon: Icons.flag_rounded)),
                     const SizedBox(width: 6),
-                    Expanded(child: _MiniSkillCard(label: 'Coherence', score: coherence, color: _Palette.purple, icon: Icons.hub_rounded)),
+                    Expanded(child: _MiniSkillCard(label: 'Coherence', score: coherence, color: WPalette.purple, icon: Icons.hub_rounded)),
                     const SizedBox(width: 6),
-                    Expanded(child: _MiniSkillCard(label: 'Lexical', score: lexical, color: _Palette.green, icon: Icons.menu_book_rounded)),
+                    Expanded(child: _MiniSkillCard(label: 'Lexical', score: lexical, color: WPalette.green, icon: Icons.menu_book_rounded)),
                     const SizedBox(width: 6),
-                    Expanded(child: _MiniSkillCard(label: 'Grammar', score: grammar, color: _Palette.orange, icon: Icons.rule_rounded)),
+                    Expanded(child: _MiniSkillCard(label: 'Grammar', score: grammar, color: WPalette.orange, icon: Icons.rule_rounded)),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -735,23 +953,35 @@ class _CriterionCard extends StatelessWidget {
     required this.score,
     required this.descriptor,
     required this.delay,
+    this.verdict,
+    this.strengths = const [],
+    this.improvements = const [],
   });
 
   final String title;
   final IconData icon;
   final double score;
+
+  /// The public band descriptor for [score] — general guidance for that band,
+  /// shown only when the grader did not return a verdict on this essay.
   final String descriptor;
   final Duration delay;
 
+  /// The grader's judgement of *this* essay against this criterion.
+  final String? verdict;
+  final List<String> strengths;
+  final List<String> improvements;
+
   @override
   Widget build(BuildContext context) {
-    final color = _scoreColor(score);
-    return _FadeSlideIn(
+    final wr = context.wr;
+    final color = wScoreColor(context, score);
+    return WFadeSlideIn(
       delay: delay,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: _Palette.softShadow),
+        decoration: wCardDecoration(context, radius: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -767,12 +997,12 @@ class _CriterionCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(fontFamily: 'SF Pro', fontSize: 15, fontWeight: FontWeight.w700, color: _Palette.primary),
+                    style: TextStyle(fontFamily: 'SF Pro', fontSize: 15, fontWeight: FontWeight.w700, color: wr.text),
                   ),
                 ),
                 Text(
                   score.toStringAsFixed(1),
-                  style: const TextStyle(fontFamily: 'SF Pro', fontSize: 22, fontWeight: FontWeight.w800, color: _Palette.primary),
+                  style: TextStyle(fontFamily: 'SF Pro', fontSize: 22, fontWeight: FontWeight.w800, color: wr.text),
                 ),
               ],
             ),
@@ -796,11 +1026,46 @@ class _CriterionCard extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              descriptor,
-              style: const TextStyle(fontFamily: 'SF Pro', fontSize: 13, height: 1.45, color: _Palette.textGrey),
+              (verdict?.trim().isNotEmpty ?? false) ? verdict!.trim() : descriptor,
+              style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, height: 1.45, color: wr.muted),
             ),
+            for (final item in strengths) _CriterionPoint(text: item, icon: Icons.check_rounded, color: wr.good),
+            for (final item in improvements)
+              _CriterionPoint(text: item, icon: Icons.arrow_forward_rounded, color: wr.accent),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// One "what works" / "what to change" line under a criterion. The icon does
+/// the labelling, so the two lists can sit together without headings.
+class _CriterionPoint extends StatelessWidget {
+  const _CriterionPoint({required this.text, required this.icon, required this.color});
+  final String text;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 9),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, height: 1.45, color: context.wr.muted),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -819,10 +1084,11 @@ class _RadarCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final wr = context.wr;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: _Palette.softShadow),
+      decoration: wCardDecoration(context, radius: 24),
       child: SizedBox(
         height: 260,
         width: double.infinity,
@@ -835,6 +1101,10 @@ class _RadarCard extends StatelessWidget {
               values: [task, coherence, lexical, grammar],
               labels: const ['Task\nAchievement', 'Coherence', 'Vocabulary', 'Grammar'],
               progress: t,
+              grid: wr.line,
+              plot: wr.accent,
+              label: wr.text,
+              knockout: wr.card,
             ),
           ),
         ),
@@ -844,11 +1114,26 @@ class _RadarCard extends StatelessWidget {
 }
 
 class _RadarChartPainter extends CustomPainter {
-  _RadarChartPainter({required this.values, required this.labels, required this.progress});
+  _RadarChartPainter({
+    required this.values,
+    required this.labels,
+    required this.progress,
+    required this.grid,
+    required this.plot,
+    required this.label,
+    required this.knockout,
+  });
 
   final List<double> values;
   final List<String> labels;
   final double progress;
+  final Color grid;
+  final Color plot;
+  final Color label;
+
+  /// The ring around each vertex — the card colour, so the dot reads as a dot
+  /// on either ground.
+  final Color knockout;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -858,7 +1143,7 @@ class _RadarChartPainter extends CustomPainter {
     final angleStep = (2 * pi) / sides;
 
     final gridPaint = Paint()
-      ..color = const Color(0xFFEDEEF3)
+      ..color = grid
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
     for (final frac in [0.34, 0.67, 1.0]) {
@@ -896,22 +1181,22 @@ class _RadarChartPainter extends CustomPainter {
       }
     }
     dataPath.close();
-    canvas.drawPath(dataPath, Paint()..color = _Palette.blue.withValues(alpha: 0.18));
+    canvas.drawPath(dataPath, Paint()..color = plot.withValues(alpha: 0.18));
     canvas.drawPath(
       dataPath,
       Paint()
-        ..color = _Palette.blue
+        ..color = plot
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.4
         ..strokeJoin = StrokeJoin.round,
     );
     for (final p in points) {
-      canvas.drawCircle(p, 4, Paint()..color = _Palette.blue);
+      canvas.drawCircle(p, 4, Paint()..color = plot);
       canvas.drawCircle(
         p,
         4,
         Paint()
-          ..color = Colors.white
+          ..color = knockout
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.6,
       );
@@ -923,7 +1208,7 @@ class _RadarChartPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: labels[i],
-          style: const TextStyle(fontFamily: 'SF Pro', fontSize: 11.5, fontWeight: FontWeight.w600, color: _Palette.primary, height: 1.2),
+          style: TextStyle(fontFamily: 'SF Pro', fontSize: 11.5, fontWeight: FontWeight.w600, color: label, height: 1.2),
         ),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
@@ -934,7 +1219,7 @@ class _RadarChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RadarChartPainter oldDelegate) =>
-      oldDelegate.progress != progress || oldDelegate.values != values;
+      oldDelegate.progress != progress || oldDelegate.values != values || oldDelegate.plot != plot;
 }
 
 // ---------------------------------------------------------------------------
@@ -954,16 +1239,12 @@ class _AiCoachCardState extends State<_AiCoachCard> {
 
   @override
   Widget build(BuildContext context) {
+    final wr = context.wr;
     final canCollapse = widget.feedback.length > 220;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: _Palette.softShadow,
-        border: Border.all(color: _Palette.blue.withValues(alpha: 0.12)),
-      ),
+      decoration: wCardDecoration(context, radius: 24, borderColor: wr.accent.withValues(alpha: 0.35)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -972,21 +1253,22 @@ class _AiCoachCardState extends State<_AiCoachCard> {
               Container(
                 width: 40,
                 height: 40,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(colors: [_Palette.blue, _Palette.primary]),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [wr.accent, wr.colors.brand]),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('AI Coach', style: TextStyle(fontFamily: 'SF Pro', fontSize: 15, fontWeight: FontWeight.w700, color: _Palette.primary)),
+                    Text('AI Coach',
+                        style: TextStyle(fontFamily: 'SF Pro', fontSize: 15, fontWeight: FontWeight.w700, color: wr.text)),
                     Text(
                       'Personalized feedback on your essay',
-                      style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: _Palette.textGrey),
+                      style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: wr.muted),
                     ),
                   ],
                 ),
@@ -998,7 +1280,7 @@ class _AiCoachCardState extends State<_AiCoachCard> {
             widget.feedback,
             maxLines: !canCollapse || _expanded ? null : 4,
             overflow: !canCollapse || _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
-            style: const TextStyle(fontFamily: 'SF Pro', fontSize: 14, height: 1.55, color: _Palette.primary),
+            style: TextStyle(fontFamily: 'SF Pro', fontSize: 14, height: 1.55, color: wr.text),
           ),
           if (canCollapse) ...[
             const SizedBox(height: 10),
@@ -1009,11 +1291,11 @@ class _AiCoachCardState extends State<_AiCoachCard> {
                 children: [
                   Text(
                     _expanded ? 'Show less' : 'View Full Feedback',
-                    style: const TextStyle(fontFamily: 'SF Pro', fontSize: 13, fontWeight: FontWeight.w700, color: _Palette.blue),
+                    style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, fontWeight: FontWeight.w700, color: wr.accent),
                   ),
                   Icon(
                     _expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                    color: _Palette.blue,
+                    color: wr.accent,
                     size: 18,
                   ),
                 ],
@@ -1046,6 +1328,7 @@ class _EssayStatsGrid extends StatelessWidget {
     final sentences = _sentenceCount(essayText);
     final avgSentenceLen = wordCount == 0 ? 0.0 : wordCount / sentences;
     final level = _readingLevel(essayText, wordCount);
+    final wr = context.wr;
 
     return GridView.count(
       crossAxisCount: 2,
@@ -1055,10 +1338,10 @@ class _EssayStatsGrid extends StatelessWidget {
       crossAxisSpacing: 12,
       childAspectRatio: 1.3,
       children: [
-        _StatTile(icon: Icons.short_text_rounded, value: '$wordCount', label: 'Words', sub: target, color: onTarget ? _Palette.green : _Palette.orange),
-        _StatTile(icon: Icons.view_agenda_rounded, value: '$paragraphs', label: 'Paragraphs', color: _Palette.blue),
-        _StatTile(icon: Icons.linear_scale_rounded, value: avgSentenceLen.toStringAsFixed(1), label: 'Avg Sentence Length', sub: 'words/sentence', color: _Palette.blue),
-        _StatTile(icon: Icons.school_rounded, value: level, label: 'Reading Level', sub: 'estimated', color: _Palette.primary),
+        _StatTile(icon: Icons.short_text_rounded, value: '$wordCount', label: 'Words', sub: target, color: onTarget ? wr.good : wr.warn),
+        _StatTile(icon: Icons.view_agenda_rounded, value: '$paragraphs', label: 'Paragraphs', color: wr.accent),
+        _StatTile(icon: Icons.linear_scale_rounded, value: avgSentenceLen.toStringAsFixed(1), label: 'Avg Sentence Length', sub: 'words/sentence', color: wr.accent),
+        _StatTile(icon: Icons.school_rounded, value: level, label: 'Reading Level', sub: 'estimated', color: wr.text),
       ],
     );
   }
@@ -1075,20 +1358,21 @@ class _StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final wr = context.wr;
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: _Palette.softShadow),
+      decoration: wCardDecoration(context, radius: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(icon, color: color, size: 20),
           const SizedBox(height: 8),
-          Text(value, style: const TextStyle(fontFamily: 'SF Pro', fontSize: 20, fontWeight: FontWeight.w800, color: _Palette.primary)),
+          Text(value, style: TextStyle(fontFamily: 'SF Pro', fontSize: 20, fontWeight: FontWeight.w800, color: wr.text)),
           const SizedBox(height: 2),
-          Text(label, style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12, fontWeight: FontWeight.w600, color: _Palette.primary)),
+          Text(label, style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, fontWeight: FontWeight.w600, color: wr.text)),
           if (sub != null)
-            Text(sub!, style: const TextStyle(fontFamily: 'SF Pro', fontSize: 10.5, color: _Palette.textGrey)),
+            Text(sub!, style: TextStyle(fontFamily: 'SF Pro', fontSize: 10.5, color: wr.muted)),
         ],
       ),
     );
@@ -1099,69 +1383,9 @@ class _StatTile extends StatelessWidget {
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-class _Palette {
-  static const primary = Color(0xFF2E3154);
-  static const primaryLight = Color(0xFF454875);
-  static const blue = Color(0xFF4F7CFF);
-  static const purple = Color(0xFF8B5CF6);
-  static const green = Color(0xFF30C48D);
-  static const orange = Color(0xFFF5A623);
-  static const red = Color(0xFFFF5C5C);
-  static const bg = Color(0xFFF6F7FB);
-  static const textGrey = Color(0xFF7A7E92);
-  static final softShadow = [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, 8))];
-}
-
 class _Tier {
   const _Tier(this.label);
   final String label;
-}
-
-/// Fades and slides its [child] up shortly after [delay], giving the page a
-/// gentle staggered-reveal feel without a shared AnimationController.
-class _FadeSlideIn extends StatefulWidget {
-  const _FadeSlideIn({required this.child, this.delay = Duration.zero});
-  final Widget child;
-  final Duration delay;
-
-  @override
-  State<_FadeSlideIn> createState() => _FadeSlideInState();
-}
-
-class _FadeSlideInState extends State<_FadeSlideIn> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
-  late final Animation<double> _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
-  late final Animation<Offset> _slide =
-      Tween(begin: const Offset(0, 0.06), end: Offset.zero).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
-
-  @override
-  void initState() {
-    super.initState();
-    Future.delayed(widget.delay, () {
-      if (mounted) _controller.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(opacity: _fade, child: SlideTransition(position: _slide, child: widget.child));
-  }
-}
-
-Widget _sectionTitle(String text) => Padding(
-      padding: const EdgeInsets.only(left: 2),
-      child: Text(text, style: const TextStyle(fontFamily: 'SF Pro', fontSize: 19, fontWeight: FontWeight.w800, color: _Palette.primary)),
-    );
-
-double _toDouble(dynamic v) {
-  if (v is num) return v.toDouble();
-  return double.tryParse(v?.toString() ?? '') ?? 0;
 }
 
 _Tier _bandTier(double band) {
@@ -1211,39 +1435,32 @@ String _formatDate(dynamic iso) {
   return '${date.day} ${months[date.month - 1]} ${date.year}';
 }
 
-Color _scoreColor(double score) {
-  if (score >= 7.5) return _Palette.green;
-  if (score >= 6) return _Palette.blue;
-  if (score >= 5) return _Palette.orange;
-  return _Palette.red;
-}
-
 /// Short paraphrases of the public IELTS Writing band descriptors, bucketed
 /// by score — general guidance for that band, not a claim about this essay
 /// specifically (the backend only returns a numeric score per criterion).
 const Map<String, List<String>> _descriptors = {
-  'task': [
+  'task_achievement': [
     'Fully addresses all parts of the task with a clear, well-developed position and relevant, well-supported ideas.',
     'Addresses all parts of the task with a clear position, supported by relevant ideas, though some points may be underdeveloped.',
     'Addresses the task, though some parts may be covered more fully than others; main ideas are relevant but could be extended.',
     'Addresses the task only partially; ideas are present but limited and not well supported.',
     'Response has limited relevance to the task and needs significant development.',
   ],
-  'coherence': [
+  'coherence_cohesion': [
     'Information and ideas are logically sequenced with skilful use of cohesive devices and paragraphing.',
     'Logically organises information with a clear progression throughout; cohesive devices used effectively.',
     'Arranges information coherently with a clear overall progression, though cohesion may be imperfect at times.',
     'Presents information with some organisation, but overall progression is not always clear.',
     'Ideas are not arranged coherently and there is little sense of progression.',
   ],
-  'lexical': [
+  'lexical_resource': [
     'Wide range of vocabulary used fluently and flexibly to convey precise meaning, with only occasional inaccuracies.',
     'Sufficient range of vocabulary to allow flexibility and precision, with some awareness of style and collocation.',
     'Adequate range of vocabulary for the task; attempts less common items with some inaccuracy.',
     'Limited range of vocabulary that is only minimally adequate for the task.',
     'Vocabulary is very limited, which restricts communication of ideas.',
   ],
-  'grammar': [
+  'grammar_accuracy': [
     'Wide range of structures used with full flexibility and accuracy; only rare, non-systematic errors.',
     'Variety of complex structures with frequent error-free sentences; good control of grammar and punctuation.',
     'Mix of simple and complex sentence forms; errors occur but rarely reduce clarity.',

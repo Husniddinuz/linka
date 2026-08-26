@@ -1,18 +1,26 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
 import 'plus_subscription_screen.dart';
+import 'speaking_attempts_screen.dart';
 import 'speaking_sample_screen.dart';
+import 'tutor_profile_screen.dart';
 import '../theme/app_colors.dart';
 
 /// How many of a tutor's topics a non-Plus user can open for free; the rest
 /// stay visible but locked and route to the Plus subscription screen.
 const int _freeSamples = 3;
 
-/// Grid of tutors with real Speaking sample answers for students to study —
-/// read-only reference content, no submission/grading. Tapping a tutor
-/// drills into their submitted topics (see [SpeakingSampleTutorTopicsScreen]);
-/// tapping a topic opens that sample's Part 1/2/3 audio + live transcript.
+/// Level 1: the tutors who have recorded Speaking answers.
+///
+/// Deliberately a list of rows, not the photo grid it used to be — that grid
+/// was visually indistinguishable from the Tutors directory, so students
+/// opened it expecting to book someone. Rows plus an explicit "listen to"
+/// header and per-tutor topic counts make it read as a library index.
+///
+/// Tapping a tutor opens their topics (see
+/// [SpeakingSampleTutorTopicsScreen]).
 class SpeakingSamplesListScreen extends StatefulWidget {
   const SpeakingSamplesListScreen({super.key});
 
@@ -21,7 +29,16 @@ class SpeakingSamplesListScreen extends StatefulWidget {
 }
 
 class _SpeakingSamplesListScreenState extends State<SpeakingSamplesListScreen> {
-  final Future<List<Map<String, dynamic>>> _future = MockTestService.fetchSpeakingSampleTutors();
+  final Future<List<Map<String, dynamic>>> _future =
+      MockTestService.fetchSpeakingSampleTutors();
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,61 +52,54 @@ class _SpeakingSamplesListScreenState extends State<SpeakingSamplesListScreen> {
             return Center(child: CircularProgressIndicator(color: context.colors.accentYellow));
           }
           if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Failed to load: ${snapshot.error}',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textSecondary, fontSize: 14),
-                ),
-              ),
-            );
+            return _ErrorState(error: snapshot.error);
           }
           final tutors = snapshot.data ?? const [];
           if (tutors.isEmpty) {
-            return Center(
-              child: Text(
-                'No speaking samples yet',
-                style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textSecondary, fontSize: 14),
-              ),
-            );
+            return const _EmptyState(message: 'No speaking samples yet');
           }
-          return GridView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            itemCount: tutors.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 14,
-              crossAxisSpacing: 14,
-              childAspectRatio: 0.72,
-            ),
-            itemBuilder: (context, i) {
-              final tutor = tutors[i];
-              final tutorId = (tutor['tutor_id'] as num?)?.toInt();
-              final tutorName = tutor['tutor_name']?.toString() ?? '';
-              final tutorImageUrl = tutor['tutor_image_url'] as String?;
-              final tutorSpeakingScore = tutor['tutor_speaking_score']?.toString();
-              final sampleCount = (tutor['sample_count'] as num?)?.toInt() ?? 0;
 
-              return _TutorCard(
-                name: tutorName,
-                imageUrl: tutorImageUrl,
-                scoreLabel: tutorSpeakingScore != null ? 'IELTS $tutorSpeakingScore' : null,
-                subtitle: '$sampleCount topic${sampleCount == 1 ? '' : 's'}',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => SpeakingSampleTutorTopicsScreen(
-                      tutorId: tutorId,
-                      tutorName: tutorName,
-                      tutorImageUrl: tutorImageUrl,
-                      tutorSpeakingScore: tutorSpeakingScore,
-                    ),
-                  ),
-                ),
-              );
-            },
+          final query = _query.trim().toLowerCase();
+          final visible = query.isEmpty
+              ? tutors
+              : tutors
+                  .where((t) => (t['tutor_name']?.toString() ?? '')
+                      .toLowerCase()
+                      .contains(query))
+                  .toList();
+          final totalTopics = tutors.fold<int>(
+            0,
+            (sum, t) => sum + ((t['sample_count'] as num?)?.toInt() ?? 0),
+          );
+
+          return Column(
+            children: [
+              _IntroHeader(
+                title: 'Listen to real high-band answers',
+                subtitle:
+                    '$totalTopics recorded topics from ${tutors.length} tutors, with follow-along transcripts',
+              ),
+              // Their own marked answers, offered where they are already
+              // hunting for a question to answer — rather than behind a nav
+              // entry of its own that nobody would look for.
+              const _YourAnswersRow(),
+              _SearchField(
+                controller: _searchController,
+                hint: 'Search a tutor',
+                query: _query,
+                onChanged: (value) => setState(() => _query = value),
+              ),
+              Expanded(
+                child: visible.isEmpty
+                    ? const _EmptyState(message: 'No tutors match that search.')
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                        itemCount: visible.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (context, i) => _TutorRow(tutor: visible[i]),
+                      ),
+              ),
+            ],
           );
         },
       ),
@@ -97,9 +107,97 @@ class _SpeakingSamplesListScreenState extends State<SpeakingSamplesListScreen> {
   }
 }
 
-/// One tutor's submitted Speaking topics — a simple list of that tutor's
-/// samples, one row per submitted topic. Tapping a topic opens the existing
-/// Part 1/2/3 audio/transcript viewer, unchanged.
+/// One tutor in the level-1 list: big photo, name, how many topics they have
+/// recorded, and their own IELTS Speaking credential.
+class _TutorRow extends StatelessWidget {
+  const _TutorRow({required this.tutor});
+  final Map<String, dynamic> tutor;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final name = tutor['tutor_name']?.toString() ?? '';
+    final imageUrl = tutor['tutor_image_url'] as String?;
+    final score = tutor['tutor_speaking_score']?.toString();
+    final count = (tutor['sample_count'] as num?)?.toInt() ?? 0;
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SpeakingSampleTutorTopicsScreen(
+            tutorId: (tutor['tutor_id'] as num?)?.toInt(),
+            tutorName: name,
+            tutorImageUrl: imageUrl,
+            tutorSpeakingScore: score,
+          ),
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: mtSoftCard(context, radius: 16),
+        child: Row(
+          children: [
+            _Artwork(imageUrl: imageUrl, size: 82),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      height: 1.25,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Row(
+                    children: [
+                      Icon(Icons.headphones_rounded, size: 14, color: colors.textTertiary),
+                      const SizedBox(width: 5),
+                      Text(
+                        '$count topic${count == 1 ? '' : 's'}',
+                        style: TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (score != null) ...[
+                    const SizedBox(height: 8),
+                    _Chip(
+                      label: 'IELTS SPEAKING $score',
+                      color: colors.textPrimary,
+                      background: colors.accentYellow.withValues(alpha: 0.25),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(Icons.chevron_right_rounded, size: 22, color: colors.textTertiary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Level 2: one tutor's topics ────────────────────────────────────────────
+
+/// The topics a single tutor has recorded. The tutor is already chosen, so
+/// their photo sits once in the header and each row leads with the band score
+/// the answer earned instead of repeating the same face down the page.
 class SpeakingSampleTutorTopicsScreen extends StatefulWidget {
   const SpeakingSampleTutorTopicsScreen({
     super.key,
@@ -115,12 +213,21 @@ class SpeakingSampleTutorTopicsScreen extends StatefulWidget {
   final String? tutorSpeakingScore;
 
   @override
-  State<SpeakingSampleTutorTopicsScreen> createState() => _SpeakingSampleTutorTopicsScreenState();
+  State<SpeakingSampleTutorTopicsScreen> createState() =>
+      _SpeakingSampleTutorTopicsScreenState();
 }
 
 class _SpeakingSampleTutorTopicsScreenState extends State<SpeakingSampleTutorTopicsScreen> {
   late final Future<List<Map<String, dynamic>>> _future;
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
   bool _isLocked = false;
+
+  /// The tutor's catalogue entry, when they have one. It is what decides
+  /// whether this voice can actually be booked: an admin-authored sample has
+  /// no account behind it at all, and an id that no longer resolves is a tutor
+  /// who has stopped teaching. Null in both cases, and the CTA stays off.
+  Map<String, dynamic>? _bookable;
 
   @override
   void initState() {
@@ -130,12 +237,37 @@ class _SpeakingSampleTutorTopicsScreenState extends State<SpeakingSampleTutorTop
       tutorName: widget.tutorId == null ? widget.tutorName : null,
     );
     _checkPlusStatus();
+    _loadBookable();
+  }
+
+  /// The id to offer a lesson with, or null when there is nothing to offer:
+  /// no tutor account, an outage, or a tutor who is not taking students.
+  int? get _bookableTutorId =>
+      _bookable?['is_enrollable'] == true ? widget.tutorId : null;
+
+  Future<void> _loadBookable() async {
+    final id = widget.tutorId;
+    if (id == null) return;
+    try {
+      final tutor = await ApiService.get('/tutors/$id/');
+      if (!mounted) return;
+      setState(() => _bookable = tutor);
+    } catch (_) {
+      // The samples are the screen; a catalogue outage costs the CTA, not the
+      // list.
+    }
   }
 
   Future<void> _checkPlusStatus() async {
     final locked = await mtCheckContentLocked();
     if (!mounted) return;
     setState(() => _isLocked = locked);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -150,141 +282,141 @@ class _SpeakingSampleTutorTopicsScreenState extends State<SpeakingSampleTutorTop
             return Center(child: CircularProgressIndicator(color: context.colors.accentYellow));
           }
           if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Failed to load: ${snapshot.error}',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textSecondary, fontSize: 14),
-                ),
-              ),
-            );
+            return _ErrorState(error: snapshot.error);
           }
-          final samples = snapshot.data ?? const [];
+          final samples = _Sample.fromResponse(
+            snapshot.data ?? const [],
+            contentLocked: _isLocked,
+          );
           if (samples.isEmpty) {
-            return Center(
-              child: Text(
-                'No speaking samples yet',
-                style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textSecondary, fontSize: 14),
-              ),
-            );
+            return const _EmptyState(message: 'No speaking samples yet');
           }
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            itemCount: samples.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 10),
-            // The backend is the source of truth ('locked' items arrive with
-            // their parts stripped); the index check is a fallback for
-            // backends that predate server-side gating.
-            itemBuilder: (context, i) => _TopicRow(
-              sample: samples[i],
-              locked: samples[i]['locked'] == true || (_isLocked && i >= _freeSamples),
-            ),
+
+          final query = _query.trim().toLowerCase();
+          final visible = query.isEmpty
+              ? samples
+              : samples
+                  .where((s) => s.topicTitle.toLowerCase().contains(query))
+                  .toList();
+
+          return Column(
+            children: [
+              _buildTutorHeader(samples.length),
+              if (samples.length > 6)
+                _SearchField(
+                  controller: _searchController,
+                  hint: 'Search a topic',
+                  query: _query,
+                  onChanged: (value) => setState(() => _query = value),
+                ),
+              Expanded(
+                child: visible.isEmpty
+                    ? const _EmptyState(message: 'No topics match that search.')
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                        itemCount: visible.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (context, i) =>
+                            _TopicRow(sample: visible[i], tutorId: _bookableTutorId),
+                      ),
+              ),
+            ],
           );
         },
       ),
     );
   }
+
+  Widget _buildTutorHeader(int count) {
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+      child: Row(
+        children: [
+          _Artwork(imageUrl: widget.tutorImageUrl, size: 88),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.tutorName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                if (widget.tutorSpeakingScore != null) ...[
+                  const SizedBox(height: 7),
+                  _Chip(
+                    label: 'IELTS SPEAKING ${widget.tutorSpeakingScore}',
+                    color: colors.textPrimary,
+                    background: colors.accentYellow.withValues(alpha: 0.25),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Text(
+                  '$count recorded topic${count == 1 ? '' : 's'} · tap one to listen',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 12.5,
+                    color: colors.textSecondary,
+                  ),
+                ),
+                // A student who has spent ten minutes listening to someone has
+                // already decided whether they like how they teach. Offering
+                // the lesson here saves them going back out to the tutors
+                // directory to find the same face again.
+                if (_bookableTutorId != null) ...[
+                  const SizedBox(height: 10),
+                  _BookTutorButton(tutorId: _bookableTutorId!),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-/// Full-bleed photo card: name/subtitle and score badge are overlaid on
-/// the photo itself (gradient scrim + corner badge) rather than stacked
-/// below it, so the card reads like a tutor/coach profile, not a product
-/// tile. Used for the top-level tutor grid — [scoreLabel], when present, is
-/// the tutor's own IELTS Speaking credential, not any single sample's score.
-class _TutorCard extends StatelessWidget {
-  const _TutorCard({
-    required this.name,
-    required this.imageUrl,
-    required this.scoreLabel,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final String name;
-  final String? imageUrl;
-  final String? scoreLabel;
-  final String subtitle;
-  final VoidCallback onTap;
+/// Takes the student from a tutor's recorded answers to their booking page.
+class _BookTutorButton extends StatelessWidget {
+  const _BookTutorButton({required this.tutorId});
+  final int tutorId;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Stack(
-          fit: StackFit.expand,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => TutorProfileScreen(tutorId: tutorId)),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: colors.brand,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            if (imageUrl != null && imageUrl!.isNotEmpty)
-              Image.network(
-                imageUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const _TutorImageFallback(),
-              )
-            else
-              const _TutorImageFallback(),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: [0.45, 1],
-                  colors: [Colors.transparent, Color(0xCC0B0C1A)],
-                ),
-              ),
-            ),
-            if (scoreLabel != null)
-              Positioned(
-                top: 10,
-                right: 10,
-                child: MtPill(
-                  background: context.colors.accentYellow,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  child: Text(
-                    scoreLabel!,
-                    style: TextStyle(
-                      fontFamily: 'SF Pro',
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
-                      color: context.colors.textPrimary,
-                    ),
-                  ),
-                ),
-              ),
-            Positioned(
-              left: 12,
-              right: 12,
-              bottom: 12,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: 'SF Pro',
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.mic_rounded, color: Colors.white70, size: 13),
-                      const SizedBox(width: 4),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(fontFamily: 'SF Pro', fontSize: 11.5, color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                ],
+            Icon(Icons.event_available_rounded, size: 15, color: colors.onBrand),
+            const SizedBox(width: 6),
+            Text(
+              'Book a lesson',
+              style: TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: colors.onBrand,
               ),
             ),
           ],
@@ -294,97 +426,100 @@ class _TutorCard extends StatelessWidget {
   }
 }
 
-/// Simple list row, one level down from [_TutorCard]: a single submitted
-/// topic (sample) for the tutor selected on the previous screen — no tutor
-/// photo, since the tutor is already chosen. The score badge here is that
-/// specific sample's own `band_score` — distinct from the tutor's overall
-/// `tutor_speaking_score` shown at the tutor-list level. When [locked], the
-/// row dims, shows a lock instead of a chevron, and tapping it opens the
-/// Plus subscription screen instead of the sample.
+/// One recorded topic. The band score is the artwork here — it varies per
+/// answer and is the reason to pick one, unlike the tutor's photo which is
+/// the same for every row on this screen.
 class _TopicRow extends StatelessWidget {
-  const _TopicRow({required this.sample, required this.locked});
-  final Map<String, dynamic> sample;
-  final bool locked;
+  const _TopicRow({required this.sample, this.tutorId});
+  final _Sample sample;
+
+  /// Carried down so the player can offer a lesson with the voice being
+  /// studied — the sample payload has no tutor id of its own.
+  final int? tutorId;
 
   @override
   Widget build(BuildContext context) {
-    final id = sample['id']?.toString() ?? '';
-    final title = sample['topic_title']?.toString() ?? 'Sample #$id';
-    final band = sample['band_score']?.toString();
-    final parts = (sample['parts'] as List?) ?? const [];
+    final colors = context.colors;
+    final locked = sample.locked;
 
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              locked ? const PlusSubscriptionScreen() : SpeakingSampleTutorScreen(tutor: sample),
+          builder: (_) => locked
+              ? const PlusSubscriptionScreen()
+              : SpeakingSampleTutorScreen(tutor: sample.raw, tutorId: tutorId),
         ),
       ),
       child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: mtSoftCard(context),
+        padding: const EdgeInsets.all(12),
+        decoration: mtSoftCard(context, radius: 16),
         child: Opacity(
-          opacity: locked ? 0.55 : 1,
+          opacity: locked ? 0.6 : 1,
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: context.colors.surfaceAlt,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.mic_rounded, color: context.colors.textPrimary, size: 22),
-              ),
+              _BandTile(score: sample.bandScore),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
+                      sample.topicTitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontFamily: 'SF Pro',
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w600,
-                        color: context.colors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
                         height: 1.25,
+                        color: colors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      locked
-                          ? 'Linka Plus'
-                          : '${parts.length} part${parts.length == 1 ? '' : 's'} recorded',
-                      style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: context.colors.textSecondary),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 5,
+                      children: [
+                        if (sample.partNumbers.isNotEmpty)
+                          _Chip(
+                            label: 'PART ${sample.partNumbers.join(' · ')}',
+                            color: colors.accentBlue,
+                            background: colors.accentBlue.withValues(alpha: 0.12),
+                          ),
+                        if (sample.hasTranscript)
+                          _Chip(
+                            label: 'TRANSCRIPT',
+                            icon: Icons.closed_caption_rounded,
+                            color: colors.textSecondary,
+                            background: colors.surface,
+                          ),
+                        if (locked)
+                          _Chip(
+                            label: 'LINKA PLUS',
+                            icon: Icons.lock_rounded,
+                            color: colors.textPrimary,
+                            background: colors.accentYellow.withValues(alpha: 0.25),
+                          ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              if (band != null) ...[
-                const SizedBox(width: 8),
-                MtPill(
-                  background: context.colors.accentYellow,
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                  child: Text(
-                    'Band $band',
-                    style: TextStyle(
-                      fontFamily: 'SF Pro',
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: context.colors.textPrimary,
-                    ),
-                  ),
+              const SizedBox(width: 8),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: locked ? colors.surface : colors.brand,
+                  shape: BoxShape.circle,
                 ),
-              ],
-              const SizedBox(width: 4),
-              Icon(
-                locked ? Icons.lock_rounded : Icons.chevron_right_rounded,
-                color: context.colors.textTertiary,
-                size: locked ? 18 : 22,
+                child: Icon(
+                  locked ? Icons.lock_rounded : Icons.play_arrow_rounded,
+                  size: locked ? 17 : 22,
+                  color: locked ? colors.textTertiary : colors.onBrand,
+                ),
               ),
             ],
           ),
@@ -394,15 +529,413 @@ class _TopicRow extends StatelessWidget {
   }
 }
 
-class _TutorImageFallback extends StatelessWidget {
-  const _TutorImageFallback();
+// ─── Model ──────────────────────────────────────────────────────────────────
+
+/// One recorded topic, flattened out of the API response with its lock state
+/// already resolved.
+class _Sample {
+  _Sample({
+    required this.raw,
+    required this.topicTitle,
+    required this.bandScore,
+    required this.partNumbers,
+    required this.hasTranscript,
+    required this.locked,
+  });
+
+  final Map<String, dynamic> raw;
+  final String topicTitle;
+  final String? bandScore;
+  final List<int> partNumbers;
+  final bool hasTranscript;
+  final bool locked;
+
+  /// The backend is the source of truth for locking ('locked' items arrive
+  /// with their parts stripped); the index check is a fallback for backends
+  /// that predate server-side gating. [data] is always one tutor's samples,
+  /// so a plain index is the per-tutor count.
+  static List<_Sample> fromResponse(
+    List<Map<String, dynamic>> data, {
+    required bool contentLocked,
+  }) {
+    final result = <_Sample>[];
+    for (var i = 0; i < data.length; i++) {
+      final json = data[i];
+      final parts = ((json['parts'] as List?) ?? const []).cast<Map<String, dynamic>>();
+      final id = json['id']?.toString() ?? '';
+      final title = json['topic_title']?.toString().trim() ?? '';
+
+      result.add(_Sample(
+        raw: json,
+        topicTitle: title.isNotEmpty ? title : 'Sample #$id',
+        bandScore: json['band_score']?.toString(),
+        partNumbers: [
+          for (final part in parts)
+            if ((part['part'] as num?) != null) (part['part'] as num).toInt(),
+        ]..sort(),
+        hasTranscript: parts.any(
+          (part) => (part['subtitle_url'] as String?)?.trim().isNotEmpty == true,
+        ),
+        locked: json['locked'] == true || (contentLocked && i >= _freeSamples),
+      ));
+    }
+    return result;
+  }
+}
+
+/// A way back to the answers this student has already recorded.
+///
+/// Always offered rather than only when there are some: a student who has
+/// never tried is exactly who should see that trying is possible, and the
+/// screen behind it says so itself when the list is empty.
+class _YourAnswersRow extends StatelessWidget {
+  const _YourAnswersRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: GestureDetector(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SpeakingAttemptsScreen()),
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+          decoration: mtSoftCard(context, radius: 14),
+          child: Row(
+            children: [
+              Icon(Icons.mic_rounded, size: 18, color: colors.accentBlue),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Answer a question yourself',
+                      style: TextStyle(
+                        fontFamily: 'SF Pro',
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Record any topic and AI marks it against the band descriptors',
+                      style: TextStyle(
+                        fontFamily: 'SF Pro',
+                        fontSize: 11.5,
+                        height: 1.3,
+                        color: colors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, size: 20, color: colors.textTertiary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Shared pieces ──────────────────────────────────────────────────────────
+
+/// Rounded tutor photo, sized by the caller. Falls back to a brand-filled
+/// mic tile so a missing or broken image never leaves a grey hole.
+class _Artwork extends StatelessWidget {
+  const _Artwork({required this.imageUrl, required this.size});
+  final String? imageUrl;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(15),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: (imageUrl != null && imageUrl!.isNotEmpty)
+            ? Image.network(
+                imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _ArtworkFallback(size: size),
+              )
+            : _ArtworkFallback(size: size),
+      ),
+    );
+  }
+}
+
+class _ArtworkFallback extends StatelessWidget {
+  const _ArtworkFallback({required this.size});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [colors.brand, colors.brand.withValues(alpha: 0.78)],
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Icon(Icons.mic_rounded, size: size * 0.36, color: colors.onBrand),
+    );
+  }
+}
+
+/// A topic row's artwork: the band score the answer earned.
+class _BandTile extends StatelessWidget {
+  const _BandTile({required this.score});
+  final String? score;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      width: 62,
+      height: 62,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [colors.brand, colors.brand.withValues(alpha: 0.78)],
+        ),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (score == null)
+            Icon(Icons.mic_rounded, size: 26, color: colors.onBrand)
+          else ...[
+            Text(
+              'BAND',
+              style: TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 8.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.1,
+                color: colors.onBrand.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(height: 1),
+            Text(
+              score!,
+              style: TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 21,
+                fontWeight: FontWeight.w800,
+                height: 1.1,
+                color: colors.onBrand,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// States outright what the page is. The old grid left students to infer it
+/// from tutor photos, which is how it got mistaken for the Tutors directory.
+class _IntroHeader extends StatelessWidget {
+  const _IntroHeader({required this.title, required this.subtitle});
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: colors.accentYellow.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(Icons.headphones_rounded, size: 20, color: colors.textPrimary),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 12,
+                    height: 1.3,
+                    color: colors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SearchField extends StatelessWidget {
+  const _SearchField({
+    required this.controller,
+    required this.hint,
+    required this.query,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final String query;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        style: TextStyle(fontFamily: 'SF Pro', fontSize: 14, color: colors.textPrimary),
+        decoration: InputDecoration(
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          hintText: hint,
+          hintStyle: TextStyle(fontFamily: 'SF Pro', fontSize: 14, color: colors.textTertiary),
+          prefixIcon: Icon(Icons.search_rounded, size: 20, color: colors.textTertiary),
+          suffixIcon: query.isEmpty
+              ? null
+              : IconButton(
+                  icon: Icon(Icons.close_rounded, size: 18, color: colors.textTertiary),
+                  onPressed: () {
+                    controller.clear();
+                    onChanged('');
+                  },
+                ),
+          filled: true,
+          fillColor: colors.surfaceAlt,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({
+    required this.label,
+    required this.color,
+    required this.background,
+    this.icon,
+  });
+
+  final String label;
+  final Color color;
+  final Color background;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: context.colors.surfaceAlt,
-      alignment: Alignment.center,
-      child: Icon(Icons.person_rounded, color: context.colors.textTertiary, size: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 11, color: color),
+            const SizedBox(width: 3),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'SF Pro',
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'SF Pro',
+            color: context.colors.textSecondary,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.error});
+  final Object? error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          'Failed to load: $error',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'SF Pro',
+            color: context.colors.textSecondary,
+            fontSize: 14,
+          ),
+        ),
+      ),
     );
   }
 }

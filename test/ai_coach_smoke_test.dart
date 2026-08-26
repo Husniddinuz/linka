@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linka/models/ai_coach.dart';
 import 'package:linka/theme/app_colors.dart';
-import 'package:linka/widgets/coach_avatar.dart';
+import 'package:linka/widgets/coach_orb.dart';
 import 'package:linka/widgets/coach_pronunciation.dart';
 
 /// The coach's surfaces read their colours from the [AppColors] theme
@@ -171,34 +171,48 @@ void main() {
       expect(find.textContaining('to look at'), findsNothing);
     });
 
-    testWidgets('every character paints, in every mood', (tester) async {
-      for (final persona in const [
-        'classic',
-        'sarcastic',
-        'strict',
-        'buddy',
-        'examiner',
-        'a-character-added-later',
-      ]) {
-        for (final mood in CoachMood.values) {
-          await tester.pumpWidget(
-            _app(Center(
-              child: CoachAvatar(
-                persona: persona,
-                accent: const Color(0xFF2563EB),
-                mood: mood,
-                level: 0.6,
-                size: 96,
-              ),
-            )),
-          );
-          // Two frames of the blink cycle, so a painter that throws on a shut
-          // eye is caught here rather than on someone's phone.
-          await tester.pump(const Duration(milliseconds: 300));
-          await tester.pump(const Duration(milliseconds: 5200));
-          expect(tester.takeException(), isNull);
-        }
+    testWidgets('the sphere paints in every mood, at every stage of the '
+        'assembly', (tester) async {
+      for (final mood in CoachMood.values) {
+        await tester.pumpWidget(
+          _app(SizedBox(
+            width: 240,
+            height: 240,
+            child: CoachOrb(
+              key: ValueKey(mood),
+              mood: mood,
+              level: 0.6,
+              accent: const Color(0xFF2563EB),
+            ),
+          )),
+        );
+        // Mid-assembly, where the dots are still flying in, and then settled:
+        // a painter that throws on either is caught here rather than on
+        // someone's phone.
+        await tester.pump(const Duration(milliseconds: 900));
+        expect(tester.takeException(), isNull);
+        await tester.pump(const Duration(seconds: 3));
+        expect(tester.takeException(), isNull);
+        // A pulse passes through the cloud every six and a half seconds, and
+        // it is the one branch the two pumps above never reach.
+        await tester.pump(const Duration(seconds: 4));
+        expect(tester.takeException(), isNull);
       }
+    });
+
+    testWidgets('the sphere survives being given no room at all',
+        (tester) async {
+      // A zero-sized box happens for a frame during a layout change, and a
+      // radius of zero is a shader with an empty rect behind it.
+      await tester.pumpWidget(
+        _app(const SizedBox(
+          width: 0,
+          height: 0,
+          child: CoachOrb(accent: Color(0xFF2563EB)),
+        )),
+      );
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(tester.takeException(), isNull);
     });
   });
 }

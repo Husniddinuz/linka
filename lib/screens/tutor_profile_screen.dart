@@ -3,12 +3,15 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:video_player/video_player.dart';
 import '../services/api_service.dart';
 import '../services/app_feature_service.dart';
+import '../services/mock_test_service.dart';
 import '../services/share_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/cached_avatar.dart';
 import '../widgets/skeleton.dart';
 import 'availability_screen.dart';
+import 'plus_subscription_screen.dart';
+import 'speaking_sample_screen.dart';
 
 class TutorProfileScreen extends StatefulWidget {
   final int tutorId;
@@ -21,6 +24,7 @@ class TutorProfileScreen extends StatefulWidget {
 class _TutorProfileScreenState extends State<TutorProfileScreen> {
   Map<String, dynamic>? _tutor;
   List<Map<String, dynamic>> _reviews = const [];
+  List<Map<String, dynamic>> _speakingSamples = const [];
   bool _loading = true;
   bool _reviewsLoading = true;
   bool _isBookmarked = false;
@@ -31,6 +35,23 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
     super.initState();
     _loadTutor();
     _loadReviews();
+    _loadSpeakingSamples();
+  }
+
+  /// The tutor's own recorded Speaking answers.
+  ///
+  /// They belong on this screen rather than only under Speaking samples: they
+  /// are the evidence behind the band numbers in the scores grid above, and a
+  /// student weighing a booking should be able to hear the person speak
+  /// without going off to browse a second directory to find the same face.
+  ///
+  /// A failure is silent — the samples are a card, not the page.
+  Future<void> _loadSpeakingSamples() async {
+    try {
+      final samples = await MockTestService.fetchSpeakingSamples(tutorId: widget.tutorId);
+      if (!mounted) return;
+      setState(() => _speakingSamples = samples);
+    } catch (_) {}
   }
 
   Future<void> _loadTutor() async {
@@ -289,6 +310,14 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
                   ),
 
                   const SizedBox(height: 16),
+
+                  // ── Speaking samples ───────────────────────────────────────
+                  if (_speakingSamples.isNotEmpty) ...[
+                    _PremiumCard(
+                      child: _SpeakingSamplesSection(samples: _speakingSamples),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   // ── Reviews ────────────────────────────────────────────────
                   if (_reviewsLoading || _reviews.isNotEmpty) ...[
@@ -1056,6 +1085,183 @@ class _LessonDurationSection extends StatelessWidget {
 }
 
 // ─── Reviews section ──────────────────────────────────────────────────────────
+
+/// How many of a tutor's topics the profile shows before deferring to the
+/// samples screen. Enough to prove there is a body of work; not so many that
+/// the card becomes the page.
+const int _samplesShown = 3;
+
+/// The tutor's recorded Speaking answers, on the screen where a student is
+/// deciding whether to book them.
+///
+/// The rows reuse the samples list wholesale, paywall included: past a
+/// tutor's free window the API returns the row with its parts stripped, and
+/// tapping a locked one routes to Plus exactly as it does under Speaking
+/// samples. Two ways in, one rule.
+class _SpeakingSamplesSection extends StatelessWidget {
+  const _SpeakingSamplesSection({required this.samples});
+  final List<Map<String, dynamic>> samples;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final shown = samples.take(_samplesShown).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.mic_rounded, size: 19, color: colors.accentBlue),
+            const SizedBox(width: 9),
+            Text(
+              'Speaking samples',
+              style: TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: colors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Real answers this tutor recorded, with follow-along transcripts. '
+          'Listen to one, then try the same question yourself.',
+          style: TextStyle(
+            fontFamily: 'SF Pro',
+            fontSize: 12.5,
+            height: 1.45,
+            color: colors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 14),
+        for (var i = 0; i < shown.length; i++) ...[
+          if (i > 0) const SizedBox(height: 9),
+          _SpeakingSampleRow(sample: shown[i]),
+        ],
+        if (samples.length > shown.length) ...[
+          const SizedBox(height: 12),
+          Text(
+            '+ ${samples.length - shown.length} more topic'
+            '${samples.length - shown.length == 1 ? '' : 's'} under Speaking samples',
+            style: TextStyle(
+              fontFamily: 'SF Pro',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: colors.textTertiary,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SpeakingSampleRow extends StatelessWidget {
+  const _SpeakingSampleRow({required this.sample});
+  final Map<String, dynamic> sample;
+
+  /// No tutor id is threaded into the player from here on purpose: the
+  /// student is already on the booking screen, and a button offering to take
+  /// them to the screen they just left is noise.
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final locked = sample['locked'] == true;
+    final parts = ((sample['parts'] as List?) ?? const []).cast<Map<String, dynamic>>();
+    final band = sample['band_score']?.toString();
+    final title = (sample['topic_title']?.toString().trim().isNotEmpty ?? false)
+        ? sample['topic_title'].toString()
+        : 'Speaking sample';
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => locked
+              ? const PlusSubscriptionScreen()
+              : SpeakingSampleTutorScreen(tutor: sample),
+        ),
+      ),
+      child: Opacity(
+        opacity: locked ? 0.6 : 1,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: colors.surfaceAlt,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colors.accentYellow.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  band == null || band.isEmpty
+                      ? '—'
+                      : (double.tryParse(band)?.toStringAsFixed(1) ?? band),
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: colors.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: 'SF Pro',
+                        fontSize: 14,
+                        height: 1.25,
+                        fontWeight: FontWeight.w600,
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      locked
+                          ? 'Linka Plus'
+                          : parts.isEmpty
+                              ? 'No recordings yet'
+                              : '${parts.length} part${parts.length == 1 ? '' : 's'} recorded',
+                      style: TextStyle(
+                        fontFamily: 'SF Pro',
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: colors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                locked ? Icons.lock_rounded : Icons.play_circle_fill_rounded,
+                size: 24,
+                color: locked ? colors.textTertiary : colors.brand,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _ReviewsSection extends StatelessWidget {
   final List<Map<String, dynamic>> reviews;

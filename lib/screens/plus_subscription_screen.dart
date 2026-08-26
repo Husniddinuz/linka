@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import '../services/affiliate_service.dart';
 import '../services/api_service.dart';
 import '../services/app_feature_service.dart';
 import '../services/plus_service.dart';
@@ -7,12 +8,24 @@ import '../services/wallet_service.dart';
 import '../theme/app_colors.dart';
 import 'payment_topup_screen.dart';
 import '../widgets/app_notify.dart';
+import '../widgets/promo_code_field.dart';
 import '../widgets/skeleton.dart';
 
-const _yearlyCode = 'yearly';
-const _monthlyCode = 'monthly';
-const _fallbackYearlyPrice = 240000;
-const _fallbackMonthlyPrice = 30000;
+/// What to show before `/payments/plus/plans/` answers — and if it never does.
+///
+/// The real list is the server's; these are the same three tariffs at the
+/// prices set on 2026-08-26, so a student on a bad connection sees the plans
+/// rather than an empty screen. Checkout is by `plan_code`, so a stale price
+/// here can only ever misprice the card, never the debit.
+const _fallbackPlans = <PlusPlan>[
+  PlusPlan(code: 'yearly', title: '1 Year', priceUzs: 799000, durationDays: 365),
+  PlusPlan(
+      code: 'quarterly',
+      title: '3 Months',
+      priceUzs: 219000,
+      durationDays: 90),
+  PlusPlan(code: 'monthly', title: '1 Month', priceUzs: 99000, durationDays: 30),
+];
 
 class PlusSubscriptionScreen extends StatefulWidget {
   const PlusSubscriptionScreen({super.key});
@@ -22,63 +35,80 @@ class PlusSubscriptionScreen extends StatefulWidget {
 }
 
 class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
-  bool _isYearly = true;
   int? _balance;
   bool _balanceLoading = true;
-  List<PlusPlan> _plans = const [];
+
+  /// Every active tariff the server offers, longest first — the best deal
+  /// leads, and the ladder reads down to the cheapest commitment.
+  List<PlusPlan> _plans = _fallbackPlans;
+
+  /// Null only until the plans arrive; then the longest one.
+  String? _pickedCode;
+
   PlusStatus? _status;
   bool _submitting = false;
 
-  PlusPlan? get _yearlyPlan => _planByCode(_yearlyCode);
-  PlusPlan? get _monthlyPlan => _planByCode(_monthlyCode);
+  final _promoController = TextEditingController();
 
-  PlusPlan? _planByCode(String code) {
+  /// The applied code, priced by the server against one specific plan.
+  PromoQuote? _promo;
+
+  /// Which plan that quote belongs to. A discount is a percentage of one
+  /// plan's price, so switching plans invalidates it — this is what notices,
+  /// rather than leaving a yearly saving displayed on a monthly total.
+  String? _promoPlanCode;
+  bool _promoChecking = false;
+  String? _promoError;
+
+  PlusPlan? _planByCode(String? code) {
+    if (code == null) return null;
     for (final plan in _plans) {
       if (plan.code == code) return plan;
     }
     return null;
   }
 
-  int get _yearlyPrice => _yearlyPlan?.priceUzs ?? _fallbackYearlyPrice;
-  int get _monthlyPrice => _monthlyPlan?.priceUzs ?? _fallbackMonthlyPrice;
-  int get _price => _isYearly ? _yearlyPrice : _monthlyPrice;
-  String get _selectedCode => _isYearly ? _yearlyCode : _monthlyCode;
+  /// The tariff on the button. Falls back to the first (longest) plan, which
+  /// is also what a fresh screen opens on.
+  PlusPlan? get _selected => _planByCode(_pickedCode) ?? _plans.firstOrNull;
 
-  /// Savings on the yearly plan vs. buying the monthly plan for the same
-  /// number of days. Returns null when we lack enough data to compute it,
-  /// or when the yearly plan isn't cheaper.
-  int? get _yearlyDiscountPercent {
-    final monthly = _monthlyPlan;
-    final yearly = _yearlyPlan;
-    if (monthly == null || yearly == null) return null;
-    final monthlyDays = monthly.durationDays ?? 30;
-    final yearlyDays = yearly.durationDays ?? 365;
-    if (monthlyDays <= 0 || yearlyDays <= 0 || monthly.priceUzs <= 0) {
-      return null;
-    }
-    final equivalentMonthlyCost =
-        monthly.priceUzs * (yearlyDays / monthlyDays);
-    if (equivalentMonthlyCost <= 0) return null;
-    final ratio = 1 - yearly.priceUzs / equivalentMonthlyCost;
-    final percent = (ratio * 100).round();
-    return percent > 0 ? percent : null;
+  /// The shortest plan on screen — the baseline every "save x%" is measured
+  /// against, because it is the one a student would otherwise renew monthly.
+  PlusPlan? get _shortest => _plans.isEmpty ? null : _plans.last;
+
+  int get _price => _selected?.priceUzs ?? 0;
+  String get _selectedCode => _selected?.code ?? '';
+
+  /// The applied code, but only while it is still priced against the plan on
+  /// screen. Kept in state across a plan switch rather than dropped: the quote
+  /// belongs to one plan, the student's intent to use the code does not.
+  PromoQuote? get _activePromo =>
+      _promoPlanCode == _selectedCode ? _promo : null;
+
+  /// What this purchase actually costs — the discounted total once a code is on.
+  int get _payable => _activePromo?.payableUzs ?? _price;
+
+  /// The badge on a card: what this plan saves against renewing the shortest
+  /// one for the same stretch of time.
+  int? _savePercent(PlusPlan plan) {
+    final baseline = _shortest;
+    return baseline == null ? null : plan.savePercentAgainst(baseline);
   }
 
-  String get _yearlySubtitle {
-    final days = _yearlyPlan?.durationDays;
-    if (days == null) return 'Billed yearly';
-    if (days % 30 == 0) return '${days ~/ 30} months';
-    return '$days days';
+  String _durationLabel(PlusPlan plan) {
+    final months = plan.months;
+    if (months <= 0) return 'Billed once';
+    if (months == 1) return 'Billed monthly';
+    if (months == 12) return 'Billed yearly';
+    return 'Billed every $months months';
   }
 
-  /// Monthly-equivalent cost of the yearly plan, e.g. "≈ 20 000 UZS/mo".
-  String? get _yearlyPerMonthLabel {
-    final days = _yearlyPlan?.durationDays ?? 365;
-    if (days <= 0) return null;
-    final months = days / 30;
-    if (months < 1) return null;
-    final perMonth = (_yearlyPrice / months).round();
-    return '≈ ${_formatPrice(perMonth)} UZS/mo';
+  /// Monthly-equivalent cost, e.g. "≈ 66 583 UZS/mo" — the only figure that
+  /// reads the same across three different billing periods.
+  String? _perMonthLabel(PlusPlan plan) {
+    final months = plan.months;
+    if (months <= 1) return null;
+    return '≈ ${_formatPrice((plan.priceUzs / months).round())} UZS/mo';
   }
 
   @override
@@ -116,10 +146,22 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
   Future<void> _loadPlans() async {
     try {
       final plans = await PlusService.getPlans();
-      if (!mounted) return;
-      setState(() => _plans = plans);
+      if (!mounted || plans.isEmpty) return;
+      // Longest first, and every plan the admin has switched on — a fourth
+      // tariff added there should appear here without a release.
+      final sorted = [...plans]..sort(
+          (a, b) => (b.durationDays ?? 0).compareTo(a.durationDays ?? 0),
+        );
+      setState(() {
+        _plans = sorted;
+        // Only if the student has not already chosen: the plans can land
+        // after a tap on a fallback card, and moving the selection under
+        // them would be a price changing by itself.
+        _pickedCode ??= sorted.first.code;
+      });
     } catch (_) {
-      // Fallback prices remain visible; checkout still works by plan_code.
+      // The fallback tariffs stay on screen; checkout is by plan_code, so a
+      // stale price here cannot become a wrong debit.
     }
   }
 
@@ -133,10 +175,95 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
     }
   }
 
+  @override
+  void dispose() {
+    _promoController.dispose();
+    super.dispose();
+  }
+
+  /// Switching plans re-prices an applied code rather than dropping it.
+  void _selectPlan(String code) {
+    if (_selectedCode == code) return;
+    setState(() => _pickedCode = code);
+    final promo = _promo;
+    if (promo != null) _applyPromo(promo.code);
+  }
+
+  /// Price a code against the selected plan on the server and hold the answer.
+  ///
+  /// Never computed here: the discount is a percentage the admin can set per
+  /// code, so a client that assumed 10% would quote the wrong total to exactly
+  /// the students whose tutor negotiated something else.
+  Future<void> _applyPromo(String raw) async {
+    final code = AffiliateService.normalizeCode(raw);
+    if (code.isEmpty || _promoChecking) return;
+
+    final planCode = _selectedCode;
+    setState(() {
+      _promoChecking = true;
+      _promoError = null;
+    });
+    try {
+      final quote = await PlusService.checkPromo(
+        planCode: planCode,
+        promoCode: code,
+      );
+      if (!mounted) return;
+      setState(() {
+        _promo = quote;
+        _promoPlanCode = planCode;
+        _promoController.text = quote.code;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _promo = null;
+        _promoPlanCode = null;
+        _promoError = _promoMessage(e);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _promo = null;
+        _promoPlanCode = null;
+        _promoError = 'Could not check this code. Try again.';
+      });
+    } finally {
+      if (mounted) setState(() => _promoChecking = false);
+    }
+  }
+
+  void _clearPromo() {
+    setState(() {
+      _promo = null;
+      _promoPlanCode = null;
+      _promoError = null;
+      _promoController.clear();
+    });
+  }
+
+  /// The refusal, in a sentence. The server sends a stable reason code beside
+  /// its own English `detail`; the codes are worded for this screen and the
+  /// detail is the fallback for a reason this build has not heard of.
+  String _promoMessage(ApiException e) {
+    switch (e.errorCode) {
+      case 'invalid_code':
+        return 'Enter a valid promo code.';
+      case 'unknown_code':
+        return 'No such promo code.';
+      case 'inactive_code':
+        return 'This promo code is no longer active.';
+      case 'own_code':
+        return 'You can\u2019t use your own promo code.';
+      default:
+        return e.message;
+    }
+  }
+
   Future<void> _onConnect() async {
     if (_submitting) return;
 
-    final price = _price;
+    final price = _payable;
     final balance = _balance;
     if (balance != null && balance < price) {
       AppNotify.show(
@@ -149,7 +276,10 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
 
     setState(() => _submitting = true);
     try {
-      final result = await PlusService.checkout(_selectedCode);
+      final result = await PlusService.checkout(
+        _selectedCode,
+        promoCode: _activePromo?.code,
+      );
       if (!mounted) return;
       AppNotify.show(
         context,
@@ -159,6 +289,18 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
       if (!mounted) return;
+      // A code can go stale between the quote and the purchase — the tutor
+      // deactivates it, an admin suspends the account. That is reported on the
+      // promo field, where it can be cleared and the plan bought at full
+      // price, rather than as a failed checkout.
+      if (e.data?['promo_error'] is String) {
+        setState(() {
+          _promo = null;
+          _promoPlanCode = null;
+          _promoError = _promoMessage(e);
+        });
+        return;
+      }
       AppNotify.show(context, message: e.message);
     } catch (_) {
       if (!mounted) return;
@@ -171,7 +313,7 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
   @override
   Widget build(BuildContext context) {
     final hasEnoughBalance =
-        !_balanceLoading && (_balance ?? 0) >= _price;
+        !_balanceLoading && (_balance ?? 0) >= _payable;
     final isAlreadyActive = _status?.isActive == true &&
         _status?.planCode == _selectedCode;
     final plusEnabled = AppFeatureService.isEnabled('plus');
@@ -217,25 +359,42 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                       ),
                     ),
                   ),
-                  _PlanCard(
-                    title: 'Yearly',
-                    subtitle: _yearlySubtitle,
-                    price: _yearlyPrice,
-                    perMonthLabel: _yearlyPerMonthLabel,
-                    badgePercent: _yearlyDiscountPercent,
-                    selected: _isYearly,
-                    formatPrice: _formatPrice,
-                    onTap: () => setState(() => _isYearly = true),
-                  ),
-                  const SizedBox(height: 10),
-                  _PlanCard(
-                    title: 'Monthly',
-                    subtitle: 'Billed monthly',
-                    price: _monthlyPrice,
-                    selected: !_isYearly,
-                    formatPrice: _formatPrice,
-                    onTap: () => setState(() => _isYearly = false),
-                  ),
+                  for (final plan in _plans) ...[
+                    _PlanCard(
+                      title: plan.title?.trim().isNotEmpty == true
+                          ? plan.title!.trim()
+                          : plan.code,
+                      subtitle: _durationLabel(plan),
+                      price: plan.priceUzs,
+                      perMonthLabel: _perMonthLabel(plan),
+                      badgePercent: _savePercent(plan),
+                      selected: plan.code == _selectedCode,
+                      formatPrice: _formatPrice,
+                      onTap: () => _selectPlan(plan.code),
+                    ),
+                    if (plan != _plans.last) const SizedBox(height: 10),
+                  ],
+                  // Directly above the summary it changes: a student types a
+                  // code to see what it does to the total below, and the
+                  // answer is priced by the server, not guessed here. It sits
+                  // in the scrolling half rather than the pinned footer so the
+                  // keyboard has somewhere to push it.
+                  if (!isAlreadyActive) ...[
+                    const SizedBox(height: 14),
+                    _PromoField(
+                      controller: _promoController,
+                      applied: _activePromo,
+                      checking: _promoChecking,
+                      error: _promoError,
+                      onApply: () => _applyPromo(_promoController.text),
+                      onRemove: _clearPromo,
+                      onChanged: () {
+                        if (_promoError != null) {
+                          setState(() => _promoError = null);
+                        }
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 16),
                 ],
               ),
@@ -333,6 +492,34 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                           ),
                         ],
                       ),
+                      if (_activePromo != null) ...[
+                        const SizedBox(height: 12),
+                        Container(height: 0.5, color: colors.border),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Promo code '
+                                '(\u2212${_activePromo!.discountPercent.round()}%)',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: colors.textSecondary,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '\u2212${_formatPrice(_activePromo!.discountAmountUzs)} UZS',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: colors.success,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       Container(height: 0.5, color: colors.border),
                       const SizedBox(height: 12),
@@ -347,11 +534,24 @@ class _PlusSubscriptionScreenState extends State<PlusSubscriptionScreen> {
                             ),
                           ),
                           const Spacer(),
+                          if (_activePromo != null) ...[
+                            Text(
+                              '${_formatPrice(_price)} UZS',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: colors.textTertiary,
+                                decoration: TextDecoration.lineThrough,
+                                decorationColor: colors.textTertiary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
                           Text.rich(
                             TextSpan(
                               children: [
                                 TextSpan(
-                                  text: '${_formatPrice(_price)} ',
+                                  text: '${_formatPrice(_payable)} ',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w800,
@@ -758,6 +958,156 @@ class _SelectDot extends StatelessWidget {
               color: Color(0xFF272942),
             )
           : null,
+    );
+  }
+}
+
+// ─── Promo code field ───────────────────────────────────────────────────────
+
+/// The tutor's promo code, entered by the student who was given it.
+///
+/// One field, one button: the button applies the code and — once the server
+/// has priced it — removes it again, because a code that is on is a thing to
+/// take off rather than a second control to find.
+class _PromoField extends StatelessWidget {
+  final TextEditingController controller;
+  final PromoQuote? applied;
+  final bool checking;
+  final String? error;
+  final VoidCallback onApply;
+  final VoidCallback onRemove;
+  final VoidCallback onChanged;
+
+  const _PromoField({
+    required this.controller,
+    required this.applied,
+    required this.checking,
+    required this.error,
+    required this.onApply,
+    required this.onRemove,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final promo = applied;
+    final locked = promo != null;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: locked ? colors.success.withValues(alpha: 0.5) : colors.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'PROMO CODE',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+              color: colors.textTertiary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: PromoCodeField(
+                  controller: controller,
+                  hintText: 'e.g. ALIYA472',
+                  enabled: !locked && !checking,
+                  onChanged: (_) => onChanged(),
+                  onSubmitted: onApply,
+                ),
+              ),
+              const SizedBox(width: 10),
+              SizedBox(
+                height: 44,
+                child: TextButton(
+                  onPressed: checking ? null : (locked ? onRemove : onApply),
+                  style: TextButton.styleFrom(
+                    backgroundColor:
+                        locked ? colors.surfaceAlt : colors.brand,
+                    foregroundColor: locked ? colors.textPrimary : colors.onBrand,
+                    disabledBackgroundColor:
+                        colors.brand.withValues(alpha: 0.35),
+                    disabledForegroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: checking
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          locked ? 'Remove' : 'Apply',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+          if (promo != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Symbols.check_circle_rounded,
+                    size: 16, fill: 1, color: colors.success),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    promo.tutorName.isNotEmpty
+                        ? '${promo.discountPercent.round()}% off, thanks to '
+                            '${promo.tutorName}'
+                        : '${promo.discountPercent.round()}% off applied',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: colors.success,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (error != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Symbols.error_rounded, size: 16, color: colors.error),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    error!,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: colors.error,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

@@ -16,6 +16,7 @@ import '../services/user_service.dart';
 import '../services/wallet_service.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/skeleton.dart';
+import 'affiliate_screen.dart';
 import 'profile_setup_screen.dart';
 import 'plus_subscription_screen.dart';
 import 'saved_tutors_screen.dart';
@@ -121,9 +122,15 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
   }
 
   String _plusPlanLabel(PlusStatus? status) {
+    // The server names its own plans ("3 Months"); the codes below are only
+    // for the shape of `current_plan` that comes back as a bare string.
+    final title = status?.currentPlan?.title?.trim();
+    if (title != null && title.isNotEmpty) return title.toUpperCase();
     switch (status?.planCode) {
       case 'yearly':
         return 'ANNUAL';
+      case 'quarterly':
+        return '3 MONTHS';
       case 'monthly':
         return 'MONTHLY';
     }
@@ -133,11 +140,15 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
   String _plusPriceLabel(PlusStatus? status) {
     final price = status?.currentPlan?.priceUzs;
     if (price != null && price > 0) return '${_formatPrice(price)} UZS';
+    // Only reached when the status came back without a plan object. Prices as
+    // set on 2026-08-26.
     switch (status?.planCode) {
       case 'yearly':
-        return '240 000 UZS';
+        return '799 000 UZS';
+      case 'quarterly':
+        return '219 000 UZS';
       case 'monthly':
-        return '30 000 UZS';
+        return '99 000 UZS';
     }
     return '';
   }
@@ -327,6 +338,14 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
           icon: Symbols.ios_share_rounded,
           label: 'Share profile',
           onTap: _shareMyProfile,
+        ),
+        const _RowDivider(),
+        _MenuRow(
+          icon: Symbols.redeem_rounded,
+          label: 'My promo code',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AffiliateScreen()),
+          ),
         ),
         const _RowDivider(),
         _MenuRow(

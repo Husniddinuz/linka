@@ -18,12 +18,12 @@ import 'podcasts_list_screen.dart' show formatClock, formatRemainingLabel;
 /// Player surface colors. The player is deliberately dark in both themes —
 /// like every other podcast app, the artwork is the subject and a dark room
 /// makes the follow-along transcript easier to read.
-const _bgTop = Color(0xFF272942);
-const _bgBottom = Color(0xFF16172A);
-const _accent = Color(0xFFF5C542);
+const playerBgTop = Color(0xFF272942);
+const playerBgBottom = Color(0xFF16172A);
+const playerAccent = Color(0xFFF5C542);
 
 /// Dot colors for labelled speakers, in the order they first speak.
-const _speakerColors = [
+const playerSpeakerColors = [
   Color(0xFFF5C542),
   Color(0xFF6FC3F5),
   Color(0xFF9B8CF5),
@@ -427,14 +427,14 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
                             horizontal: 18, vertical: 10),
                         decoration: BoxDecoration(
                           color: _speed == speed
-                              ? _accent
+                              ? playerAccent
                               : Colors.white.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           '${speed == speed.roundToDouble() ? speed.toInt() : speed}x',
                           style: TextStyle(
-                            color: _speed == speed ? _bgTop : Colors.white,
+                            color: _speed == speed ? playerBgTop : Colors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                           ),
@@ -504,13 +504,13 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: _bgTop,
+        backgroundColor: playerBgTop,
         body: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [_bgTop, _bgBottom],
+              colors: [playerBgTop, playerBgBottom],
             ),
           ),
           child: SafeArea(
@@ -520,7 +520,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
                 if (_loading)
                   const Expanded(
                     child: Center(
-                      child: CircularProgressIndicator(color: _accent),
+                      child: CircularProgressIndicator(color: playerAccent),
                     ),
                   )
                 else ...[
@@ -684,7 +684,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
                   width: 7,
                   height: 7,
                   decoration: BoxDecoration(
-                    color: _speakerColors[i % _speakerColors.length],
+                    color: playerSpeakerColors[i % playerSpeakerColors.length],
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -715,7 +715,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
             const SizedBox(
               width: 14,
               height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2, color: _accent),
+              child: CircularProgressIndicator(strokeWidth: 2, color: playerAccent),
             ),
             const SizedBox(width: 10),
             Text(
@@ -758,13 +758,13 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
               Text(
                 'Full transcript',
                 style: TextStyle(
-                  color: _accent.withValues(alpha: 0.9),
+                  color: playerAccent.withValues(alpha: 0.9),
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               Icon(Icons.chevron_right_rounded,
-                  size: 16, color: _accent.withValues(alpha: 0.9)),
+                  size: 16, color: playerAccent.withValues(alpha: 0.9)),
             ],
           ),
           const SizedBox(height: 10),
@@ -805,7 +805,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
                     activeWord: _activeWord,
                     fontSize: 16.5,
                     spokenColor: Colors.white,
-                    currentColor: _accent,
+                    currentColor: playerAccent,
                     upcomingColor: Colors.white.withValues(alpha: 0.42),
                   ),
                 ),
@@ -850,7 +850,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
 
   Color _colorForSpeaker(String speaker) {
     final index = _speakers.indexOf(speaker);
-    return _speakerColors[(index < 0 ? 0 : index) % _speakerColors.length];
+    return playerSpeakerColors[(index < 0 ? 0 : index) % playerSpeakerColors.length];
   }
 
   // ─── Transcript panel ───────────────────────────────────────────────────
@@ -946,7 +946,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
                               : Colors.white.withValues(
                                   alpha: isSpoken ? 0.55 : 0.38),
                           currentColor: isActive
-                              ? _accent
+                              ? playerAccent
                               : Colors.white.withValues(alpha: 0.55),
                           upcomingColor: isActive
                               ? Colors.white.withValues(alpha: 0.45)
@@ -977,7 +977,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                   decoration: BoxDecoration(
-                    color: _accent,
+                    color: playerAccent,
                     borderRadius: BorderRadius.circular(22),
                     boxShadow: [
                       BoxShadow(
@@ -991,12 +991,12 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.vertical_align_center_rounded,
-                          size: 15, color: _bgTop),
+                          size: 15, color: playerBgTop),
                       SizedBox(width: 6),
                       Text(
                         'Jump to current',
                         style: TextStyle(
-                          color: _bgTop,
+                          color: playerBgTop,
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700,
                         ),
@@ -1105,7 +1105,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
               ),
               child: Icon(
                 _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                color: _bgTop,
+                color: playerBgTop,
                 size: 36,
               ),
             ),
@@ -1151,7 +1151,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
               height: 16,
               colorFilter: ColorFilter.mode(
                 _sleepLabel != 'Off'
-                    ? _bgTop
+                    ? playerBgTop
                     : Colors.white.withValues(alpha: 0.75),
                 BlendMode.srcIn,
               ),
@@ -1165,7 +1165,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
               Icons.closed_caption_rounded,
               size: 17,
               color: _showTranscript
-                  ? _bgTop
+                  ? playerBgTop
                   : Colors.white.withValues(
                       alpha: _cues.isEmpty ? 0.25 : 0.75),
             ),
@@ -1179,7 +1179,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
               '${_speed == _speed.roundToDouble() ? _speed.toInt() : _speed}x',
               style: TextStyle(
                 color: _speed != 1.0
-                    ? _bgTop
+                    ? playerBgTop
                     : Colors.white.withValues(alpha: 0.75),
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
@@ -1210,7 +1210,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
             height: 38,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: active ? _accent : Colors.white.withValues(alpha: 0.12),
+              color: active ? playerAccent : Colors.white.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: child,
@@ -1480,7 +1480,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                 bars: _bars,
                 progress: _fraction,
                 buffered: _bufferedFraction,
-                playedColor: _accent,
+                playedColor: playerAccent,
                 bufferedColor: Colors.white.withValues(alpha: 0.38),
                 remainingColor: Colors.white.withValues(alpha: 0.18),
               ),
@@ -1618,7 +1618,7 @@ class _SleepTimerSheet extends StatelessWidget {
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: selected
-                                ? _accent
+                                ? playerAccent
                                 : Colors.white.withValues(alpha: 0.5),
                             width: 2,
                           ),
@@ -1631,7 +1631,7 @@ class _SleepTimerSheet extends StatelessWidget {
                                   child: DecoratedBox(
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: _accent,
+                                      color: playerAccent,
                                     ),
                                   ),
                                 ),

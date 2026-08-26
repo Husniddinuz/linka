@@ -128,6 +128,7 @@ class ApiService {
           data['detail']?.toString() ??
           'Request failed (${response.statusCode})',
       statusCode: response.statusCode,
+      data: data,
     );
   }
 
@@ -216,7 +217,7 @@ class ApiService {
       if (errors.isNotEmpty) errorMsg = errors.join('\n');
     }
 
-    throw ApiException(errorMsg, statusCode: response.statusCode);
+    throw ApiException(errorMsg, statusCode: response.statusCode, data: data);
   }
 
   /// Makes an authenticated POST request. Throws [ApiException] on failure.
@@ -271,7 +272,7 @@ class ApiService {
       if (errors.isNotEmpty) errorMsg = errors.join('\n');
     }
 
-    throw ApiException(errorMsg, statusCode: response.statusCode);
+    throw ApiException(errorMsg, statusCode: response.statusCode, data: data);
   }
 
   /// Makes an authenticated PATCH request. Throws [ApiException] on failure.
@@ -321,7 +322,7 @@ class ApiService {
       if (errors.isNotEmpty) errorMsg = errors.join('\n');
     }
 
-    throw ApiException(errorMsg, statusCode: response.statusCode);
+    throw ApiException(errorMsg, statusCode: response.statusCode, data: data);
   }
 
   /// Makes an authenticated DELETE request. Throws [ApiException] on failure.
@@ -363,17 +364,19 @@ class ApiService {
     }
 
     String errorMsg = 'Request failed (${response.statusCode})';
+    Map<String, dynamic>? data;
     if (response.body.isNotEmpty) {
       try {
-        final data = jsonDecode(response.body);
-        if (data is Map) {
-          errorMsg = data['message']?.toString() ??
-              data['detail']?.toString() ??
+        final parsed = jsonDecode(response.body);
+        if (parsed is Map<String, dynamic>) {
+          data = parsed;
+          errorMsg = parsed['message']?.toString() ??
+              parsed['detail']?.toString() ??
               errorMsg;
         }
       } catch (_) {}
     }
-    throw ApiException(errorMsg, statusCode: response.statusCode);
+    throw ApiException(errorMsg, statusCode: response.statusCode, data: data);
   }
 
   /// Makes an authenticated multipart POST request for file uploads.
@@ -467,14 +470,29 @@ class ApiService {
       }
     }
 
-    throw ApiException(errorMsg, statusCode: response.statusCode);
+    throw ApiException(errorMsg, statusCode: response.statusCode, data: data);
   }
 }
 
 class ApiException implements Exception {
   final String message;
   final int statusCode;
-  const ApiException(this.message, {this.statusCode = 0});
+
+  /// The decoded error body, when the server sent one.
+  ///
+  /// `message` is a sentence meant for a snackbar; some endpoints also answer
+  /// with a stable machine reason next to it (`promo_error: "own_code"`), and
+  /// a caller that wants to react to *which* refusal it was — clear the promo
+  /// field rather than fail the purchase — needs the code, not the prose.
+  final Map<String, dynamic>? data;
+
+  const ApiException(this.message, {this.statusCode = 0, this.data});
+
+  /// A stable reason code from the error body, if the endpoint sent one.
+  String? get errorCode {
+    final raw = data?['promo_error'] ?? data?['error'] ?? data?['code'];
+    return raw is String && raw.isNotEmpty ? raw : null;
+  }
 
   @override
   String toString() => message;

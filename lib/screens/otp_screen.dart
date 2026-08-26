@@ -11,12 +11,12 @@ import '../widgets/app_notify.dart';
 
 /// Which channel carried the code. Everything past "a code was sent" is the
 /// same for both, so the two flows share this screen and differ only in the
-/// endpoints it calls, the number of digits, and the wording.
+/// endpoints it calls and the wording.
 enum OtpChannel {
-  /// 5 digits over SMS. Creates the account if the number is new.
+  /// Over SMS. Creates the account if the number is new.
   sms,
 
-  /// 6 digits by email, into an account that already exists.
+  /// By email. Creates the account if the address is new.
   email,
 }
 
@@ -56,9 +56,9 @@ class _OtpScreenState extends State<OtpScreen> {
 
   bool get _isEmail => widget.channel == OtpChannel.email;
 
-  /// Email codes are 6 digits against SMS's 5 — an extra digit against a window
-  /// that is five times longer.
-  int get _codeLength => _isEmail ? 6 : 5;
+  /// Five digits whichever channel carried it — the backend issues the same
+  /// length for both, so the code field is one shape.
+  static const int _codeLength = 5;
 
   int get _resendSeconds => _isEmail ? 60 : 57;
 

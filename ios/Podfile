@@ -49,7 +49,7 @@ end
 def patch_dk_image_picker_controller
   # DKImagePickerController 4.3.9 uses the deprecated UIApplication.shared.keyWindow
   # (deprecated iOS 15). Apple's binary scanner flags this. Patch all occurrences to use
-  # the modern connectedScenes API (requires iOS 13+, our minimum).
+  # the modern connectedScenes API (requires iOS 13+, below our minimum).
   files = {
     'Pods/DKImagePickerController/Sources/DKImagePickerController/DKImagePickerController.swift' => [
       [
@@ -142,12 +142,13 @@ post_install do |installer|
         'PERMISSION_PHOTOS=1',
       ]
 
-      # Ensure all pods compile for iOS 13+ so modern UIWindowScene APIs are available
+      # Ensure all pods compile for iOS 15+ so modern UIWindowScene APIs are available
       # without #available guards. Without this, pods with lower podspec minimums
       # (e.g. DKImagePickerController targeting iOS 9) would fail to compile against
-      # connectedScenes / UIWindowScene APIs.
-      if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 13.0
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      # connectedScenes / UIWindowScene APIs. 15.0 is also App Store Connect's
+      # MinimumOSVersion floor from Spring 2027 (error 90068).
+      if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 15.0
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       end
 
     end

@@ -65,21 +65,6 @@ class AiCoachService {
     await ApiService.post('$_base/session/$sessionId/end/', const {});
   }
 
-  /// One typed turn — the way in when speaking aloud is not an option.
-  ///
-  /// Spoken turns do not come through here: they stream over the socket in
-  /// [CoachSocket] as they are said. The `POST /ai/turn/{id}/` upload endpoint
-  /// still exists server-side and is the fallback if streaming ever has to go.
-  /// `pronunciation` always comes back null here: there is no audio to score.
-  static Future<CoachTurn> sendTextTurn({
-    required int sessionId,
-    required String text,
-  }) async {
-    final data =
-        await ApiService.post('$_base/turn/$sessionId/text/', {'text': text});
-    return CoachTurn.fromJson(data);
-  }
-
   /// What the coach has noticed across every conversation.
   static Future<CoachStats> fetchStats() async {
     final data = await ApiService.get('$_base/stats/');

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import '../models/mock_test.dart';
 import 'api_service.dart';
 
@@ -51,6 +53,22 @@ class MockTestService {
     return data.cast<Map<String, dynamic>>();
   }
 
+  /// One attempt in full, including `analysis` — the diagnostic review the
+  /// list endpoint deliberately omits (a full review runs to several KB, and a
+  /// student with thirty essays would otherwise download all thirty of them to
+  /// draw a list of titles and bands).
+  static Future<Map<String, dynamic>> fetchWritingAttempt(int attemptId) {
+    return ApiService.get('/writing-attempts/$attemptId/');
+  }
+
+  /// What the student keeps getting wrong, counted across every graded essay:
+  /// band trend, per-criterion averages, recurring grammar topics, persistent
+  /// habits and a short focus list. Pure aggregation over stored reviews — no
+  /// second AI call — so it is free to open and stable between reloads.
+  static Future<Map<String, dynamic>> fetchWritingInsights() {
+    return ApiService.get('/writing-attempts/insights/');
+  }
+
   /// {is_plus, limit, used, remaining} — `limit`/`remaining` are null
   /// for Plus users (unlimited). The limit is a total free window, not a
   /// daily allowance.
@@ -101,6 +119,55 @@ class MockTestService {
   /// tutor account (grouped by name in that case).
   static Future<List<Map<String, dynamic>>> fetchWritingSampleTutors() async {
     final data = await ApiService.getList('/writing-samples/tutors/');
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  // ─── Speaking answers (AI marking) ────────────────────────────────────────
+
+  /// The free window on AI-marked *spoken* answers — `{is_plus, limit, used,
+  /// remaining}`, with `limit`/`remaining` null for Plus.
+  ///
+  /// A lifetime allowance, not a daily one, and not to be confused with the
+  /// free live-practice minutes in `/video/speaking/quota/`: two unrelated
+  /// budgets, and a student can be out of one with the other untouched.
+  static Future<Map<String, dynamic>> fetchSpeakingAnswerQuota() {
+    return ApiService.get('/speaking-attempts/quota/');
+  }
+
+  /// Sends the student's own recording of a sample part's question for AI
+  /// marking, and returns the created attempt — `pending`, because
+  /// transcription and marking run on the server after the upload lands.
+  /// Poll [fetchSpeakingAttempt] until `status` reads `graded` or `failed`.
+  ///
+  /// [durationSeconds] is the client's own stopwatch reading: the server
+  /// cannot probe every container, so until transcription reports an
+  /// authoritative length this is the only duration the attempt has.
+  static Future<Map<String, dynamic>> submitSpeakingAnswer({
+    required int partId,
+    required File audio,
+    required int durationSeconds,
+  }) {
+    return ApiService.postMultipart(
+      '/speaking-sample-parts/$partId/submit/',
+      files: {'audio_file': audio},
+      fields: {'duration_seconds': '$durationSeconds'},
+    );
+  }
+
+  /// One spoken attempt in full, including `analysis`, `transcript` and the
+  /// per-word timings the corrections seek against — all three of which the
+  /// list endpoint omits. This is also the poll target while marking runs.
+  static Future<Map<String, dynamic>> fetchSpeakingAttempt(int attemptId) {
+    return ApiService.get('/speaking-attempts/$attemptId/');
+  }
+
+  /// Every answer this student has sent for marking, newest first.
+  ///
+  /// Unsettled attempts are included deliberately: marking outlives the screen
+  /// that started it, and a student who backed out mid-marking is exactly who
+  /// comes looking for this list.
+  static Future<List<Map<String, dynamic>>> fetchSpeakingAttempts() async {
+    final data = await ApiService.getList('/speaking-attempts/');
     return data.cast<Map<String, dynamic>>();
   }
 }

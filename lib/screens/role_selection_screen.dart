@@ -120,6 +120,50 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
               ),
 
               const Spacer(),
+              // Email, Telegram, phone — the same order the web sign-in uses,
+              // so a student who starts on one and finishes on the other is
+              // offered the routes in the same places. Email leads because it
+              // is the channel that costs nothing to send on, never disappears
+              // into a carrier filter, and works for students whose number is
+              // not +998.
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _selectedRole != null ? _loginWithEmail : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: context.colors.brand,
+                    disabledBackgroundColor: context.colors.border,
+                    foregroundColor: Colors.white,
+                    disabledForegroundColor: context.colors.textTertiary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.mail_outline_rounded,
+                        size: 20,
+                        color: _selectedRole != null
+                            ? Colors.white
+                            : context.colors.textTertiary,
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Continue with email',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               if (telegramLoginEnabled) ...[
                 SizedBox(
                   width: double.infinity,
@@ -164,53 +208,14 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 ),
                 const SizedBox(height: 12),
               ],
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _selectedRole != null ? _loginWithPhone : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: context.colors.brand,
-                    disabledBackgroundColor: context.colors.border,
-                    foregroundColor: Colors.white,
-                    disabledForegroundColor: context.colors.textTertiary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.phone_rounded,
-                        size: 20,
-                        color: _selectedRole != null
-                            ? Colors.white
-                            : context.colors.textTertiary,
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Login via Phone number',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Text rather than a third button: it registers and signs in
-              // just like the two above, but phone remains the primary route
-              // for this market, so it gets quieter weight rather than less
-              // capability.
+              // Text rather than a third button. Phone still registers and
+              // signs in exactly as the two above do — it gets quieter weight,
+              // not less capability.
               Center(
                 child: TextButton(
-                  onPressed: _selectedRole != null ? _loginWithEmail : null,
+                  onPressed: _selectedRole != null ? _loginWithPhone : null,
                   child: Text(
-                    'Continue with email instead',
+                    'Use phone number instead',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
