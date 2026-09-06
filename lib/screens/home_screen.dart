@@ -11,6 +11,7 @@ import '../widgets/podcast_artwork.dart';
 import '../widgets/lesson_card.dart';
 import '../widgets/mini_player_bar.dart';
 import '../widgets/skeleton.dart';
+import '../widgets/progress_strip.dart';
 import '../services/api_service.dart';
 import '../services/app_feature_service.dart';
 import '../services/notification_service.dart';
@@ -234,6 +235,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Keys to drive the self-contained webinar/debate blocks on pull-to-refresh.
   final GlobalKey<_WebinarBlockState> _webinarKey = GlobalKey();
+  final GlobalKey<ProgressStripState> _progressKey = GlobalKey();
   final GlobalKey<_DebateBlockState> _debateKey = GlobalKey();
 
   bool get _isInitialLoading =>
@@ -528,6 +530,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // them to re-fetch — otherwise a freshly created session won't appear.
       _webinarKey.currentState?.refresh() ?? Future.value(),
       _debateKey.currentState?.refresh() ?? Future.value(),
+      _progressKey.currentState?.refresh() ?? Future.value(),
     ]);
   }
 
@@ -766,6 +769,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               ],
 
                               const SizedBox(height: 32),
+
+                              // Collapses to nothing until the student has
+                              // a band or a finished lesson to show.
+                              if (AppFeatureService.isEnabled('mock_tests'))
+                                ProgressStrip(key: _progressKey),
 
                               if (AppFeatureService.isEnabled('ielts') ||
                                   AppFeatureService.isEnabled(

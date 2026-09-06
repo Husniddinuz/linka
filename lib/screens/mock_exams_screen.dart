@@ -3,6 +3,7 @@ import '../widgets/mock_test_styles.dart';
 import 'ai_coach_screen.dart';
 import 'mock_test_history_screen.dart';
 import 'mock_test_list_screen.dart';
+import 'student_progress_screen.dart';
 import 'tutors_screen.dart';
 import 'writing_prompts_list_screen.dart';
 import '../theme/app_colors.dart';
@@ -18,6 +19,14 @@ class MockExamsScreen extends StatelessWidget {
         context,
         title: 'Mock Exams',
         actions: [
+          IconButton(
+            tooltip: 'My progress',
+            icon: Icon(Icons.insights_rounded, color: context.colors.textPrimary),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const StudentProgressScreen()),
+            ),
+          ),
           IconButton(
             icon: Icon(Icons.history_rounded, color: context.colors.textPrimary),
             onPressed: () => Navigator.push(

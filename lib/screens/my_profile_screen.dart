@@ -25,6 +25,7 @@ import 'faq_screen.dart';
 import 'notifications_screen.dart';
 import 'my_reviews_screen.dart';
 import 'saved_articles_screen.dart';
+import 'student_progress_screen.dart';
 import 'payment_topup_screen.dart';
 import 'public_offer_screen.dart';
 import 'blocked_users_screen.dart';
@@ -398,6 +399,14 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
         icon: Symbols.school_rounded,
         label: 'My lessons',
         onTap: () => widget.onNavigateToLessons?.call(),
+      ),
+      const _RowDivider(),
+      _MenuRow(
+        icon: Symbols.insights_rounded,
+        label: 'My progress',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const StudentProgressScreen()),
+        ),
       ),
       const _RowDivider(),
       _MenuRow(
