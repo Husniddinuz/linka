@@ -312,7 +312,10 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                 const _LogoutCard(),
                 const SizedBox(height: 28),
                 _DeleteAccountCard(
-                  phoneNumber: _profile?['phone_number'] as String?,
+                  phoneNumber: (_profile?['phone_number'] as String?) ??
+                      UserService.current?.phone,
+                  email: (_profile?['email'] as String?) ??
+                      UserService.current?.email,
                 ),
                 const SizedBox(height: 36),
               ],
@@ -1525,8 +1528,14 @@ class _SheetButton extends StatelessWidget {
 // ─── Delete account card ──────────────────────────────────────────────────────
 
 class _DeleteAccountCard extends StatefulWidget {
+  /// The phone this account signed up with, or null/empty for an
+  /// email-registered account.
   final String? phoneNumber;
-  const _DeleteAccountCard({this.phoneNumber});
+
+  /// Fallback confirmation identifier when there is no phone.
+  final String? email;
+
+  const _DeleteAccountCard({this.phoneNumber, this.email});
 
   @override
   State<_DeleteAccountCard> createState() => _DeleteAccountCardState();
@@ -1536,14 +1545,19 @@ class _DeleteAccountCardState extends State<_DeleteAccountCard> {
   bool _deleting = false;
 
   Future<void> _onTap() async {
-    final phone = widget.phoneNumber;
-    if (phone == null || phone.isEmpty) {
+    // An account has a phone OR an email (either may be null). Confirm
+    // against whichever one exists — phone first, email otherwise.
+    final phone = widget.phoneNumber?.trim() ?? '';
+    final email = widget.email?.trim() ?? '';
+    final identifier = phone.isNotEmpty ? phone : email;
+    if (identifier.isEmpty) {
       AppNotify.show(
         context,
-        message: 'Unable to verify your phone number. Please try again later.',
+        message: 'Unable to verify your account. Please try again later.',
       );
       return;
     }
+    final isEmail = phone.isEmpty;
 
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
@@ -1556,7 +1570,10 @@ class _DeleteAccountCardState extends State<_DeleteAccountCard> {
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(ctx).viewInsets.bottom,
         ),
-        child: _DeleteAccountConfirmSheet(phoneNumber: phone),
+        child: _DeleteAccountConfirmSheet(
+          identifier: identifier,
+          isEmail: isEmail,
+        ),
       ),
     );
 
@@ -1631,8 +1648,15 @@ class _DeleteAccountCardState extends State<_DeleteAccountCard> {
 // ─── Delete account confirmation sheet ────────────────────────────────────────
 
 class _DeleteAccountConfirmSheet extends StatefulWidget {
-  final String phoneNumber;
-  const _DeleteAccountConfirmSheet({required this.phoneNumber});
+  /// What the user must retype: their phone number, or their email address
+  /// when the account was registered by email.
+  final String identifier;
+  final bool isEmail;
+
+  const _DeleteAccountConfirmSheet({
+    required this.identifier,
+    required this.isEmail,
+  });
 
   @override
   State<_DeleteAccountConfirmSheet> createState() =>
@@ -1643,10 +1667,12 @@ class _DeleteAccountConfirmSheetState
     extends State<_DeleteAccountConfirmSheet> {
   final _controller = TextEditingController();
 
-  String _normalize(String s) => s.replaceAll(RegExp(r'[\s\-()]'), '');
+  String _normalize(String s) => widget.isEmail
+      ? s.trim().toLowerCase()
+      : s.replaceAll(RegExp(r'[\s\-()]'), '');
 
   bool get _matches =>
-      _normalize(_controller.text) == _normalize(widget.phoneNumber);
+      _normalize(_controller.text) == _normalize(widget.identifier);
 
   @override
   void dispose() {
@@ -1730,7 +1756,9 @@ class _DeleteAccountConfirmSheetState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'To confirm, type your phone number:',
+                    widget.isEmail
+                        ? 'To confirm, type your email address:'
+                        : 'To confirm, type your phone number:',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -1739,7 +1767,7 @@ class _DeleteAccountConfirmSheetState
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    widget.phoneNumber,
+                    widget.identifier,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -1750,7 +1778,10 @@ class _DeleteAccountConfirmSheetState
                   const SizedBox(height: 10),
                   TextField(
                     controller: _controller,
-                    keyboardType: TextInputType.phone,
+                    keyboardType: widget.isEmail
+                        ? TextInputType.emailAddress
+                        : TextInputType.phone,
+                    autocorrect: false,
                     autofocus: true,
                     onChanged: (_) => setState(() {}),
                     style: TextStyle(
@@ -1759,7 +1790,9 @@ class _DeleteAccountConfirmSheetState
                       color: context.colors.textPrimary,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'Enter phone number',
+                      hintText: widget.isEmail
+                          ? 'Enter email address'
+                          : 'Enter phone number',
                       hintStyle: TextStyle(
                         fontSize: 14,
                         color: context.colors.textTertiary,

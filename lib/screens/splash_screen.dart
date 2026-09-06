@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/app_feature_service.dart';
+import '../services/prefs_service.dart';
 import '../services/token_service.dart';
 import 'home_screen.dart';
+import 'onboarding_screen.dart';
 import 'role_selection_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -27,18 +29,26 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     if (isLoggedIn) {
+      // Someone already signed in has seen the app itself; the intro is for
+      // a fresh install only, and logging out later must not resurrect it.
+      PrefsService.setOnboardingCompleted();
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const HomeScreen()),
       );
       return;
     }
 
+    // First launch after install: introduce the app before asking who they
+    // are. Every launch after that goes straight to the auth flow.
+    final showIntro = !await PrefsService.isOnboardingCompleted();
+
     // Not logged in: hold the branding splash briefly before auth flow.
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (_, _, _) => const RoleSelectionScreen(),
+        pageBuilder: (_, _, _) =>
+            showIntro ? const OnboardingScreen() : const RoleSelectionScreen(),
         transitionsBuilder: (_, animation, _, child) =>
             FadeTransition(opacity: animation, child: child),
         transitionDuration: const Duration(milliseconds: 400),
