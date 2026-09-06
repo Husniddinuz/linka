@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/mock_test_service.dart';
+import '../services/random_test_picker.dart';
 import '../theme/app_colors.dart';
 import '../widgets/mock_test_styles.dart';
+import '../widgets/random_test_card.dart';
 import '../widgets/writing_report.dart';
 import 'writing_progress_screen.dart';
 import 'writing_test_screen.dart';
@@ -341,6 +343,15 @@ class _PromptList extends StatelessWidget {
   final List<Map<String, dynamic>> prompts;
   final bool searching;
 
+  static final _picker = RandomTestPicker();
+
+  void _openRandom(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => WritingTestScreen(prompt: _picker.pick(prompts))),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (prompts.isEmpty) {
@@ -355,10 +366,26 @@ class _PromptList extends StatelessWidget {
         ),
       );
     }
+    // Once a student is searching they have a task in mind; the shuffle row
+    // only earns its place when they don't.
+    final leading = searching ? 0 : 1;
+    final taskNumber = wToInt(prompts.first['task_number']);
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      itemCount: prompts.length,
-      itemBuilder: (context, index) => _PromptCard(prompt: prompts[index], number: index + 1),
+      itemCount: prompts.length + leading,
+      itemBuilder: (context, index) {
+        if (index < leading) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: RandomTestCard(
+              subtitle: 'Any of the ${prompts.length} Task $taskNumber prompts',
+              onTap: () => _openRandom(context),
+            ),
+          );
+        }
+        final i = index - leading;
+        return _PromptCard(prompt: prompts[i], number: i + 1);
+      },
     );
   }
 }

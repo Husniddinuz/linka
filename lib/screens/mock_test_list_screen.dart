@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
 import '../models/mock_test.dart';
 import '../services/mock_test_service.dart';
+import '../services/random_test_picker.dart';
+import '../widgets/mock_test_access.dart';
 import '../widgets/mock_test_styles.dart';
+import '../widgets/random_test_card.dart';
 import 'mock_test_taking_screen.dart';
-import 'plus_subscription_screen.dart';
 import '../theme/app_colors.dart';
-
-/// How many distinct mock tests (Reading + Listening combined) a non-Plus
-/// user can take for free. Tests they have already attempted stay open for
-/// retakes; starting a new test beyond this prompts for Linka Plus.
-const int _freeSolvedTestsLimit = 2;
 
 /// Full list of Reading or Listening mock tests for [testType]. Every test
 /// is always visible; non-Plus users who have already taken
-/// [_freeSolvedTestsLimit] tests see a lock on the remaining ones and get a
+/// [mtFreeSolvedTestsLimit] tests see a lock on the remaining ones and get a
 /// "Get Plus" prompt when opening them.
 class MockTestListScreen extends StatefulWidget {
   const MockTestListScreen({super.key, required this.testType});
@@ -27,6 +24,7 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
   late Future<List<MockTest>> _future = MockTestService.fetchTests(widget.testType);
   bool _isLocked = false;
   Set<int> _solvedTestIds = {};
+  final _picker = RandomTestPicker();
 
   @override
   void initState() {
@@ -71,61 +69,18 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
     if (mounted && _isLocked) _loadAccessState();
   }
 
-  void _showPlusPrompt() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: context.colors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.workspace_premium_rounded, color: context.colors.accentYellow, size: 40),
-            const SizedBox(height: 12),
-            Text(
-              'You\'ve used your $_freeSolvedTestsLimit free tests',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 16.5,
-                fontWeight: FontWeight.w700,
-                color: context.colors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Get Linka Plus to unlock all Reading and Listening mock tests.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, height: 1.4, color: context.colors.textSecondary),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(sheetContext);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const PlusSubscriptionScreen()),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: context.colors.brand,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: const Text(
-                  'Get Plus',
-                  style: TextStyle(fontFamily: 'SF Pro', fontSize: 15, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _showPlusPrompt() => mtShowPlusPrompt(context);
+
+  /// Opens one of the tests the student can actually start. Once the free
+  /// window is spent that is only their retakes; with none of those left the
+  /// tap lands on the Plus prompt, same as tapping a locked row.
+  void _openRandomTest(List<MockTest> tests, bool freeWindowUsed) {
+    final open = freeWindowUsed ? tests.where((t) => _solvedTestIds.contains(t.id)).toList() : tests;
+    if (open.isEmpty) {
+      _showPlusPrompt();
+      return;
+    }
+    _openTest(_picker.pick(open));
   }
 
   @override
@@ -162,7 +117,7 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
             );
           }
 
-          final freeWindowUsed = _isLocked && _solvedTestIds.length >= _freeSolvedTestsLimit;
+          final freeWindowUsed = _isLocked && _solvedTestIds.length >= mtFreeSolvedTestsLimit;
 
           return RefreshIndicator(
             color: context.colors.textPrimary,
@@ -175,6 +130,11 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
+                RandomTestCard(
+                  subtitle: 'Any of the ${tests.length} ${isListening ? 'Listening' : 'Reading'} tests',
+                  onTap: () => _openRandomTest(tests, freeWindowUsed),
+                ),
+                const SizedBox(height: 10),
                 for (final (index, test) in tests.indexed) ...[
                   Builder(builder: (context) {
                     final locked = freeWindowUsed && !_solvedTestIds.contains(test.id);

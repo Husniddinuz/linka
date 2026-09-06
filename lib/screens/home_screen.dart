@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import '../models/announcement.dart';
 import '../models/podcast.dart';
 import '../services/podcast_progress_service.dart';
 import '../widgets/cached_avatar.dart';
@@ -13,12 +14,15 @@ import '../widgets/mini_player_bar.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/progress_strip.dart';
 import '../services/api_service.dart';
+import '../services/announcement_service.dart';
 import '../services/app_feature_service.dart';
 import '../services/notification_service.dart';
 import '../services/prefs_service.dart';
 import '../services/update_service.dart';
 import '../services/user_service.dart';
 import '../theme/app_colors.dart';
+import '../utils/announcement_target.dart';
+import '../widgets/announcement_popup.dart';
 import '../widgets/update_dialog.dart';
 import 'speaking_training_screen.dart';
 import 'lesson_meeting_screen.dart';
@@ -262,8 +266,46 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _checkForUpdate() async {
     final info = await UpdateService.checkForUpdate();
-    if (info == null || !mounted) return;
-    await showUpdateDialog(context, info);
+    if (info != null && mounted) {
+      await showUpdateDialog(context, info);
+    }
+    // After the update prompt, never on top of it: one card per launch.
+    if (mounted) await _showAnnouncement();
+  }
+
+  /// The "what's new" popup for a freshly added course or feature. The
+  /// server already filtered to cards this account has not seen, so the
+  /// first one is the one to show; closing or opening it marks it seen.
+  Future<void> _showAnnouncement() async {
+    if (AnnouncementService.shownThisSession) return;
+    List<Announcement> items;
+    try {
+      items = await AnnouncementService.fetchUnseen();
+    } catch (_) {
+      return;
+    }
+    if (items.isEmpty || !mounted || AnnouncementService.shownThisSession) return;
+    AnnouncementService.shownThisSession = true;
+    final item = items.first;
+    final open = await showAnnouncementPopup(context, item);
+    AnnouncementService.markSeen(item.id);
+    if (!open || !mounted) return;
+    await AnnouncementTarget.open(
+      context,
+      item.target,
+      selectTab: _selectHomeTab,
+      openSpeakingPractice: _openSpeakingTraining,
+    );
+  }
+
+  /// Bottom-tab indices differ between the two layouts (see [_buildScaffold]).
+  void _selectHomeTab(HomeTab tab) {
+    final index = switch (tab) {
+      HomeTab.chats => 1,
+      HomeTab.tutors => _isTeacher ? 0 : 2,
+      HomeTab.profile => _isTeacher ? 4 : 3,
+    };
+    if (mounted) setState(() => _selectedTab = index);
   }
 
   // TODO: remove before release — test-only trigger
