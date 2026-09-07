@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'api_service.dart';
+import 'call_kit_service.dart';
 
 class NotificationService {
   static FirebaseMessaging get _messaging => FirebaseMessaging.instance;
@@ -33,10 +34,14 @@ class NotificationService {
 
 
       final platform = Platform.isIOS ? 'ios' : 'android';
+      // iOS rings for a video call off a PushKit token, not the FCM one.
+      // Sent together so the backend keeps them on the same device row.
+      final voipToken = await CallKitService.voipToken();
 
       await ApiService.post('/notifications/device/', {
         'token': fcmToken,
         'platform': platform,
+        'voip_token': ?voipToken,
       });
 
     } catch (_) {
@@ -48,10 +53,12 @@ class NotificationService {
   static void listenTokenRefresh() {
     _messaging.onTokenRefresh.listen((newToken) async {
       final platform = Platform.isIOS ? 'ios' : 'android';
+      final voipToken = await CallKitService.voipToken();
       try {
         await ApiService.post('/notifications/device/', {
           'token': newToken,
           'platform': platform,
+          'voip_token': ?voipToken,
         });
       } catch (e) {
       }

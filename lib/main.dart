@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -12,6 +13,7 @@ import 'screens/tutor_profile_screen.dart';
 import 'services/api_service.dart';
 import 'services/app_feature_service.dart';
 import 'services/auth_service.dart';
+import 'services/call_kit_service.dart';
 import 'services/facebook_events_service.dart';
 import 'services/notification_service.dart';
 import 'services/podcast_progress_service.dart';
@@ -36,6 +38,10 @@ void main() async {
     artDownscaleHeight: 384,
   );
   await Firebase.initializeApp();
+  // A video call arriving while the app is closed has to ring the phone
+  // before any of this runs. The handler lives in its own isolate; it is
+  // registered here so Firebase knows about it from the first launch.
+  FirebaseMessaging.onBackgroundMessage(linkaFirebaseBackgroundHandler);
   await FacebookEventsService.init();
   await ThemeService.init();
   // Resume points are read synchronously from cache while building podcast
@@ -84,9 +90,13 @@ class _LinkaAppState extends State<LinkaApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _appLinks = AppLinks();
     _initDeepLinks();
+    CallKitService.init();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FacebookEventsService.requestTracking();
       _checkForUpdate();
+      // A call accepted on the native screen while the app was closed is
+      // waiting for us to actually join it.
+      CallKitService.resumeAcceptedCall();
     });
   }
 
@@ -96,6 +106,7 @@ class _LinkaAppState extends State<LinkaApp> with WidgetsBindingObserver {
     // toggles flipped server-side land without a restart.
     if (state == AppLifecycleState.resumed) {
       AppFeatureService.refresh();
+      CallKitService.resumeAcceptedCall();
     }
   }
 

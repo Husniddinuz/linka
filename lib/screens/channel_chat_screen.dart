@@ -14,11 +14,16 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/token_service.dart';
 import '../services/api_service.dart';
+import '../services/call_kit_service.dart';
+import '../services/call_service.dart';
 import '../services/chat_service.dart';
 import '../services/podcast_playback_service.dart';
 import '../services/user_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/app_notify.dart';
 import '../widgets/skeleton.dart';
+import 'plus_subscription_screen.dart';
+import 'video_call_screen.dart';
 import 'chats_screen.dart';
 import 'tutor_profile_screen.dart';
 import 'public_profile_screen.dart';
@@ -370,6 +375,10 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
     _loadMessages();
     _scrollController.addListener(_onScroll);
     _textController.addListener(_onTextChanged);
+    // Opening a private thread is the first moment a call can reach this
+    // phone; Android 14+ needs a one-time permission to ring over the lock
+    // screen, so it is asked here rather than at app start.
+    if (widget.direct != null) CallKitService.ensureAndroidFullScreenPermission();
   }
 
   @override
@@ -1836,6 +1845,19 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         ],
       ),
       actions: [
+        // A call is placed to a person, so only a private thread offers one.
+        // Same terms as the thread itself: placing it costs Plus, a block
+        // closes it — the server says which, and the tap just relays.
+        if (widget.direct != null && !widget.direct!.isBlocked)
+          IconButton(
+            icon: Icon(
+              Icons.videocam_rounded,
+              size: 24,
+              color: context.colors.textPrimary,
+            ),
+            tooltip: 'Video call',
+            onPressed: _startVideoCall,
+          ),
         // Only a private thread is yours to delete. A community channel is a
         // shared room — there is nothing personal in it to remove.
         if (widget.direct != null)
@@ -1880,6 +1902,40 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         child: Divider(height: 1, color: context.colors.border),
       ),
     );
+  }
+
+  bool _placingCall = false;
+
+  /// Rings the other person. Only *placing* a call costs Plus, exactly as
+  /// only starting a thread does, so the refusal routes the same way.
+  Future<void> _startVideoCall() async {
+    final direct = widget.direct;
+    if (direct == null || _placingCall) return;
+    _placingCall = true;
+    try {
+      final session = await CallService.start(direct.conversationId);
+      if (!mounted) return;
+      CallKitService.activeCallUuid = session.call.roomId;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VideoCallScreen(session: session, incoming: false),
+          fullscreenDialog: true,
+        ),
+      );
+    } on CallRefused catch (e) {
+      if (!mounted) return;
+      if (e.needsPlus) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const PlusSubscriptionScreen()),
+        );
+      } else {
+        AppNotify.show(context, message: e.message);
+      }
+    } catch (e) {
+      if (mounted) AppNotify.show(context, message: 'Could not start the call.');
+    } finally {
+      _placingCall = false;
+    }
   }
 
   /// Deletes this thread for the reader alone, then leaves the screen — there
