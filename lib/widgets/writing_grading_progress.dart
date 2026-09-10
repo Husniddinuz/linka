@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import 'writing_report.dart';
 
@@ -118,7 +119,7 @@ class _WritingGradingProgressState extends State<WritingGradingProgress> with Si
                   gradient: LinearGradient(colors: [wr.accent, wr.colors.brand]),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 24),
+                child: const Icon(Symbols.auto_awesome_rounded, color: Colors.white, size: 24),
               ),
             ),
           ),
@@ -169,7 +170,7 @@ class _WritingGradingProgressState extends State<WritingGradingProgress> with Si
                     height: 20,
                     child: Center(
                       child: i < active
-                          ? Icon(Icons.check_circle_rounded, size: 17, color: wr.good)
+                          ? Icon(Symbols.check_circle_rounded, size: 17, color: wr.good)
                           : i == active
                               ? SizedBox(
                                   width: 15,

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../models/ai_coach.dart';
 import '../theme/app_colors.dart';
@@ -185,8 +186,8 @@ class _CoachPronunciationCardState extends State<CoachPronunciationCard> {
                     ),
                     Icon(
                       _wordsOpen
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
+                          ? Symbols.keyboard_arrow_up_rounded
+                          : Symbols.keyboard_arrow_down_rounded,
                       size: 20,
                       color: colors.textTertiary,
                     ),

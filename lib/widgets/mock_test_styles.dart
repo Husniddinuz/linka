@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/plus_service.dart';
 import '../services/user_service.dart';
 import '../theme/app_colors.dart';
@@ -42,7 +43,7 @@ AppBar mtAppBar(BuildContext context, {required String title, List<Widget>? acti
     surfaceTintColor: colors.background,
     leading: IconButton(
       onPressed: () => Navigator.pop(context),
-      icon: Icon(Icons.chevron_left_rounded, color: colors.textPrimary, size: 30),
+      icon: Icon(Symbols.chevron_left_rounded, color: colors.textPrimary, size: 30),
     ),
     title: Text(
       title,

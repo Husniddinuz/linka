@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -782,7 +783,7 @@ class _SelfView extends StatelessWidget {
                 mirror: mirror,
                 objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
               )
-            : const Icon(Icons.videocam_off_rounded, color: Colors.white38),
+            : const Icon(Symbols.videocam_off_rounded, color: Colors.white38),
       ),
     );
   }
@@ -816,22 +817,22 @@ class _Controls extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _RoundButton(
-            icon: micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
+            icon: micOn ? Symbols.mic_rounded : Symbols.mic_off_rounded,
             active: micOn,
             onTap: enabled ? onMic : null,
           ),
           _RoundButton(
-            icon: cameraOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
+            icon: cameraOn ? Symbols.videocam_rounded : Symbols.videocam_off_rounded,
             active: cameraOn,
             onTap: enabled ? onCamera : null,
           ),
           _RoundButton(
-            icon: Icons.cameraswitch_rounded,
+            icon: Symbols.cameraswitch_rounded,
             active: true,
             onTap: enabled && cameraOn ? onFlip : null,
           ),
           _RoundButton(
-            icon: Icons.call_end_rounded,
+            icon: Symbols.call_end_rounded,
             active: true,
             color: const Color(0xFFE53935),
             size: 64,

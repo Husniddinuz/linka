@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../theme/app_colors.dart';
 import '../widgets/lesson_card.dart';
 import '../widgets/lesson_goals.dart';
@@ -78,7 +79,7 @@ class LessonDetailScreen extends StatelessWidget {
         scrolledUnderElevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: Icon(Icons.chevron_left, color: context.colors.textPrimary, size: 28),
+          icon: Icon(Symbols.chevron_left_rounded, color: context.colors.textPrimary, size: 28),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(

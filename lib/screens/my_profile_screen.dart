@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/cached_avatar.dart';
+import '../widgets/plus_badge.dart';
 import '../widgets/plus_member_card.dart';
 import '../services/api_service.dart';
 import '../services/app_feature_service.dart';
@@ -202,12 +203,17 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
     }
   }
 
+  /// Whether Plus is a thing on this account at all: tutors and exempt
+  /// students are never sold it, and the whole feature can be switched off.
+  bool get _plusApplies =>
+      !_isTeacher &&
+      !_isExemptFromPlus &&
+      AppFeatureService.isEnabled('plus');
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final showPlus = !_isTeacher &&
-        !_isExemptFromPlus &&
-        AppFeatureService.isEnabled('plus');
+    final showPlus = _plusApplies;
 
     // The hero stays navy in both themes, so status bar icons must be light.
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -448,6 +454,9 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
       profile: _profile,
       loading: _loading,
       isTeacher: _isTeacher,
+      // Same gate as the card below the hero: an account Plus does not apply
+      // to cannot wear the badge, however the status endpoint answers.
+      isPlus: _plusApplies && _plusStatus?.isActive == true,
       // Students get extra bottom room for the overlapping balance card.
       bottomPadding: _isTeacher ? 28.0 : 56.0,
       onEdit: _openEditProfile,
@@ -476,6 +485,7 @@ class _HeroPanel extends StatelessWidget {
   final Map<String, dynamic>? profile;
   final bool loading;
   final bool isTeacher;
+  final bool isPlus;
   final double bottomPadding;
   final VoidCallback onEdit;
 
@@ -483,6 +493,7 @@ class _HeroPanel extends StatelessWidget {
     required this.profile,
     required this.loading,
     required this.isTeacher,
+    required this.isPlus,
     required this.bottomPadding,
     required this.onEdit,
   });
@@ -612,15 +623,21 @@ class _HeroPanel extends StatelessWidget {
                     ),
                   ),
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _RoleChip(isTeacher: isTeacher),
-                    if (phone.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      _PhoneChip(phone: phone),
+                // A Wrap, not a Row: role + Plus + a long phone number is more
+                // than a narrow screen fits on one line.
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _RoleChip(isTeacher: isTeacher),
+                      if (isPlus) const PlusBadge(),
+                      if (phone.isNotEmpty) _PhoneChip(phone: phone),
                     ],
-                  ],
+                  ),
                 ),
                 SizedBox(height: bottomPadding),
               ],

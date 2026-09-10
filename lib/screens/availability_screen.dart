@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import 'booking_page_screen.dart';
@@ -147,7 +148,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
-                    child: Icon(Icons.chevron_left_rounded, size: 30, color: context.colors.textPrimary),
+                    child: Icon(Symbols.chevron_left_rounded, size: 30, color: context.colors.textPrimary),
                   ),
                   Expanded(
                     child: Center(
@@ -258,7 +259,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                 onTap: () => setState(() {
                   _focusedMonth = DateTime(year, month - 1);
                 }),
-                child: Icon(Icons.chevron_left, color: context.colors.textPrimary, size: 24),
+                child: Icon(Symbols.chevron_left_rounded, color: context.colors.textPrimary, size: 24),
               ),
               Expanded(
                 child: Center(
@@ -278,7 +279,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                 onTap: () => setState(() {
                   _focusedMonth = DateTime(year, month + 1);
                 }),
-                child: Icon(Icons.chevron_right, color: context.colors.textPrimary, size: 24),
+                child: Icon(Symbols.chevron_right_rounded, color: context.colors.textPrimary, size: 24),
               ),
             ],
           ),

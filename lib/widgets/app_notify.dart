@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../theme/app_colors.dart';
 
 enum NotifyType { error, success, info }
@@ -87,9 +88,9 @@ class _NotifyOverlayState extends State<_NotifyOverlay>
     final topPadding = MediaQuery.of(context).padding.top;
 
     final (Color bg, Color fg, IconData icon) = switch (widget.type) {
-      NotifyType.error => (context.colors.errorBg, context.colors.error, Icons.error_outline_rounded),
-      NotifyType.success => (context.colors.successBg, context.colors.success, Icons.check_circle_outline_rounded),
-      NotifyType.info => (context.colors.surfaceAlt, context.colors.textPrimary, Icons.info_outline_rounded),
+      NotifyType.error => (context.colors.errorBg, context.colors.error, Symbols.error_rounded),
+      NotifyType.success => (context.colors.successBg, context.colors.success, Symbols.check_circle_rounded),
+      NotifyType.info => (context.colors.surfaceAlt, context.colors.textPrimary, Symbols.info_rounded),
     };
 
     return Positioned(
@@ -137,7 +138,7 @@ class _NotifyOverlayState extends State<_NotifyOverlay>
                     const SizedBox(width: 8),
                     GestureDetector(
                       onTap: _dismiss,
-                      child: Icon(Icons.close_rounded, color: fg.withValues(alpha: 0.5), size: 18),
+                      child: Icon(Symbols.close_rounded, color: fg.withValues(alpha: 0.5), size: 18),
                     ),
                   ],
                 ),

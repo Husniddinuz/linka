@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:video_player/video_player.dart';
 import '../services/api_service.dart';
 import '../services/user_service.dart';
@@ -228,7 +229,7 @@ class _AddStoryButton extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.add_rounded,
+                Symbols.add_rounded,
                 color: Color(0xFF272942),
                 size: 22,
               ),
@@ -329,7 +330,7 @@ class _StoryTile extends StatelessWidget {
                 top: 6,
                 right: 6,
                 child: Icon(
-                  Icons.play_circle_fill_rounded,
+                  Symbols.play_circle_rounded,
                   color: Colors.white,
                   size: 22,
                 ),
@@ -348,7 +349,7 @@ class _StoryTile extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
-                    Icons.delete_outline_rounded,
+                    Symbols.delete_rounded,
                     color: Colors.white,
                     size: 18,
                   ),
@@ -430,7 +431,7 @@ class _TilePlaceholder extends StatelessWidget {
     return Container(
       color: context.colors.surfaceAlt,
       child: Icon(
-        Icons.image_outlined,
+        Symbols.image_rounded,
         color: context.colors.textTertiary,
         size: 28,
       ),
@@ -488,7 +489,7 @@ class _EmptyState extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.auto_stories_rounded,
+                    Symbols.auto_stories_rounded,
                     color: context.colors.textPrimary,
                     size: 44,
                   ),
@@ -530,7 +531,7 @@ class _EmptyState extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          Icons.add_rounded,
+                          Symbols.add_rounded,
                           color: Color(0xFFF5C542),
                           size: 22,
                         ),

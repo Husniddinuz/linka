@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../models/mock_test.dart';
 import 'mock_test_styles.dart';
 import '../theme/app_colors.dart';
@@ -328,7 +329,7 @@ class SingleChoiceField extends StatelessWidget {
                 child: Row(
                   children: [
                     Icon(
-                      selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+                      selected ? Symbols.check_circle_rounded : Symbols.circle_rounded,
                       size: 19,
                       color: selected ? Colors.white : context.colors.textTertiary,
                     ),
@@ -425,7 +426,7 @@ class MultiSelectField extends StatelessWidget {
                   child: Row(
                     children: [
                       Icon(
-                        selected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                        selected ? Symbols.check_box_rounded : Symbols.check_box_outline_blank_rounded,
                         size: 19,
                         color: selected ? Colors.white : context.colors.textTertiary,
                       ),
@@ -711,7 +712,12 @@ class _GapSlot extends StatelessWidget {
       bg = active ? context.colors.textPrimary : context.colors.surfaceAlt;
       fg = active ? Colors.white : context.colors.textPrimary;
     } else {
-      bg = active ? const Color(0xFFFDF4DA) : context.colors.surfaceAlt;
+      // A wash rather than a fixed cream: the literal pale sheet stayed light
+      // in dark mode, leaving the grey placeholder text on it unreadable. Over
+      // white this composites to the same cream it always was.
+      bg = active
+          ? context.colors.accentYellow.withValues(alpha: 0.3)
+          : context.colors.surfaceAlt;
       fg = context.colors.textTertiary;
     }
     return GestureDetector(
@@ -761,7 +767,7 @@ class _GapSlot extends StatelessWidget {
             ),
             if (filled && active) ...[
               const SizedBox(width: 5),
-              const Icon(Icons.close_rounded, size: 14, color: Colors.white70),
+              const Icon(Symbols.close_rounded, size: 14, color: Colors.white70),
             ],
           ],
         ),

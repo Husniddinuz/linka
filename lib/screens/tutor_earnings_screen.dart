@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../services/app_feature_service.dart';
 import '../services/earnings_service.dart';
@@ -251,7 +252,7 @@ class _TopBar extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Icon(
-                  Icons.arrow_back_ios_new_rounded,
+                  Symbols.arrow_back_ios_new_rounded,
                   size: 20,
                   color: context.colors.textPrimary,
                 ),
@@ -713,7 +714,7 @@ class _FilterBar extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(
-                    Icons.filter_list_rounded,
+                    Symbols.filter_list_rounded,
                     size: 18,
                     color: context.colors.textPrimary,
                   ),
@@ -731,7 +732,7 @@ class _FilterBar extends StatelessWidget {
                     ),
                   ),
                   Icon(
-                    Icons.keyboard_arrow_down_rounded,
+                    Symbols.keyboard_arrow_down_rounded,
                     size: 18,
                     color: context.colors.textPrimary,
                   ),
@@ -889,14 +890,14 @@ class _WithdrawalRow extends StatelessWidget {
   static IconData _statusIcon(String s) {
     switch (s) {
       case 'completed':
-        return Icons.check_rounded;
+        return Symbols.check_rounded;
       case 'rejected':
-        return Icons.close_rounded;
+        return Symbols.close_rounded;
       case 'failed':
-        return Icons.error_outline_rounded;
+        return Symbols.error_rounded;
       case 'pending':
       default:
-        return Icons.hourglass_empty_rounded;
+        return Symbols.hourglass_empty_rounded;
     }
   }
 
@@ -991,7 +992,7 @@ class _TotalRow extends StatelessWidget {
               border: Border.all(color: context.colors.border),
             ),
             child: Icon(
-              Icons.arrow_downward_rounded,
+              Symbols.arrow_downward_rounded,
               size: 18,
               color: context.colors.textSecondary,
             ),
@@ -1140,7 +1141,7 @@ class _AvatarFallback extends StatelessWidget {
       width: 44,
       height: 44,
       color: context.colors.surfaceAlt,
-      child: Icon(Icons.person, color: context.colors.textTertiary, size: 22),
+      child: Icon(Symbols.person_rounded, color: context.colors.textTertiary, size: 22),
     );
   }
 }
@@ -1349,7 +1350,7 @@ class _WithdrawSheetState extends State<_WithdrawSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Icon(
-                    Icons.access_time_rounded,
+                    Symbols.access_time_rounded,
                     size: 16,
                     color: Color(0xFF8A6D00),
                   ),
@@ -1997,7 +1998,7 @@ class _DateField extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              Icons.calendar_today_rounded,
+              Symbols.calendar_today_rounded,
               size: 16,
               color: context.colors.textSecondary,
             ),
@@ -2021,7 +2022,7 @@ class _DateField extends StatelessWidget {
                 onTap: onClear,
                 behavior: HitTestBehavior.opaque,
                 child: Icon(
-                  Icons.close_rounded,
+                  Symbols.close_rounded,
                   size: 16,
                   color: context.colors.textSecondary,
                 ),

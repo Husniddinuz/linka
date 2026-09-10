@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import 'article_detail_screen.dart';
@@ -54,7 +55,7 @@ class _SavedArticlesScreenState extends State<SavedArticlesScreen> {
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.chevron_left, color: context.colors.textPrimary, size: 28),
+          icon: Icon(Symbols.chevron_left_rounded, color: context.colors.textPrimary, size: 28),
         ),
         title: Text(
           'Saved articles',

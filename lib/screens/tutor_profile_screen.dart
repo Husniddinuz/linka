@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:video_player/video_player.dart';
 import '../services/api_service.dart';
 import '../services/app_feature_service.dart';
@@ -392,7 +393,7 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
                 errorBuilder: (_, _, _) => Container(
                   height: 200,
                   color: context.colors.surface,
-                  child: const Center(child: Icon(Icons.broken_image_outlined)),
+                  child: const Center(child: Icon(Symbols.broken_image_rounded)),
                 ),
               ),
             ),
@@ -407,7 +408,7 @@ class _TutorProfileScreenState extends State<TutorProfileScreen> {
                     color: Colors.black.withValues(alpha: 0.5),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.close, color: Colors.white, size: 20),
+                  child: const Icon(Symbols.close_rounded, color: Colors.white, size: 20),
                 ),
               ),
             ),
@@ -559,8 +560,8 @@ class _TutorVideoState extends State<_TutorVideo> {
                                       ),
                                       child: Icon(
                                         _controller.value.isPlaying
-                                            ? Icons.pause_rounded
-                                            : Icons.play_arrow_rounded,
+                                            ? Symbols.pause_rounded
+                                            : Symbols.play_arrow_rounded,
                                         color: Colors.white,
                                         size: 36,
                                       ),
@@ -660,7 +661,7 @@ class _ProfileHero extends StatelessWidget {
                   errorBuilder: (_, _, _) => Container(
                     color: context.colors.border,
                     child: Icon(
-                      Icons.person,
+                      Symbols.person_rounded,
                       size: 64,
                       color: context.colors.textTertiary,
                     ),
@@ -669,7 +670,7 @@ class _ProfileHero extends StatelessWidget {
               : Container(
                   color: context.colors.border,
                   child: Icon(
-                    Icons.person,
+                    Symbols.person_rounded,
                     size: 64,
                     color: context.colors.textTertiary,
                   ),
@@ -706,23 +707,22 @@ class _ProfileHero extends StatelessWidget {
               child: Row(
                 children: [
                   _heroIconButton(
-                    Icons.chevron_left_rounded,
+                    Symbols.chevron_left_rounded,
                     onBackTap,
                     size: 26,
                   ),
                   const Spacer(),
                   _heroIconButton(
-                    Icons.ios_share_rounded,
+                    Symbols.ios_share_rounded,
                     onShareTap,
                     size: 19,
                   ),
                   const SizedBox(width: 10),
                   _heroIconButton(
-                    isBookmarked
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
+                    Symbols.favorite_rounded,
                     onBookmarkTap,
                     size: 19,
+                    fill: isBookmarked ? 1 : 0,
                     tint: isBookmarked ? const Color(0xFFE53935) : Colors.white,
                   ),
                 ],
@@ -810,6 +810,7 @@ class _ProfileHero extends StatelessWidget {
     VoidCallback onTap, {
     required double size,
     Color tint = Colors.white,
+    double fill = 0,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -820,7 +821,7 @@ class _ProfileHero extends StatelessWidget {
           color: Colors.black.withValues(alpha: 0.32),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, size: size, color: tint),
+        child: Icon(icon, size: size, color: tint, fill: fill),
       ),
     );
   }
@@ -869,7 +870,7 @@ class _CertificateBadge extends StatelessWidget {
         child: Row(
           children: [
             const Icon(
-              Icons.verified_rounded,
+              Symbols.verified_rounded,
               size: 18,
               color: Color(0xFF2E7D32),
             ),
@@ -886,7 +887,7 @@ class _CertificateBadge extends StatelessWidget {
               ),
             ),
             Icon(
-              Icons.chevron_right_rounded,
+              Symbols.chevron_right_rounded,
               size: 18,
               color: context.colors.textTertiary,
             ),
@@ -1050,7 +1051,7 @@ class _LessonDurationSection extends StatelessWidget {
                 child: Row(
                   children: [
                     Icon(
-                      Icons.access_time_rounded,
+                      Symbols.access_time_rounded,
                       size: 18,
                       color: context.colors.textTertiary,
                     ),
@@ -1112,7 +1113,7 @@ class _SpeakingSamplesSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(Icons.mic_rounded, size: 19, color: colors.accentBlue),
+            Icon(Symbols.mic_rounded, size: 19, color: colors.accentBlue),
             const SizedBox(width: 9),
             Text(
               'Speaking samples',
@@ -1251,7 +1252,7 @@ class _SpeakingSampleRow extends StatelessWidget {
                 ),
               ),
               Icon(
-                locked ? Icons.lock_rounded : Icons.play_circle_fill_rounded,
+                locked ? Symbols.lock_rounded : Symbols.play_circle_rounded,
                 size: 24,
                 color: locked ? colors.textTertiary : colors.brand,
               ),
@@ -1373,9 +1374,8 @@ class _ReviewsSection extends StatelessWidget {
                                   Row(
                                     children: List.generate(5, (s) {
                                       return Icon(
-                                        s < stars
-                                            ? Icons.star_rounded
-                                            : Icons.star_outline_rounded,
+                                        Symbols.star_rounded,
+                                        fill: s < stars ? 1 : 0,
                                         size: 16,
                                         color: const Color(0xFFF5C542),
                                       );

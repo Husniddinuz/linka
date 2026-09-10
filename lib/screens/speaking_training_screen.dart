@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -860,10 +861,10 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
 
   void _showReportDialog() {
     const reasons = [
-      ('harassment', Icons.do_not_disturb_on_outlined, 'Harassment'),
-      ('spam',       Icons.mark_email_unread_outlined,  'Spam'),
-      ('inappropriate', Icons.visibility_off_outlined,  'Inappropriate content'),
-      ('other',      Icons.flag_outlined,               'Other'),
+      ('harassment', Symbols.do_not_disturb_on_rounded, 'Harassment'),
+      ('spam',       Symbols.mark_email_unread_rounded,  'Spam'),
+      ('inappropriate', Symbols.visibility_off_rounded,  'Inappropriate content'),
+      ('other',      Symbols.flag_rounded,               'Other'),
     ];
     String selected = 'harassment';
 
@@ -957,7 +958,7 @@ class _SpeakingTrainingScreenState extends State<SpeakingTrainingScreen> {
                             ),
                           ),
                           child: isSelected
-                              ? const Icon(Icons.check, size: 11, color: Colors.white)
+                              ? const Icon(Symbols.check_rounded, size: 11, color: Colors.white)
                               : null,
                         ),
                       ],
@@ -1310,7 +1311,7 @@ class _WaitingRoomOverlayState extends State<_WaitingRoomOverlay>
                           ),
                         ),
                         child: const Icon(
-                          Icons.mic,
+                          Symbols.mic_rounded,
                           color: Color(0xFFF5C542),
                           size: 26,
                         ),
@@ -1383,9 +1384,9 @@ class _CameraOffPlaceholder extends StatelessWidget {
                         _resolveImageUrl(profileImage!),
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) =>
-                            const Icon(Icons.person, size: 40, color: Colors.white38),
+                            const Icon(Symbols.person_rounded, size: 40, color: Colors.white38),
                       )
-                    : const Icon(Icons.person, size: 40, color: Colors.white38),
+                    : const Icon(Symbols.person_rounded, size: 40, color: Colors.white38),
               ),
             ),
             const SizedBox(height: 10),
@@ -1436,9 +1437,9 @@ class _PartnerInfoPill extends StatelessWidget {
                           _resolveImageUrl(profileImage!),
                           fit: BoxFit.cover,
                           errorBuilder: (_, _, _) =>
-                              const Icon(Icons.person, size: 20, color: Colors.white60),
+                              const Icon(Symbols.person_rounded, size: 20, color: Colors.white60),
                         )
-                      : const Icon(Icons.person, size: 20, color: Colors.white60),
+                      : const Icon(Symbols.person_rounded, size: 20, color: Colors.white60),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1459,7 +1460,7 @@ class _PartnerInfoPill extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          gender == 'Female' ? Icons.female : Icons.male,
+                          gender == 'Female' ? Symbols.female_rounded : Symbols.male_rounded,
                           size: 12,
                           color: gender == 'Female' ? Colors.pinkAccent : const Color(0xFF6C6CFF),
                         ),
@@ -1503,7 +1504,7 @@ class _ReportChip extends StatelessWidget {
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.flag_outlined, color: Colors.white60, size: 14),
+                Icon(Symbols.flag_rounded, color: Colors.white60, size: 14),
                 SizedBox(width: 5),
                 Text(
                   'Report',
@@ -1553,9 +1554,9 @@ class _RemoteCameraOffBackground extends StatelessWidget {
                         _resolveImageUrl(profileImage!),
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) =>
-                            Icon(Icons.person, size: 46, color: Colors.grey.shade400),
+                            Icon(Symbols.person_rounded, size: 46, color: Colors.grey.shade400),
                       )
-                    : Icon(Icons.person, size: 46, color: Colors.grey.shade400),
+                    : Icon(Symbols.person_rounded, size: 46, color: Colors.grey.shade400),
               ),
             ),
             const SizedBox(height: 12),
@@ -1596,7 +1597,7 @@ class _CountdownBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.timer_outlined, color: color, size: 14),
+          Icon(Symbols.timer_rounded, color: color, size: 14),
           const SizedBox(width: 4),
           Text(
             label,
@@ -1688,7 +1689,7 @@ class _BottomControls extends StatelessWidget {
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.stop_rounded, color: Color(0xFFCF6679), size: 17),
+                      Icon(Symbols.stop_rounded, color: Color(0xFFCF6679), size: 17),
                       SizedBox(width: 6),
                       Text(
                         'Stop',
@@ -1726,7 +1727,7 @@ class _BottomControls extends StatelessWidget {
                         ),
                       ),
                       SizedBox(width: 5),
-                      Icon(Icons.arrow_forward_rounded, color: Colors.white54, size: 16),
+                      Icon(Symbols.arrow_forward_rounded, color: Colors.white54, size: 16),
                     ],
                   ),
                 ),
@@ -1783,7 +1784,7 @@ class _GenderFilterSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _GenderOption(
-              icon: Icons.transgender,
+              icon: Symbols.transgender_rounded,
               iconColor: const Color(0xFF6C6CFF),
               label: 'All gender',
               isSelected: selected == GenderFilter.all,
@@ -1791,7 +1792,7 @@ class _GenderFilterSheet extends StatelessWidget {
             ),
             const Divider(height: 1, indent: 16, endIndent: 16),
             _GenderOption(
-              icon: Icons.female,
+              icon: Symbols.female_rounded,
               iconColor: Colors.pinkAccent,
               label: 'Female',
               isSelected: selected == GenderFilter.female,
@@ -1799,7 +1800,7 @@ class _GenderFilterSheet extends StatelessWidget {
             ),
             const Divider(height: 1, indent: 16, endIndent: 16),
             _GenderOption(
-              icon: Icons.male,
+              icon: Symbols.male_rounded,
               iconColor: const Color(0xFF6C6CFF),
               label: 'Male',
               isSelected: selected == GenderFilter.male,
@@ -1889,7 +1890,7 @@ class _BlockChip extends StatelessWidget {
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.block_rounded, color: Colors.white60, size: 14),
+                Icon(Symbols.block_rounded, color: Colors.white60, size: 14),
                 SizedBox(width: 5),
                 Text(
                   'Block',
@@ -1946,7 +1947,7 @@ class _PartnerFoundSheet extends StatelessWidget {
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.person_rounded, color: Color(0xFF27AE60), size: 12),
+                Icon(Symbols.person_rounded, color: Color(0xFF27AE60), size: 12),
                 SizedBox(width: 4),
                 Text(
                   'Partner found!',
@@ -1974,9 +1975,9 @@ class _PartnerFoundSheet extends StatelessWidget {
                       _resolveImageUrl(profileImage!),
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) =>
-                          const Icon(Icons.person, size: 40, color: Colors.white38),
+                          const Icon(Symbols.person_rounded, size: 40, color: Colors.white38),
                     )
-                  : const Icon(Icons.person, size: 40, color: Colors.white38),
+                  : const Icon(Symbols.person_rounded, size: 40, color: Colors.white38),
             ),
           ),
           const SizedBox(height: 12),
@@ -1994,7 +1995,7 @@ class _PartnerFoundSheet extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  gender == 'Female' ? Icons.female : Icons.male,
+                  gender == 'Female' ? Symbols.female_rounded : Symbols.male_rounded,
                   size: 14,
                   color: gender == 'Female' ? Colors.pinkAccent : const Color(0xFF6C6CFF),
                 ),

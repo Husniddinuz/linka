@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:video_player/video_player.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
@@ -114,7 +115,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
             ),
             const SizedBox(height: 20),
             _SheetOption(
-              icon: Icons.photo_library_outlined,
+              icon: Symbols.photo_library_rounded,
               label: 'Photo from gallery',
               onTap: () {
                 Navigator.pop(context);
@@ -122,7 +123,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
               },
             ),
             _SheetOption(
-              icon: Icons.videocam_outlined,
+              icon: Symbols.videocam_rounded,
               label: 'Video from gallery',
               onTap: () {
                 Navigator.pop(context);
@@ -130,7 +131,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
               },
             ),
             _SheetOption(
-              icon: Icons.camera_alt_outlined,
+              icon: Symbols.camera_alt_rounded,
               label: 'Take a photo',
               onTap: () {
                 Navigator.pop(context);
@@ -138,7 +139,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
               },
             ),
             _SheetOption(
-              icon: Icons.videocam_outlined,
+              icon: Symbols.videocam_rounded,
               label: 'Record a video',
               onTap: () {
                 Navigator.pop(context);
@@ -232,7 +233,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
           scrolledUnderElevation: 0,
           leading: IconButton(
             icon: const Icon(
-              Icons.arrow_back_ios_rounded,
+              Symbols.arrow_back_ios_rounded,
               color: Colors.white,
               size: 20,
             ),
@@ -271,7 +272,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
           child: const Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.add_rounded, color: Color(0xFFF5C542), size: 48),
+              Icon(Symbols.add_rounded, color: Color(0xFFF5C542), size: 48),
               SizedBox(height: 12),
               Text(
                 'Add photo or video',
@@ -324,7 +325,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
-                      Icons.play_arrow_rounded,
+                      Symbols.play_arrow_rounded,
                       color: Colors.white,
                       size: 40,
                     ),
@@ -345,7 +346,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 18),
+                          Icon(Symbols.swap_horiz_rounded, color: Colors.white, size: 18),
                           SizedBox(width: 4),
                           Text(
                             'Change',
@@ -421,7 +422,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
                 const Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.warning_amber_rounded,
+                    Icon(Symbols.warning_amber_rounded,
                         color: Color(0xFFF5C542), size: 16),
                     SizedBox(width: 6),
                     Expanded(
@@ -497,7 +498,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
                           ),
                         )
                       : const Icon(
-                          Icons.arrow_forward_rounded,
+                          Symbols.arrow_forward_rounded,
                           color: Color(0xFF272942),
                           size: 24,
                         ),

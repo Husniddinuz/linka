@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
@@ -9,9 +10,19 @@ import 'writing_result_screen.dart';
 import '../theme/app_colors.dart';
 
 class WritingTestScreen extends StatefulWidget {
-  const WritingTestScreen({super.key, required this.prompt});
+  const WritingTestScreen({super.key, required this.prompt, this.sampleId});
 
   final Map<String, dynamic> prompt;
+
+  /// Set when the student is answering the task a published Writing sample
+  /// answers, rather than a prompt from the practice catalogue.
+  ///
+  /// A sample's task has no [WritingPrompt] of its own to submit against — the
+  /// server mirrors one on first use behind `/writing-samples/{id}/submit/` —
+  /// so the id here routes the submission, and `prompt` is the sample's task
+  /// rendered for the editor rather than a row the client could post to.
+  /// Everything else (quota, grading, the result screen) is identical.
+  final int? sampleId;
 
   @override
   State<WritingTestScreen> createState() => _WritingTestScreenState();
@@ -76,7 +87,7 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.workspace_premium_rounded, color: context.colors.accentYellow),
+            Icon(Symbols.workspace_premium_rounded, color: context.colors.accentYellow),
             SizedBox(width: 8),
             Text(
               'Free limit reached',
@@ -144,10 +155,11 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
     }
     setState(() => _submitting = true);
     try {
-      final result = await MockTestService.submitWriting(
-        widget.prompt['id'] as int,
-        _controller.text.trim(),
-      );
+      final essay = _controller.text.trim();
+      final sampleId = widget.sampleId;
+      final result = sampleId != null
+          ? await MockTestService.submitWritingSampleAnswer(sampleId, essay)
+          : await MockTestService.submitWriting(widget.prompt['id'] as int, essay);
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
@@ -157,6 +169,10 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
       if (!mounted) return;
       setState(() => _submitting = false);
       if (e.statusCode == 429) {
+        _showUpgradeDialog(e.message);
+      } else if (e.statusCode == 403) {
+        // Only reachable from a sample: the free window that gates reading a
+        // sample gates answering it too, so this is the Plus wall, not an error.
         _showUpgradeDialog(e.message);
       } else {
         ScaffoldMessenger.of(
@@ -303,7 +319,7 @@ class _WritingTestScreenState extends State<WritingTestScreen> {
                                   ],
                                 ),
                                 child: Icon(
-                                  Icons.keyboard_hide_rounded,
+                                  Symbols.keyboard_hide_rounded,
                                   size: 18,
                                   color: context.colors.textSecondary,
                                 ),

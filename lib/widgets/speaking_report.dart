@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import 'writing_report.dart';
 
@@ -55,10 +56,10 @@ const sCriterionShort = <String, String>{
 };
 
 const sCriterionIcons = <String, IconData>{
-  'fluency_coherence': Icons.waves_rounded,
-  'lexical_resource': Icons.menu_book_rounded,
-  'grammar_range_accuracy': Icons.rule_rounded,
-  'pronunciation': Icons.record_voice_over_rounded,
+  'fluency_coherence': Symbols.waves_rounded,
+  'lexical_resource': Symbols.menu_book_rounded,
+  'grammar_range_accuracy': Symbols.rule_rounded,
+  'pronunciation': Symbols.record_voice_over_rounded,
 };
 
 /// Why pronunciation has no number, in the student's terms. Used when the
@@ -213,7 +214,7 @@ class SpeakingBandHero extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.mic_rounded, color: Colors.white, size: 14),
+                    const Icon(Symbols.mic_rounded, color: Colors.white, size: 14),
                     const SizedBox(width: 6),
                     Text(
                       overall == null ? 'Speaking' : sBandTier(overall),
@@ -241,7 +242,7 @@ class SpeakingBandHero extends StatelessWidget {
                             height: 15,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Icon(Icons.ios_share_rounded, size: 16, color: Colors.white),
+                        : const Icon(Symbols.ios_share_rounded, size: 16, color: Colors.white),
                   ),
                 ),
             ],
@@ -485,7 +486,7 @@ class SpeakingCriterionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final wr = context.wr;
     final name = sCriterionNames[criterionKey] ?? wTopicLabel(criterionKey);
-    final icon = sCriterionIcons[criterionKey] ?? Icons.rule_rounded;
+    final icon = sCriterionIcons[criterionKey] ?? Symbols.rule_rounded;
     final scored = band != null;
 
     if (!scored) {
@@ -564,11 +565,11 @@ class SpeakingCriterionCard extends StatelessWidget {
           ],
           for (final item in strengths) ...[
             const SizedBox(height: 9),
-            _Bullet(icon: Icons.check_circle_rounded, color: wr.good, text: item),
+            _Bullet(icon: Symbols.check_circle_rounded, color: wr.good, text: item),
           ],
           for (final item in improvements) ...[
             const SizedBox(height: 9),
-            _Bullet(icon: Icons.arrow_forward_rounded, color: wr.accent, text: item),
+            _Bullet(icon: Symbols.arrow_forward_rounded, color: wr.accent, text: item),
           ],
         ],
       ),
@@ -682,7 +683,7 @@ class SpeakingCorrectionCard extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.play_arrow_rounded, size: 14, color: wr.accent),
+                        Icon(Symbols.play_arrow_rounded, size: 14, color: wr.accent),
                         const SizedBox(width: 3),
                         Text(
                           'Hear it',
@@ -715,7 +716,7 @@ class SpeakingCorrectionCard extends StatelessWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
-                  child: Icon(Icons.subdirectory_arrow_right_rounded, size: 16, color: wr.good),
+                  child: Icon(Symbols.subdirectory_arrow_right_rounded, size: 16, color: wr.good),
                 ),
                 const SizedBox(width: 6),
                 Expanded(

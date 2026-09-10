@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'package:audioplayers/audioplayers.dart' as ap;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/ai_coach.dart';
@@ -685,7 +686,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                       valueColor: AlwaysStoppedAnimation(colors.onBrand),
                     ),
                   )
-                : const Icon(Icons.mic_rounded, size: 20),
+                : const Icon(Symbols.mic_rounded, size: 20),
             label: Text(
               _starting ? 'Starting…' : 'Start talking',
               style: const TextStyle(
@@ -767,7 +768,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                       onPressed: _toggleMute,
                       tooltip: _muted ? 'Turn the microphone on' : 'Mute',
                       icon: Icon(
-                        _muted ? Icons.mic_off_rounded : Icons.mic_rounded,
+                        _muted ? Symbols.mic_off_rounded : Symbols.mic_rounded,
                         color: _muted
                             ? colors.error
                             : colors.coachGlow.withValues(alpha: 0.8),
@@ -783,7 +784,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
-                      icon: const Icon(Icons.call_end_rounded, size: 16),
+                      icon: const Icon(Symbols.call_end_rounded, size: 16),
                       label: const Text(
                         'End',
                         style: TextStyle(
@@ -1039,8 +1040,8 @@ class _LastTurnCardState extends State<_LastTurnCard> {
                   const Spacer(),
                   Icon(
                     _open
-                        ? Icons.keyboard_arrow_down_rounded
-                        : Icons.keyboard_arrow_up_rounded,
+                        ? Symbols.keyboard_arrow_down_rounded
+                        : Symbols.keyboard_arrow_up_rounded,
                     color: colors.textTertiary,
                     size: 20,
                   ),
@@ -1188,7 +1189,7 @@ class _CorrectionsCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.check_rounded,
+                      Icon(Symbols.check_rounded,
                           size: 14, color: colors.success),
                       const SizedBox(width: 5),
                       Expanded(
@@ -1250,7 +1251,7 @@ class _MistakesCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
             child: Row(
               children: [
-                Icon(Icons.auto_awesome_rounded,
+                Icon(Symbols.auto_awesome_rounded,
                     size: 16, color: colors.accentBlue),
                 const SizedBox(width: 8),
                 Expanded(
@@ -1456,7 +1457,7 @@ class _PersonaCard extends StatelessWidget {
               ),
             ),
             if (selected)
-              Icon(Icons.check_circle_rounded, size: 20, color: accent),
+              Icon(Symbols.check_circle_rounded, size: 20, color: accent),
           ],
         ),
       ),

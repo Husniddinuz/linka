@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../services/ielts_registration_service.dart';
 import '../widgets/mock_test_styles.dart';
@@ -146,7 +147,7 @@ class _IeltsIdUploadScreenState extends State<IeltsIdUploadScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.add_a_photo_outlined, color: MockTestColors.grey, size: 32),
+                          Icon(Symbols.add_a_photo_rounded, color: MockTestColors.grey, size: 32),
                           SizedBox(height: 8),
                           Text('Add ID photo', style: TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey)),
                         ],

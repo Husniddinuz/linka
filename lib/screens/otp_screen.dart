@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'home_screen.dart';
 import 'profile_setup_screen.dart';
 import '../services/auth_service.dart';
@@ -199,7 +200,7 @@ class _OtpScreenState extends State<OtpScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: Icon(
-            Icons.arrow_back_ios_rounded,
+            Symbols.arrow_back_ios_rounded,
             color: context.colors.textPrimary,
             size: 20,
           ),

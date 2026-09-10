@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart' as ap;
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
@@ -43,15 +44,30 @@ class SpeakingAnswerScreen extends StatefulWidget {
     super.key,
     required this.part,
     required this.tutorName,
-  });
+  }) : fromTopicBank = false;
+
+  /// The same screen for a question taken straight from the topic bank, with
+  /// no tutor recording behind it.
+  ///
+  /// Only two things change: the id posts to the topic endpoint (topic part
+  /// ids and sample part ids come from different tables), and there is no
+  /// tutor to name or to compare against afterwards.
+  const SpeakingAnswerScreen.fromTopic({super.key, required this.part})
+      : tutorName = null,
+        fromTopicBank = true;
 
   /// One entry from a sample's `parts`: `{id, part, title, question_text,
-  /// audio_url, …}`.
+  /// audio_url, …}` — or from a topic's, which carries the first four and no
+  /// audio.
   final Map<String, dynamic> part;
 
   /// Whose sample this question comes from — the answer's only context once
-  /// the report is reopened weeks later.
-  final String tutorName;
+  /// the report is reopened weeks later. Null for a topic-bank question, which
+  /// belongs to nobody.
+  final String? tutorName;
+
+  /// Whether [part] is a topic part rather than a sample part.
+  final bool fromTopicBank;
 
   @override
   State<SpeakingAnswerScreen> createState() => _SpeakingAnswerScreenState();
@@ -294,11 +310,17 @@ class _SpeakingAnswerScreenState extends State<SpeakingAnswerScreen> {
     });
 
     try {
-      final attempt = await MockTestService.submitSpeakingAnswer(
-        partId: partId,
-        audio: File(path),
-        durationSeconds: _takeSeconds,
-      );
+      final attempt = widget.fromTopicBank
+          ? await MockTestService.submitSpeakingTopicAnswer(
+              partId: partId,
+              audio: File(path),
+              durationSeconds: _takeSeconds,
+            )
+          : await MockTestService.submitSpeakingAnswer(
+              partId: partId,
+              audio: File(path),
+              durationSeconds: _takeSeconds,
+            );
       if (!mounted) return;
       setState(() => _attempt = attempt);
       _startPolling();
@@ -444,9 +466,9 @@ class _SpeakingAnswerScreenState extends State<SpeakingAnswerScreen> {
       header: hasPlayer ? _buildMarkedPlayer() : null,
       footer: Column(
         children: [
-          if (sampleUrl != null && sampleUrl.isNotEmpty) ...[
+          if (sampleUrl != null && sampleUrl.isNotEmpty && widget.tutorName != null) ...[
             _CompareCard(
-              tutorName: widget.tutorName,
+              tutorName: widget.tutorName!,
               playing: _samplePlaying,
               onToggle: _toggleSamplePlayback,
             ),
@@ -459,7 +481,7 @@ class _SpeakingAnswerScreenState extends State<SpeakingAnswerScreen> {
           const SizedBox(height: 10),
           _SecondaryButton(
             label: 'All Your Answers',
-            icon: Icons.history_rounded,
+            icon: Symbols.history_rounded,
             onPressed: _openHistory,
           ),
         ],
@@ -479,7 +501,7 @@ class _SpeakingAnswerScreenState extends State<SpeakingAnswerScreen> {
               width: 64,
               height: 64,
               decoration: BoxDecoration(color: wr.bad.withValues(alpha: 0.12), shape: BoxShape.circle),
-              child: Icon(Icons.error_outline_rounded, size: 32, color: wr.bad),
+              child: Icon(Symbols.error_rounded, size: 32, color: wr.bad),
             ),
             const SizedBox(height: 16),
             Text(
@@ -546,7 +568,7 @@ class _SpeakingAnswerScreenState extends State<SpeakingAnswerScreen> {
               alignment: Alignment.center,
               decoration: BoxDecoration(color: wr.accent, shape: BoxShape.circle),
               child: Icon(
-                _takePlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                _takePlaying ? Symbols.pause_rounded : Symbols.play_arrow_rounded,
                 size: 24,
                 color: wr.isDark ? wr.bg : Colors.white,
               ),
@@ -602,7 +624,7 @@ class _SpeakingAnswerScreenState extends State<SpeakingAnswerScreen> {
           Align(
             alignment: Alignment.centerLeft,
             child: WTag(
-              icon: _isPlus ? Icons.workspace_premium_rounded : Icons.auto_awesome_rounded,
+              icon: _isPlus ? Symbols.workspace_premium_rounded : Symbols.auto_awesome_rounded,
               label: _isPlus
                   ? 'Linka Plus — unlimited marking'
                   : '${_left ?? 0} of ${_quota!['limit'] ?? 0} free markings left',
@@ -704,7 +726,10 @@ class _SpeakingAnswerScreenState extends State<SpeakingAnswerScreen> {
 class _QuestionCard extends StatelessWidget {
   const _QuestionCard({required this.part, required this.tutorName});
   final Map<String, dynamic> part;
-  final String tutorName;
+
+  /// Null when the question came from the topic bank rather than from a
+  /// tutor's sample.
+  final String? tutorName;
 
   @override
   Widget build(BuildContext context) {
@@ -730,7 +755,9 @@ class _QuestionCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'The same question $tutorName answered',
+                  tutorName != null
+                      ? 'The same question $tutorName answered'
+                      : 'Straight from the IELTS topic bank',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, color: wr.faint),
@@ -761,7 +788,7 @@ class _QuestionCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              Icon(Icons.timer_outlined, size: 14, color: wr.faint),
+              Icon(Symbols.timer_rounded, size: 14, color: wr.faint),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -915,7 +942,7 @@ class _MicCheckState extends State<_MicCheck> {
         decoration: wCardDecoration(context),
         child: Row(
           children: [
-            Icon(Icons.check_circle_rounded, size: 18, color: wr.good),
+            Icon(Symbols.check_circle_rounded, size: 18, color: wr.good),
             const SizedBox(width: 9),
             Expanded(
               child: Text(
@@ -952,7 +979,7 @@ class _MicCheckState extends State<_MicCheck> {
         children: [
           Row(
             children: [
-              Icon(Icons.settings_voice_rounded, size: 18, color: wr.accent),
+              Icon(Symbols.settings_voice_rounded, size: 18, color: wr.accent),
               const SizedBox(width: 9),
               Text(
                 'Check your microphone',
@@ -981,7 +1008,7 @@ class _MicCheckState extends State<_MicCheck> {
                   fontFamily: 'SF Pro', fontSize: 12.5, fontWeight: FontWeight.w700, color: wr.accent),
             ),
             const SizedBox(height: 12),
-            _MiniButton(label: 'Stop', icon: Icons.stop_rounded, onPressed: _stopTest),
+            _MiniButton(label: 'Stop', icon: Symbols.stop_rounded, onPressed: _stopTest),
           ] else if (_path != null) ...[
             if (_peak < 0.08) ...[
               const SizedBox(height: 12),
@@ -997,11 +1024,11 @@ class _MicCheckState extends State<_MicCheck> {
               children: [
                 _MiniButton(
                   label: _playing ? 'Pause' : 'Play it back',
-                  icon: _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  icon: _playing ? Symbols.pause_rounded : Symbols.play_arrow_rounded,
                   onPressed: _togglePlayback,
                 ),
                 const SizedBox(width: 8),
-                _MiniButton(label: 'Try again', icon: Icons.refresh_rounded, onPressed: _startTest),
+                _MiniButton(label: 'Try again', icon: Symbols.refresh_rounded, onPressed: _startTest),
                 const Spacer(),
                 GestureDetector(
                   onTap: widget.onPassed,
@@ -1019,7 +1046,7 @@ class _MicCheckState extends State<_MicCheck> {
             ),
           ] else ...[
             const SizedBox(height: 14),
-            _MiniButton(label: 'Start mic check', icon: Icons.mic_rounded, onPressed: _startTest),
+            _MiniButton(label: 'Start mic check', icon: Symbols.mic_rounded, onPressed: _startTest),
           ],
         ],
       ),
@@ -1205,7 +1232,7 @@ class _ReviewCard extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(color: wr.accent, shape: BoxShape.circle),
                   child: Icon(
-                    playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    playing ? Symbols.pause_rounded : Symbols.play_arrow_rounded,
                     size: 24,
                     color: wr.isDark ? wr.bg : Colors.white,
                   ),
@@ -1244,7 +1271,7 @@ class _ReviewCard extends StatelessWidget {
           else
             MtPrimaryButton(label: 'Send for AI Marking', onPressed: onSubmit),
           const SizedBox(height: 10),
-          _SecondaryButton(label: 'Record Again', icon: Icons.refresh_rounded, onPressed: onDiscard),
+          _SecondaryButton(label: 'Record Again', icon: Symbols.refresh_rounded, onPressed: onDiscard),
         ],
       ),
     );
@@ -1287,7 +1314,7 @@ class _CompareCard extends StatelessWidget {
           const SizedBox(height: 14),
           _MiniButton(
             label: playing ? 'Pause' : 'Play the tutor’s answer',
-            icon: playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+            icon: playing ? Symbols.pause_rounded : Symbols.play_arrow_rounded,
             onPressed: onToggle,
           ),
         ],

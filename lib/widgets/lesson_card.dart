@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../screens/lesson_detail_screen.dart';
 import '../theme/app_colors.dart';
@@ -253,7 +254,7 @@ class _LessonCardState extends State<LessonCard> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.cancel_outlined, color: context.colors.error),
+              leading: Icon(Symbols.cancel_rounded, color: context.colors.error),
               title: const Text('Cancel lesson'),
               onTap: () {
                 Navigator.pop(ctx);
@@ -477,7 +478,7 @@ class _LessonCardState extends State<LessonCard> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
-                            Icons.link_rounded,
+                            Symbols.link_rounded,
                             size: 22,
                             color: context.colors.textPrimary,
                           ),
@@ -500,8 +501,8 @@ class _LessonCardState extends State<LessonCard> {
                     children: [
                       Icon(
                         _hasEnded
-                            ? Icons.check_circle_outline_rounded
-                            : Icons.access_time_rounded,
+                            ? Symbols.check_circle_rounded
+                            : Symbols.access_time_rounded,
                         size: 16,
                         color: context.colors.textSecondary,
                       ),
@@ -583,7 +584,7 @@ class _LessonCardState extends State<LessonCard> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          Icons.check_circle_outline_rounded,
+                          Symbols.check_circle_rounded,
                           size: 15,
                           color: context.colors.success,
                         ),
@@ -781,9 +782,8 @@ class _RateSheetState extends State<_RateSheet> {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 6),
                           child: Icon(
-                            filled
-                                ? Icons.star_rounded
-                                : Icons.star_outline_rounded,
+                            Symbols.star_rounded,
+                            fill: filled ? 1 : 0,
                             size: 40,
                             color: filled
                                 ? context.colors.accentYellow

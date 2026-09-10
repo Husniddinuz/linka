@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../models/mock_test.dart';
 import '../services/mock_test_service.dart';
 import '../services/random_test_picker.dart';
@@ -210,7 +211,7 @@ class _TestCard extends StatelessWidget {
               ),
             ),
             Icon(
-              locked ? Icons.lock_rounded : Icons.chevron_right_rounded,
+              locked ? Symbols.lock_rounded : Symbols.chevron_right_rounded,
               color: context.colors.textTertiary,
               size: locked ? 18 : 24,
             ),

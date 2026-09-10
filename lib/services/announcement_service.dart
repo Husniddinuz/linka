@@ -1,3 +1,5 @@
+import 'package:package_info_plus/package_info_plus.dart';
+
 import '../models/announcement.dart';
 import 'api_service.dart';
 
@@ -9,8 +11,13 @@ class AnnouncementService {
   /// home screen (e.g. after re-login in the same process) stays quiet.
   static bool shownThisSession = false;
 
+  /// Sends this build's version so release notes written for it (the
+  /// card's `min_app_version`) show up the first launch after the update.
   static Future<List<Announcement>> fetchUnseen() async {
-    final raw = await ApiService.getList('/announcements/');
+    final version = (await PackageInfo.fromPlatform()).version;
+    final raw = await ApiService.getList(
+      '/announcements/?app_version=${Uri.encodeQueryComponent(version)}',
+    );
     return [
       for (final item in raw)
         if (item is Map<String, dynamic>) Announcement.fromJson(item),

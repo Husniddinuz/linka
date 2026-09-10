@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../models/mock_test.dart';
 import '../widgets/mock_test_styles.dart';
 import '../theme/app_colors.dart';
@@ -86,7 +87,7 @@ class MockTestResultScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    correct ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                    correct ? Symbols.check_circle_rounded : Symbols.cancel_rounded,
                     color: correct ? context.colors.success : context.colors.error,
                     size: 20,
                   ),

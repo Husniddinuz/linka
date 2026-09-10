@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../models/mock_test.dart';
 import '../services/mock_test_service.dart';
 import '../services/podcast_playback_service.dart';
@@ -12,12 +13,30 @@ import '../theme/app_colors.dart';
 
 /// Background tint choices for the reading passage, persisted locally so
 /// they apply across every passage the learner opens.
-const List<Color> kPassageBackgroundOptions = [
-  Colors.white,
-  Color(0xFFFBF3DF), // sepia
-  Color(0xFFEAF3EA), // mint
-  Color(0xFFF1F1F1), // grey
+///
+/// Each option carries the light-mode paper and the dark-mode paper the same
+/// choice becomes. The tint is the point of the setting, but the passage text
+/// is [AppColors.textPrimary] — near-white in dark mode — so a white or sepia
+/// sheet there renders the passage invisible. Stored by index (see
+/// [PrefsService.getReaderBackgroundIndex]) rather than by color value, so the
+/// learner's pick survives a theme flip.
+const List<({Color light, Color dark})> kPassageBackgroundOptions = [
+  (light: Color(0xFFFFFFFF), dark: Color(0xFF14141A)), // plain
+  (light: Color(0xFFFBF3DF), dark: Color(0xFF2A2113)), // sepia
+  (light: Color(0xFFEAF3EA), dark: Color(0xFF14251B)), // mint
+  (light: Color(0xFFF1F1F1), dark: Color(0xFF222229)), // grey
 ];
+
+/// The paper color for option [index] under the active theme. Out-of-range
+/// indices (a pref written by a future build) fall back to the plain sheet.
+Color passagePaperColor(BuildContext context, int index) {
+  final option = kPassageBackgroundOptions[
+    index >= 0 && index < kPassageBackgroundOptions.length ? index : 0
+  ];
+  return Theme.of(context).brightness == Brightness.dark
+      ? option.dark
+      : option.light;
+}
 
 /// Font-size multipliers applied to the passage's base 14.5pt style.
 const List<double> kPassageFontScales = [0.9, 1.0, 1.15, 1.3];
@@ -56,7 +75,7 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
   final ValueNotifier<Duration> _remaining = ValueNotifier(Duration.zero);
   bool _submitting = false;
 
-  Color _passageBackground = kPassageBackgroundOptions.first;
+  int _passageBackgroundIndex = 0;
   double _passageFontScale = 1.0;
 
   bool get _isListening => widget.testType == 'listening';
@@ -69,11 +88,25 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
   }
 
   Future<void> _loadPassageSettings() async {
-    final bgValue = await PrefsService.getReaderBackgroundColor();
+    var bgIndex = await PrefsService.getReaderBackgroundIndex();
+    if (bgIndex == null) {
+      // Pre-dark-mode builds stored the light paper's ARGB value; map it once
+      // onto the matching option so an existing pick isn't silently reset.
+      final legacy = await PrefsService.getLegacyReaderBackgroundColor();
+      if (legacy != null) {
+        final match = kPassageBackgroundOptions.indexWhere(
+          (o) => o.light.toARGB32() == legacy,
+        );
+        if (match != -1) {
+          bgIndex = match;
+          await PrefsService.setReaderBackgroundIndex(match);
+        }
+      }
+    }
     final fontScale = await PrefsService.getReaderFontScale();
     if (!mounted) return;
     setState(() {
-      if (bgValue != null) _passageBackground = Color(bgValue);
+      if (bgIndex != null) _passageBackgroundIndex = bgIndex;
       _passageFontScale = fontScale;
     });
   }
@@ -313,36 +346,36 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                   ),
                   const SizedBox(height: 10),
                   Row(
-                    children: kPassageBackgroundOptions.map((color) {
-                      final selected =
-                          color.toARGB32() == _passageBackground.toARGB32();
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() => _passageBackground = color);
-                            setSheetState(() {});
-                            PrefsService.setReaderBackgroundColor(
-                              color.toARGB32(),
-                            );
-                          },
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: selected
-                                    ? context.colors.brand
-                                    : context.colors.border,
-                                width: selected ? 2.5 : 1,
+                    children: List.generate(
+                      kPassageBackgroundOptions.length,
+                      (index) {
+                        final selected = index == _passageBackgroundIndex;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 12),
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() => _passageBackgroundIndex = index);
+                              setSheetState(() {});
+                              PrefsService.setReaderBackgroundIndex(index);
+                            },
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: passagePaperColor(context, index),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: selected
+                                      ? context.colors.brand
+                                      : context.colors.border,
+                                  width: selected ? 2.5 : 1,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      },
+                    ),
                   ),
                   const SizedBox(height: 22),
                   Text(
@@ -439,7 +472,7 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
             IconButton(
               onPressed: _openPassageSettings,
               icon: Icon(
-                Icons.text_fields_rounded,
+                Symbols.text_fields_rounded,
                 color: context.colors.textPrimary,
               ),
               tooltip: 'Passage display settings',
@@ -459,7 +492,7 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          Icons.timer_outlined,
+                          Symbols.timer_rounded,
                           size: 15,
                           color: urgent
                               ? context.colors.error
@@ -540,7 +573,10 @@ class _MockTestTakingScreenState extends State<MockTestTakingScreen> {
                       child: _PassageView(
                         passageKey: '${widget.testId}_$_sectionIndex',
                         bodyHtml: section.bodyHtml,
-                        background: _passageBackground,
+                        background: passagePaperColor(
+                          context,
+                          _passageBackgroundIndex,
+                        ),
                         fontScale: _passageFontScale,
                       ),
                     ),
@@ -851,8 +887,13 @@ class _PassageViewState extends State<_PassageView> {
     if (matches.isEmpty) return [TextSpan(text: paragraph)];
     matches.sort((a, b) => a.$1.compareTo(b.$1));
 
+    // The wash is lighter in dark mode: at the light-mode alpha the yellow
+    // washes out to a mid olive that the near-white passage text sits on
+    // poorly.
     final highlightStyle = baseStyle.copyWith(
-      backgroundColor: context.colors.accentYellow.withValues(alpha: 0.45),
+      backgroundColor: context.colors.accentYellow.withValues(
+        alpha: Theme.of(context).brightness == Brightness.dark ? 0.28 : 0.45,
+      ),
     );
     final spans = <InlineSpan>[];
     var cursor = 0;
@@ -1067,7 +1108,7 @@ class _AudioBar extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    playing ? Symbols.pause_rounded : Symbols.play_arrow_rounded,
                     color: Colors.white,
                     size: 24,
                   ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../services/ielts_registration_service.dart';
 import '../widgets/mock_test_styles.dart';
@@ -631,7 +632,7 @@ class _IeltsProfileFormScreenState extends State<IeltsProfileFormScreen> {
                         style: const TextStyle(fontFamily: 'SF Pro', fontSize: 15),
                         decoration: InputDecoration(
                           hintText: 'Search',
-                          prefixIcon: const Icon(Icons.search, size: 20, color: MockTestColors.grey),
+                          prefixIcon: const Icon(Symbols.search_rounded, size: 20, color: MockTestColors.grey),
                           filled: true,
                           fillColor: MockTestColors.softBg,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),

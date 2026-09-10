@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/prefs_service.dart';
 import '../theme/app_colors.dart';
 import 'role_selection_screen.dart';
@@ -51,33 +52,33 @@ const _slides = [
     title: 'Take a\nmock IELTS.',
     subtitle: 'Full Reading, Listening, Writing and Speaking tests, sat under '
         'real exam timing.',
-    icon: Icons.assignment_rounded,
+    icon: Symbols.assignment_rounded,
     gradient: [Color(0xFF34C759), Color(0xFF1F8A3D)],
     chips: [
-      _Chip(Icons.timer_rounded, '60:00'),
-      _Chip(Icons.workspace_premium_rounded, 'Band 7.5'),
+      _Chip(Symbols.timer_rounded, '60:00'),
+      _Chip(Symbols.workspace_premium_rounded, 'Band 7.5'),
     ],
   ),
   _Slide(
     title: 'Practise\nwith AI.',
     subtitle: 'Speak with the AI coach whenever you like, and have your '
         'writing and speaking marked in minutes.',
-    icon: Icons.auto_awesome_rounded,
+    icon: Symbols.auto_awesome_rounded,
     gradient: [Color(0xFF8A7EF0), Color(0xFF5F4FC7)],
     chips: [
-      _Chip(Icons.mic_rounded, 'Live speaking'),
-      _Chip(Icons.edit_rounded, 'Instant feedback'),
+      _Chip(Symbols.mic_rounded, 'Live speaking'),
+      _Chip(Symbols.edit_rounded, 'Instant feedback'),
     ],
   ),
   _Slide(
     title: 'Track\nyour band.',
     subtitle: 'Every attempt, score and correction in one place, so you can '
         'see the progress you are making.',
-    icon: Icons.trending_up_rounded,
+    icon: Symbols.trending_up_rounded,
     gradient: [Color(0xFFFF9500), Color(0xFFCC6D00)],
     chips: [
-      _Chip(Icons.history_rounded, 'Every attempt'),
-      _Chip(Icons.insights_rounded, '+0.5 band'),
+      _Chip(Symbols.history_rounded, 'Every attempt'),
+      _Chip(Symbols.insights_rounded, '+0.5 band'),
     ],
   ),
 ];

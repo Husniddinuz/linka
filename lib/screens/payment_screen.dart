@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../services/booking_service.dart';
 import '../services/wallet_service.dart';
@@ -138,7 +139,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.chevron_left, color: context.colors.textPrimary, size: 28),
+          icon: Icon(Symbols.chevron_left_rounded, color: context.colors.textPrimary, size: 28),
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
@@ -205,7 +206,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                             width: 66,
                                             height: 66,
                                             color: context.colors.surfaceAlt,
-                                            child: Icon(Icons.person, size: 30, color: context.colors.textTertiary),
+                                            child: Icon(Symbols.person_rounded, size: 30, color: context.colors.textTertiary),
                                           ),
                                         )
                                       : Image.asset(
@@ -408,7 +409,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(
-                                          Icons.add_circle_outline,
+                                          Symbols.add_circle_rounded,
                                           color: Colors.white,
                                           size: 16,
                                         ),
@@ -429,7 +430,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                 GestureDetector(
                                   onTap: _onTopUp,
                                   child: Icon(
-                                    Icons.add_circle_outline,
+                                    Symbols.add_circle_rounded,
                                     color: context.colors.textTertiary,
                                     size: 24,
                                   ),
@@ -533,7 +534,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.info_outline, size: 18, color: Color(0xFF6C9BD1)),
+                  Icon(Symbols.info_rounded, size: 18, color: Color(0xFF6C9BD1)),
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(

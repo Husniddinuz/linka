@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../services/mock_test_service.dart';
 import '../widgets/band_chart.dart';
@@ -88,7 +89,7 @@ class _Message extends StatelessWidget {
               width: 62,
               height: 62,
               decoration: BoxDecoration(color: wr.accent.withValues(alpha: 0.12), shape: BoxShape.circle),
-              child: Icon(Icons.insights_rounded, size: 30, color: wr.accent),
+              child: Icon(Symbols.insights_rounded, size: 30, color: wr.accent),
             ),
             const SizedBox(height: 16),
             Text(
@@ -293,7 +294,7 @@ class _TrendCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  change! >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                  change! >= 0 ? Symbols.trending_up_rounded : Symbols.trending_down_rounded,
                   size: 17,
                   color: change! >= 0 ? wr.good : wr.bad,
                 ),
@@ -495,7 +496,7 @@ class _CriterionAverageCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Icon(wCriterionIcons[key] ?? Icons.rule_rounded, size: 17, color: weakest ? wr.bad : wr.accent),
+              Icon(wCriterionIcons[key] ?? Symbols.rule_rounded, size: 17, color: weakest ? wr.bad : wr.accent),
               const SizedBox(width: 9),
               Expanded(
                 child: Text(
@@ -608,7 +609,7 @@ class _EssayRow extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, size: 22, color: wr.faint),
+              Icon(Symbols.chevron_right_rounded, size: 22, color: wr.faint),
             ],
           ),
         ),

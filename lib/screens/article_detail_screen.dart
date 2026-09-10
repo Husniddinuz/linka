@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:pdfrx/pdfrx.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
@@ -69,7 +70,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.chevron_left, color: context.colors.textPrimary, size: 28),
+          icon: Icon(Symbols.chevron_left_rounded, color: context.colors.textPrimary, size: 28),
         ),
         // On a PDF article the title has nowhere else to go — the page under
         // it is the document, edge to edge.
@@ -176,7 +177,7 @@ class _PdfMessage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.picture_as_pdf_outlined,
+              Symbols.picture_as_pdf_rounded,
               size: 40,
               color: colors.textTertiary,
             ),

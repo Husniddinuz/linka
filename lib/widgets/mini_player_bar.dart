@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../screens/podcast_player_screen.dart';
 import '../services/podcast_playback_service.dart';
@@ -194,7 +195,7 @@ class _MiniPlayerBarState extends State<MiniPlayerBar> {
                         constraints:
                             const BoxConstraints(minWidth: 36, minHeight: 36),
                         icon: Icon(
-                          _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          _playing ? Symbols.pause_rounded : Symbols.play_arrow_rounded,
                           color: Colors.white,
                           size: 28,
                         ),
@@ -205,7 +206,7 @@ class _MiniPlayerBarState extends State<MiniPlayerBar> {
                         constraints:
                             const BoxConstraints(minWidth: 32, minHeight: 32),
                         icon: Icon(
-                          Icons.close,
+                          Symbols.close_rounded,
                           color: Colors.white.withValues(alpha: 0.7),
                           size: 20,
                         ),

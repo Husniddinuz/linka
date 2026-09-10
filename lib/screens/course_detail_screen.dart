@@ -233,7 +233,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.chevron_left, color: colors.textPrimary, size: 28),
+          icon: Icon(Symbols.chevron_left_rounded, color: colors.textPrimary, size: 28),
         ),
         title: Text('Course',
             style: TextStyle(
@@ -685,7 +685,7 @@ class _RoomSection extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Icon(Icons.chevron_right, size: 20, color: colors.textTertiary),
+                    Icon(Symbols.chevron_right_rounded, size: 20, color: colors.textTertiary),
                   ],
                 ),
               ),

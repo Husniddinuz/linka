@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
@@ -242,7 +243,7 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
                     style: TextStyle(color: colors.textSecondary, fontSize: 12.5),
                   ),
                   trailing: _selectedTopic?.id == topic.id
-                      ? Icon(Icons.check_rounded, color: colors.brand)
+                      ? Icon(Symbols.check_rounded, color: colors.brand)
                       : null,
                   onTap: () {
                     Navigator.pop(context);
@@ -277,7 +278,7 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
             scrolledUnderElevation: 0,
             iconTheme: IconThemeData(color: colors.textPrimary),
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_rounded, size: 20),
+              icon: const Icon(Symbols.arrow_back_ios_rounded, size: 20),
               onPressed: _handleBack,
             ),
             title: Text(
@@ -311,7 +312,7 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         foregroundColor: colors.textPrimary,
                       ),
-                      icon: const Icon(Icons.border_color_rounded, size: 14),
+                      icon: const Icon(Symbols.border_color_rounded, size: 14),
                       label: const Text(
                         'Highlight',
                         style: TextStyle(
@@ -473,7 +474,7 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
                 ),
               ),
             ),
-            Icon(Icons.expand_more_rounded, color: colors.textSecondary),
+            Icon(Symbols.expand_more_rounded, color: colors.textSecondary),
           ],
         ),
       ),
@@ -532,7 +533,7 @@ class _WritingSampleUploadScreenState extends State<WritingSampleUploadScreen> {
                 ),
                 IconButton(
                   visualDensity: VisualDensity.compact,
-                  icon: Icon(Icons.close_rounded,
+                  icon: Icon(Symbols.close_rounded,
                       size: 18, color: colors.textTertiary),
                   onPressed: _submitting ? null : () => _removeHighlight(m),
                 ),

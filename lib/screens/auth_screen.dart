@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'otp_screen.dart';
 import 'public_offer_screen.dart';
 import '../services/auth_service.dart';
@@ -125,7 +126,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
-                            Icons.arrow_back_ios_new_rounded,
+                            Symbols.arrow_back_ios_new_rounded,
                             size: 18,
                             color: context.colors.textPrimary,
                           ),
@@ -255,7 +256,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               ),
                               child: _accepted
                                   ? const Icon(
-                                      Icons.check,
+                                      Symbols.check_rounded,
                                       color: Colors.white,
                                       size: 14,
                                     )

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/social.dart';
 import '../services/api_service.dart';
@@ -113,6 +114,10 @@ class DirectConversation {
   final String displayName;
   final String? avatarUrl;
 
+  /// True while the other person's Plus subscription is live — the badge
+  /// beside their name. Older backends omit it, which reads as no badge.
+  final bool isPlus;
+
   /// True when *either* side has blocked the other. The server does not say
   /// which, and the effect here is the same either way: the composer closes.
   final bool isBlocked;
@@ -131,6 +136,7 @@ class DirectConversation {
     required this.otherUserId,
     required this.displayName,
     this.avatarUrl,
+    this.isPlus = false,
     this.isBlocked = false,
     this.unreadCount = 0,
     this.lastMessage,
@@ -150,6 +156,7 @@ class DirectConversation {
       otherUserId: (other['user_id'] as num?)?.toInt() ?? 0,
       displayName: other['display_name']?.toString() ?? 'Linka user',
       avatarUrl: ChatService.absoluteUrl(other['profile_image'] as String?),
+      isPlus: other['is_plus'] as bool? ?? false,
       isBlocked: json['is_blocked'] as bool? ?? false,
       unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
       lastMessage: lastMsg?['text'] as String?,
@@ -177,6 +184,7 @@ class DirectConversation {
         conversationId: id,
         otherUserId: otherUserId,
         displayName: displayName,
+        isPlus: isPlus,
         isBlocked: isBlocked,
       );
 }
@@ -189,12 +197,18 @@ class DirectThread {
   final int conversationId;
   final int otherUserId;
   final String displayName;
+
+  /// Their live Plus subscription, carried so the header can badge the name
+  /// without a second call for a profile the list already described.
+  final bool isPlus;
+
   final bool isBlocked;
 
   const DirectThread({
     required this.conversationId,
     required this.otherUserId,
     required this.displayName,
+    this.isPlus = false,
     required this.isBlocked,
   });
 }
@@ -525,13 +539,13 @@ class _ChatsScreenState extends State<ChatsScreen>
           labels: [
             _ChatSegmentLabel(
               'Channels',
-              Icons.forum_rounded,
+              Symbols.forum_rounded,
               'Community',
               _channels.fold(0, (sum, c) => sum + c.unreadCount),
             ),
             _ChatSegmentLabel(
               'Direct',
-              Icons.person_rounded,
+              Symbols.person_rounded,
               'Private',
               _conversations.fold(0, (sum, c) => sum + c.unreadCount),
             ),
@@ -552,7 +566,7 @@ class _ChatsScreenState extends State<ChatsScreen>
     if (_channels.isEmpty) {
       return _refreshable(
         const _EmptyState(
-          icon: Icons.forum_outlined,
+          icon: Symbols.forum_rounded,
           title: 'No channels yet',
           message: 'Community channels will appear here once they open.',
         ),
@@ -580,7 +594,7 @@ class _ChatsScreenState extends State<ChatsScreen>
     if (_conversations.isEmpty) {
       return _refreshable(
         _EmptyState(
-          icon: Icons.chat_bubble_outline_rounded,
+          icon: Symbols.chat_bubble_rounded,
           title: 'No private messages',
           message: 'Write to someone and the thread will live here.',
           actionLabel: 'New message',
@@ -783,7 +797,7 @@ class _ChatsScreenState extends State<ChatsScreen>
               onPressed: _startNewConversation,
               tooltip: 'New message',
               icon: Icon(
-                Icons.edit_square,
+                Symbols.edit_square_rounded,
                 size: 22,
                 color: context.colors.textSecondary,
               ),
@@ -891,7 +905,7 @@ class _ComposeSheetState extends State<_ComposeSheet> {
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.search_rounded),
+                    : const Icon(Symbols.search_rounded),
                 color: context.colors.textSecondary,
                 onPressed: _run,
               ),
@@ -945,7 +959,7 @@ class _ComposeSheetState extends State<_ComposeSheet> {
                                 TextStyle(color: context.colors.textSecondary),
                           ),
                     trailing: Icon(
-                      Icons.chat_bubble_outline_rounded,
+                      Symbols.chat_bubble_rounded,
                       size: 20,
                       color: context.colors.accentBlue,
                     ),
@@ -1204,7 +1218,7 @@ class _ChannelTile extends StatelessWidget {
                 ),
               ),
             ),
-          Icon(Icons.image_outlined, size: 14, color: context.colors.textTertiary),
+          Icon(Symbols.image_rounded, size: 14, color: context.colors.textTertiary),
           const SizedBox(width: 3),
           Text(
             'Image',
@@ -1232,7 +1246,7 @@ class _ChannelTile extends StatelessWidget {
               ),
             ),
           ),
-          Icon(Icons.headphones_rounded, size: 14, color: context.colors.textTertiary),
+          Icon(Symbols.headphones_rounded, size: 14, color: context.colors.textTertiary),
           const SizedBox(width: 3),
           Text(
             'Voice message',
@@ -1262,7 +1276,7 @@ class _ChannelTile extends StatelessWidget {
                 ),
               ),
             ),
-          Icon(Icons.image_outlined, size: 14, color: context.colors.textTertiary),
+          Icon(Symbols.image_rounded, size: 14, color: context.colors.textTertiary),
           const SizedBox(width: 3),
           Text(
             'Image',
@@ -1532,7 +1546,7 @@ class _EmptyState extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              icon: const Icon(Icons.edit_square, size: 18),
+              icon: const Icon(Symbols.edit_square_rounded, size: 18),
               label: Text(
                 actionLabel!,
                 style: const TextStyle(
@@ -1595,7 +1609,7 @@ class _ConversationTile extends StatelessWidget {
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.delete_outline_rounded, size: 20, color: Colors.white),
+          Icon(Symbols.delete_rounded, size: 20, color: Colors.white),
           SizedBox(width: 6),
           Text(
             'Delete',
@@ -1651,7 +1665,7 @@ class _ConversationTile extends StatelessWidget {
             ),
             ListTile(
               leading: Icon(
-                Icons.delete_outline_rounded,
+                Symbols.delete_rounded,
                 color: context.colors.error,
               ),
               title: Text(
@@ -1726,7 +1740,7 @@ class _ConversationTile extends StatelessWidget {
                                 if (conversation.isBlocked) ...[
                                   const SizedBox(width: 6),
                                   Icon(
-                                    Icons.block_rounded,
+                                    Symbols.block_rounded,
                                     size: 14,
                                     color: context.colors.textTertiary,
                                   ),

@@ -4,6 +4,7 @@ import 'package:audioplayers/audioplayers.dart' as ap;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show PlatformException;
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import '../services/api_service.dart';
@@ -202,7 +203,7 @@ class _SpeakingSampleUploadScreenState
                     style: TextStyle(color: colors.textSecondary, fontSize: 12.5),
                   ),
                   trailing: _selectedTopic?.id == topic.id
-                      ? Icon(Icons.check_rounded, color: colors.brand)
+                      ? Icon(Symbols.check_rounded, color: colors.brand)
                       : null,
                   onTap: () {
                     Navigator.pop(context);
@@ -235,7 +236,7 @@ class _SpeakingSampleUploadScreenState
             scrolledUnderElevation: 0,
             iconTheme: IconThemeData(color: colors.textPrimary),
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_rounded, size: 20),
+              icon: const Icon(Symbols.arrow_back_ios_rounded, size: 20),
               onPressed: _handleBack,
             ),
             title: Text(
@@ -379,7 +380,7 @@ class _SpeakingSampleUploadScreenState
                 ),
               ),
             ),
-            Icon(Icons.expand_more_rounded, color: colors.textSecondary),
+            Icon(Symbols.expand_more_rounded, color: colors.textSecondary),
           ],
         ),
       ),
@@ -850,7 +851,7 @@ class _AudioRecorderControlState extends State<_AudioRecorderControl> {
                 height: 36,
                 decoration: BoxDecoration(color: colors.brand, shape: BoxShape.circle),
                 child: Icon(
-                  _previewPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  _previewPlaying ? Symbols.pause_rounded : Symbols.play_arrow_rounded,
                   color: colors.onBrand,
                   size: 20,
                 ),
@@ -875,7 +876,7 @@ class _AudioRecorderControlState extends State<_AudioRecorderControl> {
             ),
             GestureDetector(
               onTap: widget.enabled ? _discardRecording : null,
-              child: Icon(Icons.delete_outline_rounded, color: colors.error, size: 20),
+              child: Icon(Symbols.delete_rounded, color: colors.error, size: 20),
             ),
           ],
         ),
@@ -891,7 +892,7 @@ class _AudioRecorderControlState extends State<_AudioRecorderControl> {
               BoxDecoration(color: colors.errorBg, borderRadius: BorderRadius.circular(12)),
           child: Row(
             children: [
-              Icon(Icons.stop_circle_rounded, color: colors.error, size: 24),
+              Icon(Symbols.stop_circle_rounded, color: colors.error, size: 24),
               const SizedBox(width: 10),
               Text(
                 'Recording ${_fmt(_recordSeconds)} · tap to stop',
@@ -912,7 +913,7 @@ class _AudioRecorderControlState extends State<_AudioRecorderControl> {
         Expanded(
           child: _idleAction(
             colors,
-            icon: Icons.mic_none_rounded,
+            icon: Symbols.mic_rounded,
             label: 'Record',
             onTap: widget.enabled ? _startRecording : null,
           ),
@@ -921,7 +922,7 @@ class _AudioRecorderControlState extends State<_AudioRecorderControl> {
         Expanded(
           child: _idleAction(
             colors,
-            icon: Icons.upload_file_rounded,
+            icon: Symbols.upload_file_rounded,
             label: 'Upload file',
             onTap: widget.enabled ? _pickAudioFile : null,
           ),

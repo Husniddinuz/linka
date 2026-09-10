@@ -7,6 +7,7 @@ import '../services/user_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/cached_avatar.dart';
+import '../widgets/plus_badge.dart';
 import 'chats_screen.dart' show openDirectConversation;
 import 'home_screen.dart' show StoryData;
 import 'story_viewer_screen.dart';
@@ -233,13 +234,26 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    profile.displayName,
-                    style: TextStyle(
-                      color: colors.textPrimary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  // The badge rides beside the name, where a long name yields
+                  // to it rather than pushing it off the row.
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          profile.displayName,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colors.textPrimary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      if (profile.isPlus) ...[
+                        const SizedBox(width: 8),
+                        const PlusBadge(compact: true),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -333,7 +347,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                   context,
                   userId: profile.userId,
                 ),
-                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                icon: const Icon(Symbols.chat_bubble_rounded, size: 18),
                 label: const Text('Message'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: colors.textPrimary,
@@ -596,7 +610,7 @@ class _PersonRow extends StatelessWidget {
                 tooltip: 'Message',
                 visualDensity: VisualDensity.compact,
                 icon: Icon(
-                  Icons.chat_bubble_outline_rounded,
+                  Symbols.chat_bubble_rounded,
                   size: 18,
                   color: colors.accentBlue,
                 ),

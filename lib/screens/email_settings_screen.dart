@@ -159,7 +159,7 @@ class _EmailSettingsScreenState extends State<EmailSettingsScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: Icon(
-            Icons.arrow_back_ios_rounded,
+            Symbols.arrow_back_ios_rounded,
             color: colors.textPrimary,
             size: 20,
           ),

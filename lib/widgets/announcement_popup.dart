@@ -6,7 +6,7 @@ import '../theme/app_colors.dart';
 import 'new_badge.dart';
 
 /// The "what's new" popup: an ad-style card for a freshly added course or
-/// feature. Resolves to `true` when the user taps the call-to-action and
+/// feature, or the release notes of the version just installed. Resolves to `true` when the user taps the call-to-action and
 /// `false` when they close it; the caller navigates, so it controls the
 /// order of pop and push on the navigator.
 Future<bool> showAnnouncementPopup(BuildContext context, Announcement item) async {
@@ -62,7 +62,10 @@ class AnnouncementCard extends StatelessWidget {
                           height: 1.25,
                         ),
                       ),
-                      if (item.body.isNotEmpty) ...[
+                      if (item.hasChecklist) ...[
+                        const SizedBox(height: 12),
+                        _Checklist(item: item),
+                      ] else if (item.body.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Text(
                           item.body,
@@ -105,34 +108,97 @@ class AnnouncementCard extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              const Icon(Symbols.arrow_forward, size: 18, weight: 600),
+                              if (!item.dismissOnly) ...[
+                                const SizedBox(width: 6),
+                                const Icon(Symbols.arrow_forward, size: 18, weight: 600),
+                              ],
                             ],
                           ),
                         ),
                       ),
                       const SizedBox(height: 4),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        style: TextButton.styleFrom(
-                          foregroundColor: colors.textTertiary,
-                          minimumSize: const Size.fromHeight(40),
-                        ),
-                        child: const Text(
-                          'Maybe later',
-                          style: TextStyle(
-                            fontFamily: 'SF Pro',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                      if (!item.dismissOnly)
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          style: TextButton.styleFrom(
+                            foregroundColor: colors.textTertiary,
+                            minimumSize: const Size.fromHeight(40),
+                          ),
+                          child: const Text(
+                            'Maybe later',
+                            style: TextStyle(
+                              fontFamily: 'SF Pro',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Release notes: the body's `- ` lines as a checklist, with any prose lines
+/// around them kept as-is. Scrolls past a third of the screen so a long
+/// changelog never pushes the buttons off a small phone.
+class _Checklist extends StatelessWidget {
+  final Announcement item;
+  const _Checklist({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.34),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final line in item.bodyLines)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: line.bullet
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 1),
+                            child: Icon(Symbols.check_circle_rounded, size: 18, color: colors.success),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              line.text,
+                              style: TextStyle(
+                                fontFamily: 'SF Pro',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: colors.textPrimary,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Text(
+                        line.text,
+                        style: TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w400,
+                          color: colors.textSecondary,
+                          height: 1.45,
+                        ),
+                      ),
+              ),
+          ],
         ),
       ),
     );
@@ -154,7 +220,11 @@ class _Header extends StatelessWidget {
           color: colors.brand,
           child: Center(
             child: Icon(
-              item.isCourse ? Symbols.school : Symbols.auto_awesome,
+              item.isCourse
+                  ? Symbols.school
+                  : item.isReleaseNotes
+                      ? Symbols.rocket_launch_rounded
+                      : Symbols.auto_awesome,
               size: 44,
               color: colors.accentYellow,
               fill: 1,
@@ -194,7 +264,7 @@ class _Header extends StatelessWidget {
                   color: Colors.black.withValues(alpha: 0.35),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                child: const Icon(Symbols.close_rounded, color: Colors.white, size: 18),
               ),
             ),
           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../services/wallet_service.dart';
@@ -268,7 +269,7 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen>
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.chevron_left, color: context.colors.textPrimary, size: 28),
+          icon: Icon(Symbols.chevron_left_rounded, color: context.colors.textPrimary, size: 28),
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
@@ -403,7 +404,7 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen>
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, size: 18, color: context.colors.accentBlue),
+                        Icon(Symbols.info_rounded, size: 18, color: context.colors.accentBlue),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(

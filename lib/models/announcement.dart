@@ -13,6 +13,9 @@ class Announcement {
   final String audience;
   final int? courseId;
 
+  /// Set on app release notes: the version they describe. Empty otherwise.
+  final String minAppVersion;
+
   const Announcement({
     required this.id,
     required this.title,
@@ -22,6 +25,7 @@ class Announcement {
     required this.imageUrl,
     required this.audience,
     required this.courseId,
+    this.minAppVersion = '',
   });
 
   factory Announcement.fromJson(Map<String, dynamic> json) {
@@ -36,9 +40,34 @@ class Announcement {
       imageUrl: (image == null || image.isEmpty) ? null : image,
       audience: json['audience']?.toString() ?? 'students',
       courseId: json['course'] is int ? json['course'] as int : null,
+      minAppVersion: json['min_app_version']?.toString().trim() ?? '',
     );
   }
 
   /// True for the card a new course made for itself.
   bool get isCourse => courseId != null;
+
+  /// A "what's new in this version" card rather than a single feature.
+  bool get isReleaseNotes => minAppVersion.isNotEmpty;
+
+  /// The button leads nowhere past the popup (release notes usually point
+  /// at `/`), so a second "Maybe later" button would be noise.
+  bool get dismissOnly {
+    final t = target.trim();
+    return t.isEmpty || t == '/';
+  }
+
+  static final _bullet = RegExp(r'^[-•*]\s+');
+
+  /// [body] line by line, with `- ` lines flagged as checklist items. Staff
+  /// write release notes that way; plain prose has no bullets at all.
+  List<({bool bullet, String text})> get bodyLines => [
+        for (final raw in body.split('\n'))
+          if (raw.trim().isNotEmpty)
+            _bullet.hasMatch(raw.trim())
+                ? (bullet: true, text: raw.trim().replaceFirst(_bullet, ''))
+                : (bullet: false, text: raw.trim()),
+      ];
+
+  bool get hasChecklist => bodyLines.any((l) => l.bullet);
 }

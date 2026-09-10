@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 
 class ConnectivityWrapper extends StatefulWidget {
@@ -154,7 +155,7 @@ class _NoInternetPageState extends State<_NoInternetPage>
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
-                    Icons.wifi_off_rounded,
+                    Symbols.wifi_off_rounded,
                     size: 56,
                     color: Colors.white,
                   ),

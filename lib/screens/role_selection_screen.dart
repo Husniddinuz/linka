@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api_constants.dart';
 import '../services/app_feature_service.dart';
@@ -145,7 +146,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.mail_outline_rounded,
+                        Symbols.mail_rounded,
                         size: 20,
                         color: _selectedRole != null
                             ? Colors.white

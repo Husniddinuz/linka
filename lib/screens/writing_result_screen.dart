@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:path_provider/path_provider.dart';
 import '../services/api_service.dart';
 import '../services/mock_test_service.dart';
@@ -190,7 +191,7 @@ class _FailedView extends StatelessWidget {
               width: 64,
               height: 64,
               decoration: BoxDecoration(color: wr.bad.withValues(alpha: 0.12), shape: BoxShape.circle),
-              child: Icon(Icons.error_outline_rounded, size: 32, color: wr.bad),
+              child: Icon(Symbols.error_rounded, size: 32, color: wr.bad),
             ),
             const SizedBox(height: 16),
             Text(
@@ -405,7 +406,7 @@ class _GradedView extends StatelessWidget {
             const SizedBox(height: 10),
             _SecondaryButton(
               label: 'See What You Keep Repeating',
-              icon: Icons.insights_rounded,
+              icon: Symbols.insights_rounded,
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const WritingProgressScreen()),
@@ -512,7 +513,7 @@ class _HeroCard extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 14),
+                    const Icon(Symbols.workspace_premium_rounded, color: Colors.white, size: 14),
                     const SizedBox(width: 6),
                     Text(
                       tier.label,
@@ -533,7 +534,7 @@ class _HeroCard extends StatelessWidget {
                           padding: EdgeInsets.all(9),
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : const Icon(Icons.ios_share_rounded, color: Colors.white, size: 17),
+                      : const Icon(Symbols.ios_share_rounded, color: Colors.white, size: 17),
                 ),
               ),
             ],
@@ -693,7 +694,7 @@ class _InstagramStoryCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 12),
+                      const Icon(Symbols.workspace_premium_rounded, color: Colors.white, size: 12),
                       const SizedBox(width: 5),
                       Text(
                         tier.label,
@@ -718,7 +719,7 @@ class _InstagramStoryCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     _SideStat(
-                      icon: Icons.assignment_rounded,
+                      icon: Symbols.assignment_rounded,
                       color: WPalette.purple,
                       value: taskNumber != null ? 'Task $taskNumber' : 'Writing',
                       caption: 'IELTS section',
@@ -754,7 +755,7 @@ class _InstagramStoryCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _SideStat(icon: Icons.trending_up_rounded, color: WPalette.green, value: _levelLabel(overall), caption: 'level of English'),
+                    _SideStat(icon: Symbols.trending_up_rounded, color: WPalette.green, value: _levelLabel(overall), caption: 'level of English'),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -763,9 +764,9 @@ class _InstagramStoryCard extends StatelessWidget {
                   decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14)),
                   child: Row(
                     children: [
-                      Expanded(child: _MiniStat(icon: Icons.short_text_rounded, label: 'Words Written', value: '$wordCount')),
+                      Expanded(child: _MiniStat(icon: Symbols.short_text_rounded, label: 'Words Written', value: '$wordCount')),
                       Container(width: 1, height: 26, color: Colors.white.withValues(alpha: 0.15)),
-                      Expanded(child: _MiniStat(icon: Icons.school_rounded, label: 'Reading Level', value: readingLevel)),
+                      Expanded(child: _MiniStat(icon: Symbols.school_rounded, label: 'Reading Level', value: readingLevel)),
                     ],
                   ),
                 ),
@@ -777,19 +778,19 @@ class _InstagramStoryCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Expanded(child: _MiniSkillCard(label: 'Task', score: task, color: WPalette.blue, icon: Icons.flag_rounded)),
+                    Expanded(child: _MiniSkillCard(label: 'Task', score: task, color: WPalette.blue, icon: Symbols.flag_rounded)),
                     const SizedBox(width: 6),
-                    Expanded(child: _MiniSkillCard(label: 'Coherence', score: coherence, color: WPalette.purple, icon: Icons.hub_rounded)),
+                    Expanded(child: _MiniSkillCard(label: 'Coherence', score: coherence, color: WPalette.purple, icon: Symbols.hub_rounded)),
                     const SizedBox(width: 6),
-                    Expanded(child: _MiniSkillCard(label: 'Lexical', score: lexical, color: WPalette.green, icon: Icons.menu_book_rounded)),
+                    Expanded(child: _MiniSkillCard(label: 'Lexical', score: lexical, color: WPalette.green, icon: Symbols.menu_book_rounded)),
                     const SizedBox(width: 6),
-                    Expanded(child: _MiniSkillCard(label: 'Grammar', score: grammar, color: WPalette.orange, icon: Icons.rule_rounded)),
+                    Expanded(child: _MiniSkillCard(label: 'Grammar', score: grammar, color: WPalette.orange, icon: Symbols.rule_rounded)),
                   ],
                 ),
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    const Icon(Icons.rocket_launch_rounded, color: Colors.white70, size: 15),
+                    const Icon(Symbols.rocket_launch_rounded, color: Colors.white70, size: 15),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -819,7 +820,7 @@ class _InstagramStoryCard extends StatelessWidget {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.calendar_today_rounded, color: Colors.white54, size: 11),
+                        const Icon(Symbols.calendar_today_rounded, color: Colors.white54, size: 11),
                         const SizedBox(width: 5),
                         Text(dateLabel, style: const TextStyle(fontFamily: 'SF Pro', fontSize: 10.5, color: Colors.white70)),
                       ],
@@ -1029,9 +1030,9 @@ class _CriterionCard extends StatelessWidget {
               (verdict?.trim().isNotEmpty ?? false) ? verdict!.trim() : descriptor,
               style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, height: 1.45, color: wr.muted),
             ),
-            for (final item in strengths) _CriterionPoint(text: item, icon: Icons.check_rounded, color: wr.good),
+            for (final item in strengths) _CriterionPoint(text: item, icon: Symbols.check_rounded, color: wr.good),
             for (final item in improvements)
-              _CriterionPoint(text: item, icon: Icons.arrow_forward_rounded, color: wr.accent),
+              _CriterionPoint(text: item, icon: Symbols.arrow_forward_rounded, color: wr.accent),
           ],
         ),
       ),
@@ -1257,7 +1258,7 @@ class _AiCoachCardState extends State<_AiCoachCard> {
                   gradient: LinearGradient(colors: [wr.accent, wr.colors.brand]),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
+                child: const Icon(Symbols.auto_awesome_rounded, color: Colors.white, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1294,7 +1295,7 @@ class _AiCoachCardState extends State<_AiCoachCard> {
                     style: TextStyle(fontFamily: 'SF Pro', fontSize: 13, fontWeight: FontWeight.w700, color: wr.accent),
                   ),
                   Icon(
-                    _expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                    _expanded ? Symbols.keyboard_arrow_up_rounded : Symbols.keyboard_arrow_down_rounded,
                     color: wr.accent,
                     size: 18,
                   ),
@@ -1338,10 +1339,10 @@ class _EssayStatsGrid extends StatelessWidget {
       crossAxisSpacing: 12,
       childAspectRatio: 1.3,
       children: [
-        _StatTile(icon: Icons.short_text_rounded, value: '$wordCount', label: 'Words', sub: target, color: onTarget ? wr.good : wr.warn),
-        _StatTile(icon: Icons.view_agenda_rounded, value: '$paragraphs', label: 'Paragraphs', color: wr.accent),
-        _StatTile(icon: Icons.linear_scale_rounded, value: avgSentenceLen.toStringAsFixed(1), label: 'Avg Sentence Length', sub: 'words/sentence', color: wr.accent),
-        _StatTile(icon: Icons.school_rounded, value: level, label: 'Reading Level', sub: 'estimated', color: wr.text),
+        _StatTile(icon: Symbols.short_text_rounded, value: '$wordCount', label: 'Words', sub: target, color: onTarget ? wr.good : wr.warn),
+        _StatTile(icon: Symbols.view_agenda_rounded, value: '$paragraphs', label: 'Paragraphs', color: wr.accent),
+        _StatTile(icon: Symbols.linear_scale_rounded, value: avgSentenceLen.toStringAsFixed(1), label: 'Avg Sentence Length', sub: 'words/sentence', color: wr.accent),
+        _StatTile(icon: Symbols.school_rounded, value: level, label: 'Reading Level', sub: 'estimated', color: wr.text),
       ],
     );
   }

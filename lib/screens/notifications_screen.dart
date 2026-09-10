@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 
@@ -54,7 +55,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         surfaceTintColor: context.colors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, size: 20, color: context.colors.textPrimary),
+          icon: Icon(Symbols.arrow_back_ios_rounded, size: 20, color: context.colors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,

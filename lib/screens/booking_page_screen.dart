@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../theme/app_colors.dart';
 import 'payment_screen.dart';
 
@@ -102,7 +103,7 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
-                    child: Icon(Icons.chevron_left_rounded, size: 30, color: context.colors.textPrimary),
+                    child: Icon(Symbols.chevron_left_rounded, size: 30, color: context.colors.textPrimary),
                   ),
                   Expanded(
                     child: Center(
@@ -119,7 +120,7 @@ class _BookingPageScreenState extends State<BookingPageScreen> {
                   ),
                   GestureDetector(
                     onTap: () {},
-                    child: Icon(Icons.more_vert, size: 24, color: context.colors.textPrimary),
+                    child: Icon(Symbols.more_vert_rounded, size: 24, color: context.colors.textPrimary),
                   ),
                 ],
               ),

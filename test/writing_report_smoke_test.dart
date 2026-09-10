@@ -6,6 +6,7 @@ import 'package:linka/screens/writing_result_screen.dart';
 import 'package:linka/theme/app_colors.dart';
 import 'package:linka/widgets/writing_grading_progress.dart';
 import 'package:linka/widgets/writing_report.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 /// Every report surface reads its colours from the [AppColors] theme
 /// extension, the same way the app wires them up in `main.dart`.
@@ -480,7 +481,7 @@ void main() {
     // have lost track of what you were asked to describe.
     expect(find.textContaining('survey conducted by a university library'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.tap(find.byIcon(Symbols.close_rounded));
     await tester.pumpAndSettle();
     expect(find.byType(WChartViewer), findsNothing);
   });

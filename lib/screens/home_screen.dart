@@ -1822,7 +1822,7 @@ class _CoursesPromoBanner extends StatelessWidget {
                           ),
                           SizedBox(width: 4),
                           Icon(
-                            Icons.arrow_forward_rounded,
+                            Symbols.arrow_forward_rounded,
                             color: Color(0xFF6C3FD4),
                             size: 14,
                           ),
@@ -2018,7 +2018,7 @@ class _ComingSoonBanner extends StatelessWidget {
                                 ),
                                 child: const Center(
                                   child: Icon(
-                                    Icons.play_circle_rounded,
+                                    Symbols.play_circle_rounded,
                                     color: Color(0xFFF5C542),
                                     size: 28,
                                   ),
@@ -2173,7 +2173,7 @@ class _IeltsSection extends StatelessWidget {
                               ),
                               SizedBox(width: 4),
                               Icon(
-                                Icons.arrow_forward_rounded,
+                                Symbols.arrow_forward_rounded,
                                 color: Color(0xFFC8102E),
                                 size: 14,
                               ),
@@ -2207,7 +2207,7 @@ class _IeltsSection extends StatelessWidget {
                       height: 96,
                       child: _IeltsActionButton(
                         label: 'Speaking Samples',
-                        icon: Icons.record_voice_over_rounded,
+                        icon: Symbols.record_voice_over_rounded,
                         colors: const [Color(0xFFFF9500), Color(0xFFF08300), Color(0xFFCC6D00)],
                         shadowColor: const Color(0xFF8F4C00),
                         onTap: () => Navigator.push(
@@ -2223,7 +2223,7 @@ class _IeltsSection extends StatelessWidget {
                       height: 96,
                       child: _IeltsActionButton(
                         label: 'Writing Samples',
-                        icon: Icons.edit_rounded,
+                        icon: Symbols.edit_rounded,
                         colors: const [Color(0xFF8A7EF0), Color(0xFF7C6CE8), Color(0xFF5F4FC7)],
                         shadowColor: const Color(0xFF3F3494),
                         onTap: () => Navigator.push(
@@ -2244,7 +2244,7 @@ class _IeltsSection extends StatelessWidget {
                   child: _IeltsActionButton(
                     label: 'Mock Exams',
                     subtitle: 'Reading · Listening\nWriting · Speaking',
-                    icon: Icons.assignment_rounded,
+                    icon: Symbols.assignment_rounded,
                     colors: const [Color(0xFF34C759), Color(0xFF2CAF4F), Color(0xFF1F8A3D)],
                     shadowColor: const Color(0xFF14602A),
                     onTap: () => Navigator.push(
@@ -2353,7 +2353,7 @@ class _IeltsActionButton extends StatelessWidget {
                         ),
                       ),
                       Icon(
-                        Icons.arrow_outward_rounded,
+                        Symbols.arrow_outward_rounded,
                         color: Colors.white.withValues(alpha: 0.55),
                         size: large ? 18 : 14,
                       ),
@@ -2520,7 +2520,7 @@ class _WebinarBlockState extends State<_WebinarBlock> {
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
-                      Icons.live_tv_rounded,
+                      Symbols.live_tv_rounded,
                       color: Color(0xFFF5C542),
                       size: 20,
                     ),
@@ -2585,7 +2585,7 @@ class _WebinarBlockState extends State<_WebinarBlock> {
                 children: [
                   if (webinar.tutorName.isNotEmpty) ...[
                     const Icon(
-                      Icons.person_outline_rounded,
+                      Symbols.person_rounded,
                       size: 14,
                       color: Color(0xFFAAAAAA),
                     ),
@@ -2764,7 +2764,7 @@ class _DebateBlockState extends State<_DebateBlock>
                   right: -28,
                   bottom: -34,
                   child: Icon(
-                    Icons.forum_rounded,
+                    Symbols.forum_rounded,
                     size: 150,
                     color: Colors.white.withValues(alpha: 0.05),
                   ),
@@ -2796,7 +2796,7 @@ class _DebateBlockState extends State<_DebateBlock>
                             Row(
                               children: [
                                 const Icon(
-                                  Icons.visibility_rounded,
+                                  Symbols.visibility_rounded,
                                   size: 13,
                                   color: Color(0xFFAEB9D6),
                                 ),
@@ -2876,7 +2876,7 @@ class _DebateBlockState extends State<_DebateBlock>
                             ),
                             SizedBox(width: 6),
                             Icon(
-                              Icons.arrow_forward_rounded,
+                              Symbols.arrow_forward_rounded,
                               size: 17,
                               color: Color(0xFF1B2440),
                             ),
@@ -3153,7 +3153,7 @@ class _PodcastCard extends StatelessWidget {
                         ],
                       ),
                       child: Icon(
-                        isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        isPlaying ? Symbols.pause_rounded : Symbols.play_arrow_rounded,
                         size: 21,
                         color: colors.textPrimary,
                       ),
@@ -3224,7 +3224,7 @@ class _PodcastCard extends StatelessWidget {
     if (completed) {
       return Row(
         children: [
-          Icon(Icons.check_circle_rounded, size: 13, color: colors.success),
+          Icon(Symbols.check_circle_rounded, size: 13, color: colors.success),
           const SizedBox(width: 4),
           Text(
             'Played',
@@ -3984,7 +3984,7 @@ class _PendingActivationBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline_rounded, color: _accent, size: 20),
+          Icon(Symbols.info_rounded, color: _accent, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -4427,7 +4427,7 @@ class _TutorCalendarCard extends StatelessWidget {
               GestureDetector(
                 onTap: onPrevMonth,
                 child: Icon(
-                  Icons.chevron_left,
+                  Symbols.chevron_left_rounded,
                   color: context.colors.textPrimary,
                   size: 24,
                 ),
@@ -4448,7 +4448,7 @@ class _TutorCalendarCard extends StatelessWidget {
               GestureDetector(
                 onTap: onNextMonth,
                 child: Icon(
-                  Icons.chevron_right,
+                  Symbols.chevron_right_rounded,
                   color: context.colors.textPrimary,
                   size: 24,
                 ),
@@ -4600,19 +4600,19 @@ class _SpeakingTermsSheet extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           _rule(
-            Icons.person_search_rounded,
+            Symbols.person_search_rounded,
             'You will see your partner\'s name and gender before connecting — you can skip any match.',
           ),
           _rule(
-            Icons.do_not_disturb_on_outlined,
+            Symbols.do_not_disturb_on_rounded,
             'Zero tolerance for harassment, hate speech, or sexually inappropriate content.',
           ),
           _rule(
-            Icons.flag_outlined,
+            Symbols.flag_rounded,
             'Use the Report or Block buttons during a call to flag abusive users instantly.',
           ),
           _rule(
-            Icons.schedule_rounded,
+            Symbols.schedule_rounded,
             'All reports are reviewed and acted upon within 24 hours; violators are suspended.',
           ),
           const SizedBox(height: 24),
@@ -4704,7 +4704,7 @@ class _SectionClosed extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.lock_clock_rounded,
+                    Symbols.lock_clock_rounded,
                     color: context.colors.textPrimary,
                     size: 32,
                   ),

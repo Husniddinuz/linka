@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/skeleton.dart';
@@ -53,7 +54,7 @@ class _FaqScreenState extends State<FaqScreen> {
                     child: Padding(
                       padding: const EdgeInsets.all(8),
                       child: Icon(
-                        Icons.chevron_left_rounded,
+                        Symbols.chevron_left_rounded,
                         size: 28,
                         color: context.colors.textPrimary,
                       ),
@@ -156,7 +157,7 @@ class _FaqScreenState extends State<FaqScreen> {
                       turns: isExpanded ? 0.5 : 0,
                       duration: const Duration(milliseconds: 200),
                       child: Icon(
-                        Icons.keyboard_arrow_down_rounded,
+                        Symbols.keyboard_arrow_down_rounded,
                         color: context.colors.textPrimary,
                         size: 24,
                       ),

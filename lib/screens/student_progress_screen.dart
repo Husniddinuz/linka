@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../models/mock_test.dart';
 import '../models/student_progress.dart';
@@ -55,7 +56,7 @@ class _StudentProgressScreenState extends State<StudentProgressScreen> {
           }
           if (snapshot.hasError || snapshot.data == null) {
             return _Message(
-              icon: Icons.cloud_off_rounded,
+              icon: Symbols.cloud_off_rounded,
               title: 'Progress unavailable',
               body: 'Your progress could not be loaded right now. Try again in a moment.',
               actionLabel: 'Try again',
@@ -65,7 +66,7 @@ class _StudentProgressScreenState extends State<StudentProgressScreen> {
           final progress = snapshot.data!;
           if (!progress.hasAny) {
             return _Message(
-              icon: Icons.insights_rounded,
+              icon: Symbols.insights_rounded,
               title: 'Nothing to show yet',
               body: 'Sit a mock test, write an essay or book a lesson, and your bands will start to appear here.',
               actionLabel: 'Open Mock Exams',
@@ -249,7 +250,7 @@ class ProgressTiles extends StatelessWidget {
 
     final tiles = <Widget>[
       _Tile(
-        icon: Icons.edit_note_rounded,
+        icon: Symbols.edit_note_rounded,
         label: 'Writing band',
         value: writing.hasBand ? wFormatBand(writing.latest) : null,
         fill: writing.latest,
@@ -259,7 +260,7 @@ class ProgressTiles extends StatelessWidget {
         onTap: () => _open(context, ProgressTileKind.writing),
       ),
       _Tile(
-        icon: Icons.headphones_rounded,
+        icon: Symbols.headphones_rounded,
         label: 'Listening band',
         value: listening.hasBand ? wFormatBand(listening.latest) : null,
         fill: listening.latest,
@@ -268,7 +269,7 @@ class ProgressTiles extends StatelessWidget {
         onTap: () => _open(context, ProgressTileKind.listening),
       ),
       _Tile(
-        icon: Icons.menu_book_rounded,
+        icon: Symbols.menu_book_rounded,
         label: 'Reading band',
         value: reading.hasBand ? wFormatBand(reading.latest) : null,
         fill: reading.latest,
@@ -277,7 +278,7 @@ class ProgressTiles extends StatelessWidget {
         onTap: () => _open(context, ProgressTileKind.reading),
       ),
       _Tile(
-        icon: Icons.schedule_rounded,
+        icon: Symbols.schedule_rounded,
         label: 'Hours studied',
         value: lessons.count > 0 ? lessons.hoursLabel : null,
         caption: lessons.count > 0 ? 'from ${wPlural(lessons.count, 'lesson', 'lessons')}' : null,
@@ -553,7 +554,7 @@ class _SkillCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  change! >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                  change! >= 0 ? Symbols.trending_up_rounded : Symbols.trending_down_rounded,
                   size: 17,
                   color: change! >= 0 ? wr.good : wr.bad,
                 ),
@@ -592,7 +593,7 @@ class _SkillCard extends StatelessWidget {
                         fontFamily: 'SF Pro', fontSize: 13, fontWeight: FontWeight.w700, color: wr.accent),
                   ),
                   const SizedBox(width: 2),
-                  Icon(Icons.chevron_right_rounded, size: 18, color: wr.accent),
+                  Icon(Symbols.chevron_right_rounded, size: 18, color: wr.accent),
                 ],
               ),
             ),
@@ -653,7 +654,7 @@ class _EntryRow extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, size: 20, color: wr.faint),
+            Icon(Symbols.chevron_right_rounded, size: 20, color: wr.faint),
           ],
         ),
       ),

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
 import 'ielts_booking_screen.dart';
 import 'mock_test_history_screen.dart';
 import 'mock_test_list_screen.dart';
 import 'speaking_samples_list_screen.dart';
+import 'speaking_topics_screen.dart';
 import 'tutors_screen.dart';
 import 'writing_prompts_list_screen.dart';
 import 'writing_samples_list_screen.dart';
@@ -54,7 +56,7 @@ class _MockTestsHomeScreenState extends State<MockTestsHomeScreen> {
         title: 'Mock Tests',
         actions: [
           IconButton(
-            icon: Icon(Icons.history_rounded, color: context.colors.textPrimary),
+            icon: Icon(Symbols.history_rounded, color: context.colors.textPrimary),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const MockTestHistoryScreen()),
@@ -71,7 +73,7 @@ class _MockTestsHomeScreenState extends State<MockTestsHomeScreen> {
           ),
           const SizedBox(height: 18),
           _SkillButton(
-            icon: Icons.menu_book_rounded,
+            icon: Symbols.menu_book_rounded,
             title: 'Reading',
             subtitle: _testsSubtitle(_readingCount, '60 min'),
             onTap: () => Navigator.push(
@@ -81,7 +83,7 @@ class _MockTestsHomeScreenState extends State<MockTestsHomeScreen> {
           ),
           const SizedBox(height: 12),
           _SkillButton(
-            icon: Icons.headphones_rounded,
+            icon: Symbols.headphones_rounded,
             title: 'Listening',
             subtitle: _testsSubtitle(_listeningCount, '40 min'),
             onTap: () => Navigator.push(
@@ -91,7 +93,7 @@ class _MockTestsHomeScreenState extends State<MockTestsHomeScreen> {
           ),
           const SizedBox(height: 12),
           _SkillButton(
-            icon: Icons.edit_note_rounded,
+            icon: Symbols.edit_note_rounded,
             title: 'Writing',
             subtitle: 'Task 1 & Task 2 · graded by AI',
             onTap: () => Navigator.push(
@@ -101,7 +103,7 @@ class _MockTestsHomeScreenState extends State<MockTestsHomeScreen> {
           ),
           const SizedBox(height: 12),
           _SkillButton(
-            icon: Icons.mic_rounded,
+            icon: Symbols.mic_rounded,
             title: 'Speaking',
             subtitle: 'Practise live with a tutor',
             onTap: () => Navigator.push(
@@ -110,8 +112,20 @@ class _MockTestsHomeScreenState extends State<MockTestsHomeScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          // The solo counterpart to the tutor above: the same exam questions,
+          // answered alone at any hour and marked by AI.
           _SkillButton(
-            icon: Icons.badge_rounded,
+            icon: Symbols.forum_rounded,
+            title: 'Speaking Topics',
+            subtitle: 'Answer any topic on your own · graded by AI',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SpeakingTopicsScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _SkillButton(
+            icon: Symbols.badge_rounded,
             title: 'Book Real IELTS Test',
             subtitle: 'Register for an official test date',
             onTap: () => Navigator.push(
@@ -132,7 +146,7 @@ class _MockTestsHomeScreenState extends State<MockTestsHomeScreen> {
           ),
           const SizedBox(height: 12),
           _SkillButton(
-            icon: Icons.record_voice_over_rounded,
+            icon: Symbols.record_voice_over_rounded,
             title: 'Speaking Samples',
             subtitle: 'Real test answers with band scores',
             onTap: () => Navigator.push(
@@ -142,7 +156,7 @@ class _MockTestsHomeScreenState extends State<MockTestsHomeScreen> {
           ),
           const SizedBox(height: 12),
           _SkillButton(
-            icon: Icons.auto_stories_rounded,
+            icon: Symbols.auto_stories_rounded,
             title: 'Writing Samples',
             subtitle: 'Real essays with band scores',
             onTap: () => Navigator.push(
@@ -201,7 +215,7 @@ class _SkillButton extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: context.colors.textTertiary),
+            Icon(Symbols.chevron_right_rounded, color: context.colors.textTertiary),
           ],
         ),
       ),

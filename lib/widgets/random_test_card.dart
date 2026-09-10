@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../theme/app_colors.dart';
 import 'mock_test_styles.dart';
 
@@ -33,7 +34,7 @@ class RandomTestCard extends StatelessWidget {
         decoration: mtSoftCard(context, border: Border.all(color: colors.border)),
         child: Row(
           children: [
-            MtAvatar(icon: Icons.shuffle_rounded, background: colors.accentBlue),
+            MtAvatar(icon: Symbols.shuffle_rounded, background: colors.accentBlue),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -65,7 +66,7 @@ class RandomTestCard extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2, color: colors.textTertiary),
               )
             else
-              Icon(Icons.chevron_right_rounded, color: colors.textTertiary, size: 24),
+              Icon(Symbols.chevron_right_rounded, color: colors.textTertiary, size: 24),
           ],
         ),
       ),

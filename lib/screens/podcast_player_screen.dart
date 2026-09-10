@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../services/api_service.dart';
 import '../services/facebook_events_service.dart';
@@ -554,7 +555,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.keyboard_arrow_down_rounded,
+            icon: const Icon(Symbols.keyboard_arrow_down_rounded,
                 color: Colors.white, size: 30),
           ),
           Expanded(
@@ -763,7 +764,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              Icon(Icons.chevron_right_rounded,
+              Icon(Symbols.chevron_right_rounded,
                   size: 16, color: playerAccent.withValues(alpha: 0.9)),
             ],
           ),
@@ -990,7 +991,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.vertical_align_center_rounded,
+                      Icon(Symbols.vertical_align_center_rounded,
                           size: 15, color: playerBgTop),
                       SizedBox(width: 6),
                       Text(
@@ -1069,7 +1070,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
           IconButton(
             onPressed: _service.hasPrevious ? _previousTrack : null,
             icon: Icon(
-              Icons.skip_previous_rounded,
+              Symbols.skip_previous_rounded,
               size: 30,
               color: _service.hasPrevious
                   ? Colors.white
@@ -1104,7 +1105,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
                 ],
               ),
               child: Icon(
-                _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                _playing ? Symbols.pause_rounded : Symbols.play_arrow_rounded,
                 color: playerBgTop,
                 size: 36,
               ),
@@ -1124,7 +1125,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
           IconButton(
             onPressed: _service.hasNext ? _nextTrack : null,
             icon: Icon(
-              Icons.skip_next_rounded,
+              Symbols.skip_next_rounded,
               size: 30,
               color: _service.hasNext
                   ? Colors.white
@@ -1162,7 +1163,7 @@ class _PodcastPlayerScreenState extends State<PodcastPlayerScreen>
             onTap: _cues.isEmpty ? null : _toggleTranscript,
             active: _showTranscript,
             child: Icon(
-              Icons.closed_caption_rounded,
+              Symbols.closed_caption_rounded,
               size: 17,
               color: _showTranscript
                   ? playerBgTop

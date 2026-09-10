@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../theme/app_colors.dart';
@@ -103,7 +104,7 @@ class _NotificationsInboxScreenState extends State<NotificationsInboxScreen> {
                   GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
                     child: Icon(
-                      Icons.chevron_left_rounded,
+                      Symbols.chevron_left_rounded,
                       size: 30,
                       color: context.colors.textPrimary,
                     ),
@@ -128,7 +129,7 @@ class _NotificationsInboxScreenState extends State<NotificationsInboxScreen> {
                       ),
                     ),
                     child: Icon(
-                      Icons.settings_outlined,
+                      Symbols.settings_rounded,
                       size: 24,
                       color: context.colors.textPrimary,
                     ),
@@ -255,13 +256,13 @@ String _titleForType(String? type) {
 IconData _iconForType(String type) {
   switch (type) {
     case 'lesson_reminder':
-      return Icons.event_available_rounded;
+      return Symbols.event_available_rounded;
     case 'recommended_tutors':
-      return Icons.person_search_rounded;
+      return Symbols.person_search_rounded;
     case 'new_features':
-      return Icons.auto_awesome_rounded;
+      return Symbols.auto_awesome_rounded;
     default:
-      return Icons.notifications_rounded;
+      return Symbols.notifications_rounded;
   }
 }
 

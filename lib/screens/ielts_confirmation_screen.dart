@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../widgets/mock_test_styles.dart';
@@ -35,7 +36,7 @@ class IeltsConfirmationScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
         children: [
           Center(
-            child: Icon(Icons.check_circle_rounded, color: MockTestColors.green, size: 56),
+            child: Icon(Symbols.check_circle_rounded, color: MockTestColors.green, size: 56),
           ),
           const SizedBox(height: 16),
           const Center(

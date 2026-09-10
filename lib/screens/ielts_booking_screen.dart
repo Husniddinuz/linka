@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../services/ielts_registration_service.dart';
 import '../widgets/mock_test_styles.dart';
@@ -121,7 +122,7 @@ class _IeltsBookingScreenState extends State<IeltsBookingScreen> {
       return ListView(
         children: [
           const SizedBox(height: 80),
-          Icon(Icons.wifi_off_rounded, color: MockTestColors.greyLight, size: 40),
+          Icon(Symbols.wifi_off_rounded, color: MockTestColors.greyLight, size: 40),
           const SizedBox(height: 12),
           Center(
             child: Text(_error!, style: const TextStyle(fontFamily: 'SF Pro', color: MockTestColors.grey)),
@@ -190,7 +191,7 @@ class _SessionCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                MtAvatar(icon: Icons.event_rounded, size: 44),
+                MtAvatar(icon: Symbols.event_rounded, size: 44),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(

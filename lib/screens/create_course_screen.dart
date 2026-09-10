@@ -306,7 +306,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.chevron_left, color: colors.textPrimary, size: 28),
+          icon: Icon(Symbols.chevron_left_rounded, color: colors.textPrimary, size: 28),
         ),
         title: Text(
           _isEdit ? 'Edit course' : 'New course',
@@ -919,7 +919,7 @@ class _CoTutorPickerSheetState extends State<_CoTutorPickerSheet> {
                 decoration: InputDecoration(
                   hintText: 'Search tutors by name',
                   hintStyle: TextStyle(color: colors.textTertiary),
-                  prefixIcon: Icon(Icons.search, color: colors.textTertiary),
+                  prefixIcon: Icon(Symbols.search_rounded, color: colors.textTertiary),
                   filled: true,
                   fillColor: colors.surfaceAlt,
                   border: OutlineInputBorder(

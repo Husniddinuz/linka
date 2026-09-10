@@ -163,7 +163,7 @@ class _AffiliateScreenState extends State<AffiliateScreen> {
         scrolledUnderElevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.of(context).maybePop(),
-          icon: Icon(Icons.chevron_left, color: colors.textPrimary, size: 28),
+          icon: Icon(Symbols.chevron_left_rounded, color: colors.textPrimary, size: 28),
         ),
         title: Text(
           'Promo code',

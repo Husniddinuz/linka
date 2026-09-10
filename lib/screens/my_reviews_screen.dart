@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/cached_avatar.dart';
@@ -143,7 +144,7 @@ class _Header extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
-                Icons.chevron_left_rounded,
+                Symbols.chevron_left_rounded,
                 size: 24,
                 color: colors.textPrimary,
               ),
@@ -237,9 +238,8 @@ class _ReviewCard extends StatelessWidget {
                   children: List.generate(5, (i) => Padding(
                     padding: const EdgeInsets.only(right: 2),
                     child: Icon(
-                      i < rating
-                          ? Icons.star_rounded
-                          : Icons.star_outline_rounded,
+                      Symbols.star_rounded,
+                      fill: i < rating ? 1 : 0,
                       size: 20,
                       color: i < rating
                           ? colors.accentYellow
@@ -319,7 +319,7 @@ class _ReviewCard extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.edit_outlined,
+                              Symbols.edit_rounded,
                               size: 13,
                               color: colors.textSecondary,
                             ),
@@ -526,9 +526,8 @@ class _EditReviewSheetState extends State<_EditReviewSheet> {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 6),
                           child: Icon(
-                            filled
-                                ? Icons.star_rounded
-                                : Icons.star_outline_rounded,
+                            Symbols.star_rounded,
+                            fill: filled ? 1 : 0,
                             size: 40,
                             color: filled
                                 ? colors.accentYellow
@@ -710,7 +709,7 @@ class _EmptyState extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.star_outline_rounded,
+                Symbols.star_rounded,
                 size: 40,
                 color: Color(0xFFF5C542),
               ),

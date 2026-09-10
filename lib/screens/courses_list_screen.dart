@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../models/course.dart';
 import '../services/course_service.dart';
@@ -59,7 +60,7 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.chevron_left, color: colors.textPrimary, size: 28),
+          icon: Icon(Symbols.chevron_left_rounded, color: colors.textPrimary, size: 28),
         ),
         title: Text(
           'Courses',
@@ -112,7 +113,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.school_outlined, size: 56, color: colors.textTertiary),
+            Icon(Symbols.school_rounded, size: 56, color: colors.textTertiary),
             const SizedBox(height: 16),
             Text(
               'No courses available yet',

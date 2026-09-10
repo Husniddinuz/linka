@@ -4,6 +4,7 @@ import 'package:daily_flutter/daily_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../theme/app_colors.dart';
 
@@ -449,7 +450,7 @@ class _MeetingHeader extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.close, color: Colors.white, size: 20),
+              child: const Icon(Symbols.close_rounded, color: Colors.white, size: 20),
             ),
           ),
           const SizedBox(width: 12),
@@ -491,7 +492,7 @@ class _MeetingHeader extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  Icons.circle,
+                  Symbols.circle_rounded,
                   color: live ? const Color(0xFF27AE60) : Colors.grey,
                   size: 8,
                 ),
@@ -623,7 +624,7 @@ class _CameraOffView extends StatelessWidget {
                 color: const Color(0xFF1E2040),
                 border: Border.all(color: Colors.white24, width: 2),
               ),
-              child: const Icon(Icons.person, size: 56, color: Colors.white70),
+              child: const Icon(Symbols.person_rounded, size: 56, color: Colors.white70),
             ),
             const SizedBox(height: 14),
             Text(
@@ -639,7 +640,7 @@ class _CameraOffView extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  micOn ? Icons.mic : Icons.mic_off,
+                  micOn ? Symbols.mic_rounded : Symbols.mic_off_rounded,
                   size: 14,
                   color: micOn ? Colors.white54 : const Color(0xFFE53935),
                 ),
@@ -692,13 +693,13 @@ class _BottomControls extends StatelessWidget {
       child: Row(
         children: [
           _CircleButton(
-            icon: micOn ? Icons.mic : Icons.mic_off,
+            icon: micOn ? Symbols.mic_rounded : Symbols.mic_off_rounded,
             active: micOn,
             onTap: onToggleMic,
           ),
           const SizedBox(width: 12),
           _CircleButton(
-            icon: cameraOn ? Icons.videocam : Icons.videocam_off,
+            icon: cameraOn ? Symbols.videocam_rounded : Symbols.videocam_off_rounded,
             active: cameraOn,
             onTap: onToggleCamera,
           ),
@@ -710,7 +711,7 @@ class _BottomControls extends StatelessWidget {
                 clipBehavior: Clip.none,
                 children: [
                   _CircleButton(
-                    icon: Icons.chat_bubble_outline,
+                    icon: Symbols.chat_bubble_rounded,
                     active: true,
                     onTap: onChat,
                   ),
@@ -757,7 +758,7 @@ class _BottomControls extends StatelessWidget {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.call_end, color: Colors.white, size: 20),
+                  Icon(Symbols.call_end_rounded, color: Colors.white, size: 20),
                   SizedBox(width: 8),
                   Text(
                     'Leave',
@@ -932,7 +933,7 @@ class _ChatSheetState extends State<_ChatSheet> {
                           color: context.colors.brand,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.send, color: Colors.white, size: 20),
+                        child: const Icon(Symbols.send_rounded, color: Colors.white, size: 20),
                       ),
                     ),
                   ],

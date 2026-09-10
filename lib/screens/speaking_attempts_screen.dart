@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart' as ap;
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
 import '../widgets/speaking_report.dart';
 import '../widgets/writing_report.dart';
+import 'speaking_topics_screen.dart';
 
 /// Same cadence as the answer screen: marking takes about a minute, and three
 /// seconds is responsive without being a load.
@@ -52,7 +54,7 @@ class _SpeakingAttemptsScreenState extends State<SpeakingAttemptsScreen> {
           }
           if (snapshot.hasError || snapshot.data == null) {
             return _Message(
-              icon: Icons.cloud_off_rounded,
+              icon: Symbols.cloud_off_rounded,
               title: 'Answers unavailable',
               body: 'Your answers could not be loaded right now. Try again in a moment.',
               actionLabel: 'Try again',
@@ -63,12 +65,17 @@ class _SpeakingAttemptsScreenState extends State<SpeakingAttemptsScreen> {
           final attempts = snapshot.data!;
           if (attempts.isEmpty) {
             return _Message(
-              icon: Icons.mic_none_rounded,
+              icon: Symbols.mic_rounded,
               title: 'No answers yet',
-              body: 'Pick a tutor’s question, record your answer, and AI marks it '
+              body: 'Pick a question from any topic, record your answer, and AI marks it '
                   'against the band descriptors. Everything you send is kept here.',
               actionLabel: 'Find a question to answer',
-              onAction: () => Navigator.pop(context),
+              // Straight to the question bank, rather than back to whichever
+              // screen happened to open this one — the CTA promises a question.
+              onAction: () => Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const SpeakingTopicsScreen()),
+              ),
             );
           }
 
@@ -420,7 +427,7 @@ class _SpeakingAttemptScreenState extends State<SpeakingAttemptScreen> {
         }
         if (_attempt == null || (_failedToLoad && _attempt!['analysis'] == null)) {
           return _Message(
-            icon: Icons.cloud_off_rounded,
+            icon: Symbols.cloud_off_rounded,
             title: 'Report unavailable',
             body: 'This answer could not be loaded right now. Try again in a moment.',
             actionLabel: 'Try again',
@@ -438,7 +445,7 @@ class _SpeakingAttemptScreenState extends State<SpeakingAttemptScreen> {
         if (!_settled) return _PendingView(attempt: attempt);
         if (attempt['status']?.toString() == 'failed') {
           return _Message(
-            icon: Icons.error_outline_rounded,
+            icon: Symbols.error_rounded,
             title: 'We could not mark that answer',
             body: (attempt['error_message']?.toString() ?? '').trim().isNotEmpty
                 ? attempt['error_message'].toString()
@@ -480,7 +487,7 @@ class _SpeakingAttemptScreenState extends State<SpeakingAttemptScreen> {
               alignment: Alignment.center,
               decoration: BoxDecoration(color: wr.accent, shape: BoxShape.circle),
               child: Icon(
-                _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                _playing ? Symbols.pause_rounded : Symbols.play_arrow_rounded,
                 size: 24,
                 color: wr.isDark ? wr.bg : Colors.white,
               ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/random_test_picker.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/mock_test_access.dart';
@@ -68,14 +69,14 @@ class _MockExamsScreenState extends State<MockExamsScreen> {
         actions: [
           IconButton(
             tooltip: 'My progress',
-            icon: Icon(Icons.insights_rounded, color: context.colors.textPrimary),
+            icon: Icon(Symbols.insights_rounded, color: context.colors.textPrimary),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const StudentProgressScreen()),
             ),
           ),
           IconButton(
-            icon: Icon(Icons.history_rounded, color: context.colors.textPrimary),
+            icon: Icon(Symbols.history_rounded, color: context.colors.textPrimary),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const MockTestHistoryScreen()),
@@ -98,7 +99,7 @@ class _MockExamsScreenState extends State<MockExamsScreen> {
           ),
           const SizedBox(height: 12),
           _ExamTypeButton(
-            icon: Icons.menu_book_rounded,
+            icon: Symbols.menu_book_rounded,
             title: 'Reading',
             subtitle: '28 practice tests · 60 min each',
             onTap: () => Navigator.push(
@@ -108,7 +109,7 @@ class _MockExamsScreenState extends State<MockExamsScreen> {
           ),
           const SizedBox(height: 12),
           _ExamTypeButton(
-            icon: Icons.headphones_rounded,
+            icon: Symbols.headphones_rounded,
             title: 'Listening',
             subtitle: '25 practice tests · 40 min each',
             onTap: () => Navigator.push(
@@ -118,7 +119,7 @@ class _MockExamsScreenState extends State<MockExamsScreen> {
           ),
           const SizedBox(height: 12),
           _ExamTypeButton(
-            icon: Icons.edit_note_rounded,
+            icon: Symbols.edit_note_rounded,
             title: 'Writing',
             subtitle: 'Task 1 & Task 2 · graded by AI',
             onTap: () => Navigator.push(
@@ -128,7 +129,7 @@ class _MockExamsScreenState extends State<MockExamsScreen> {
           ),
           const SizedBox(height: 12),
           _ExamTypeButton(
-            icon: Icons.mic_rounded,
+            icon: Symbols.mic_rounded,
             title: 'Speaking',
             subtitle: 'Practise live with a tutor',
             onTap: () => Navigator.push(
@@ -140,7 +141,7 @@ class _MockExamsScreenState extends State<MockExamsScreen> {
           // Under Speaking: it answers the same want at the hours when no
           // tutor is free, which is most of them.
           _ExamTypeButton(
-            icon: Icons.auto_awesome_rounded,
+            icon: Symbols.auto_awesome_rounded,
             title: 'AI Coach',
             subtitle: 'Talk out loud · scored sound by sound',
             onTap: () => Navigator.push(
@@ -199,7 +200,7 @@ class _ExamTypeButton extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: context.colors.textTertiary),
+            Icon(Symbols.chevron_right_rounded, color: context.colors.textTertiary),
           ],
         ),
       ),

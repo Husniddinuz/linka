@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../models/mock_test.dart';
 import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
@@ -66,7 +67,7 @@ class _MockTestHistoryScreenState extends State<MockTestHistoryScreen>
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, i) {
                   final a = attempts[i];
-                  final icon = a.testType == 'listening' ? Icons.headphones_rounded : Icons.menu_book_rounded;
+                  final icon = a.testType == 'listening' ? Symbols.headphones_rounded : Symbols.menu_book_rounded;
                   return _HistoryRow(
                     icon: icon,
                     title: a.testTitle,
@@ -97,7 +98,7 @@ class _MockTestHistoryScreenState extends State<MockTestHistoryScreen>
                   final a = attempts[i];
                   final prompt = (a['prompt'] as Map?) ?? const {};
                   return _HistoryRow(
-                    icon: Icons.edit_note_rounded,
+                    icon: Symbols.edit_note_rounded,
                     title: prompt['title']?.toString() ?? '',
                     subtitle: '${a['word_count']} words · ${a['status']}',
                     band: a['overall_band'] != null ? '${a['overall_band']}' : '-',

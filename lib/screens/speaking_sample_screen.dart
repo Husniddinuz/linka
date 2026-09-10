@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../services/podcast_playback_service.dart';
 import '../services/subtitle_service.dart';
@@ -407,7 +408,7 @@ class _SpeakingSampleTutorScreenState extends State<SpeakingSampleTutorScreen> {
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 30),
+            icon: const Icon(Symbols.keyboard_arrow_down_rounded, color: Colors.white, size: 30),
           ),
           Expanded(
             child: Column(
@@ -565,8 +566,8 @@ class _SpeakingSampleTutorScreenState extends State<SpeakingSampleTutorScreen> {
                     const Spacer(),
                     Icon(
                       _questionExpanded
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
+                          ? Symbols.keyboard_arrow_up_rounded
+                          : Symbols.keyboard_arrow_down_rounded,
                       size: 18,
                       color: Colors.white.withValues(alpha: 0.5),
                     ),
@@ -664,7 +665,7 @@ class _SpeakingSampleTutorScreenState extends State<SpeakingSampleTutorScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.event_available_rounded, size: 16, color: playerBgTop),
+                    const Icon(Symbols.event_available_rounded, size: 16, color: playerBgTop),
                     const SizedBox(width: 7),
                     Text(
                       name.isEmpty ? 'Book a lesson' : 'Book a lesson with $name',
@@ -847,7 +848,7 @@ class _SpeakingSampleTutorScreenState extends State<SpeakingSampleTutorScreen> {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.vertical_align_center_rounded, size: 15, color: playerBgTop),
+                      Icon(Symbols.vertical_align_center_rounded, size: 15, color: playerBgTop),
                       SizedBox(width: 6),
                       Text(
                         'Jump to current',
@@ -958,7 +959,7 @@ class _SpeakingSampleTutorScreenState extends State<SpeakingSampleTutorScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2.5, color: playerBgTop),
                   )
                 : Icon(
-                    _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    _playing ? Symbols.pause_rounded : Symbols.play_arrow_rounded,
                     color: playerBgTop,
                     size: 36,
                   ),
@@ -1006,8 +1007,8 @@ class _SpeakingSampleTutorScreenState extends State<SpeakingSampleTutorScreen> {
             label: _showTranscript ? 'Transcript' : 'Tutor',
             child: Icon(
               _showTranscript
-                  ? Icons.closed_caption_rounded
-                  : Icons.person_rounded,
+                  ? Symbols.closed_caption_rounded
+                  : Symbols.person_rounded,
               size: 17,
               color: _showTranscript ? playerBgTop : Colors.white.withValues(alpha: 0.75),
             ),
@@ -1020,7 +1021,7 @@ class _SpeakingSampleTutorScreenState extends State<SpeakingSampleTutorScreen> {
             onTap: _openAnswerScreen,
             active: true,
             label: 'Try yourself',
-            child: const Icon(Icons.mic_rounded, size: 17, color: playerBgTop),
+            child: const Icon(Symbols.mic_rounded, size: 17, color: playerBgTop),
           ),
           _utilityButton(
             onTap: _showSpeedSheet,
@@ -1086,7 +1087,7 @@ class _AvatarFallback extends StatelessWidget {
     return Container(
       color: Colors.white.withValues(alpha: 0.1),
       alignment: Alignment.center,
-      child: Icon(Icons.person_rounded, color: Colors.white.withValues(alpha: 0.5), size: 56),
+      child: Icon(Symbols.person_rounded, color: Colors.white.withValues(alpha: 0.5), size: 56),
     );
   }
 }

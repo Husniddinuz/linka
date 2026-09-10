@@ -6,6 +6,7 @@ import '../widgets/cached_avatar.dart';
 import 'crop_screen.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/token_service.dart';
@@ -470,7 +471,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             automaticallyImplyLeading: false,
             leading: IconButton(
               icon: Icon(
-                Icons.arrow_back_ios_rounded,
+                Symbols.arrow_back_ios_rounded,
                 color: context.colors.textPrimary,
                 size: 20,
               ),
@@ -696,7 +697,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                           _UploadButton(
                             onTap: _pickCertificate,
                             label: 'Upload IELTS certificate',
-                            icon: Icons.description_outlined,
+                            icon: Symbols.description_rounded,
                           ),
 
                         const SizedBox(height: 10),
@@ -710,7 +711,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                           _UploadButton(
                             onTap: _pickIntroVideo,
                             label: 'Upload intro video',
-                            icon: Icons.videocam_outlined,
+                            icon: Symbols.videocam_rounded,
                           ),
 
                         const SizedBox(height: 8),
@@ -718,7 +719,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Icon(
-                              Icons.screen_rotation_outlined,
+                              Symbols.screen_rotation_rounded,
                               size: 14,
                               color: context.colors.textTertiary,
                             ),
@@ -943,7 +944,7 @@ class _DropdownField extends StatelessWidget {
               ),
             const SizedBox(width: 8),
             Icon(
-              Icons.keyboard_arrow_down_rounded,
+              Symbols.keyboard_arrow_down_rounded,
               color: context.colors.textTertiary,
               size: 22,
             ),
@@ -964,7 +965,7 @@ class _UploadButton extends StatelessWidget {
   const _UploadButton({
     required this.onTap,
     this.label = 'Upload file',
-    this.icon = Icons.file_upload_outlined,
+    this.icon = Symbols.file_upload_rounded,
   });
 
   @override
@@ -1011,7 +1012,7 @@ class _UploadButton extends StatelessWidget {
                 ),
               ),
               Icon(
-                Icons.arrow_forward_ios_rounded,
+                Symbols.arrow_forward_ios_rounded,
                 color: context.colors.textTertiary,
                 size: 14,
               ),
@@ -1096,7 +1097,7 @@ class _OverallScoreCard extends StatelessWidget {
       child: Row(
         children: [
           const Icon(
-            Icons.auto_awesome_rounded,
+            Symbols.auto_awesome_rounded,
             color: Colors.white,
             size: 18,
           ),
@@ -1240,7 +1241,7 @@ class _PhotoPicker extends StatelessWidget {
               border: Border.all(color: context.colors.surface, width: 3),
             ),
             child: const Icon(
-              Icons.camera_alt_rounded,
+              Symbols.camera_alt_rounded,
               color: Colors.white,
               size: 16,
             ),
@@ -1283,7 +1284,7 @@ class _PriceRow extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  Icons.schedule_rounded,
+                  Symbols.schedule_rounded,
                   size: 15,
                   color: context.colors.textPrimary,
                 ),
@@ -1399,7 +1400,7 @@ class _VideoUploadOverlay extends StatelessWidget {
                         color: const Color(0xFF1E2035),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.videocam_rounded,
+                      child: const Icon(Symbols.videocam_rounded,
                           color: Colors.white, size: 24),
                     ),
                     const SizedBox(width: 12),
@@ -1473,7 +1474,7 @@ class _VideoUploadOverlay extends StatelessWidget {
                   child: const Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.warning_amber_rounded,
+                      Icon(Symbols.warning_amber_rounded,
                           color: Color(0xFFE69A19), size: 18),
                       SizedBox(width: 8),
                       Expanded(
@@ -1524,7 +1525,7 @@ class _UploadedFileCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
-              Icons.description_outlined,
+              Symbols.description_rounded,
               color: Colors.white,
               size: 22,
             ),
@@ -1556,7 +1557,7 @@ class _UploadedFileCard extends StatelessWidget {
             onTap: onRemove,
             child: const Padding(
               padding: EdgeInsets.all(4),
-              child: Icon(Icons.close, color: Colors.white, size: 18),
+              child: Icon(Symbols.close_rounded, color: Colors.white, size: 18),
             ),
           ),
         ],
@@ -1616,7 +1617,7 @@ class _DropdownSheet extends StatelessWidget {
               GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Icon(
-                  Icons.close,
+                  Symbols.close_rounded,
                   color: context.colors.textPrimary,
                   size: 22,
                 ),

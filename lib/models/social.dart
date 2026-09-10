@@ -162,6 +162,10 @@ class SocialProfile {
   final bool isFollowing;
   final bool isFollowedBy;
 
+  /// True while this account's Plus subscription is live — the badge on the
+  /// profile header. Absent from older backends, which reads as no badge.
+  final bool isPlus;
+
   /// False means the story endpoints will answer 403. Render the locked state
   /// rather than firing a request already known to be refused.
   final bool canViewStories;
@@ -182,6 +186,7 @@ class SocialProfile {
     this.isMe = false,
     this.isFollowing = false,
     this.isFollowedBy = false,
+    this.isPlus = false,
     this.canViewStories = false,
   });
 
@@ -207,6 +212,7 @@ class SocialProfile {
         isMe: json['is_me'] as bool? ?? false,
         isFollowing: json['is_following'] as bool? ?? false,
         isFollowedBy: json['is_followed_by'] as bool? ?? false,
+        isPlus: json['is_plus'] as bool? ?? false,
         canViewStories: json['can_view_stories'] as bool? ?? false,
       );
 
@@ -232,6 +238,7 @@ class SocialProfile {
         isMe: isMe,
         isFollowing: isFollowing ?? this.isFollowing,
         isFollowedBy: isFollowedBy,
+        isPlus: isPlus,
         canViewStories: canViewStories ?? this.canViewStories,
       );
 }

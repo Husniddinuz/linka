@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:video_player/video_player.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../services/api_constants.dart';
@@ -352,7 +353,7 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
         children: [
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
-            child: Icon(Icons.chevron_left_rounded, size: 30, color: context.colors.textPrimary),
+            child: Icon(Symbols.chevron_left_rounded, size: 30, color: context.colors.textPrimary),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -408,7 +409,7 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
           const Padding(
             padding: EdgeInsets.all(8),
             child: Icon(
-              Icons.fullscreen_rounded,
+              Symbols.fullscreen_rounded,
               color: Colors.white,
               size: 28,
               shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
@@ -502,7 +503,7 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.mic_off_rounded, size: 14, color: context.colors.textTertiary),
+                  Icon(Symbols.mic_off_rounded, size: 14, color: context.colors.textTertiary),
                   const SizedBox(width: 4),
                   Text(
                     'View only',
@@ -565,8 +566,8 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
             const Spacer(),
             Icon(
               _chatExpanded
-                  ? Icons.keyboard_arrow_down_rounded
-                  : Icons.keyboard_arrow_up_rounded,
+                  ? Symbols.keyboard_arrow_down_rounded
+                  : Symbols.keyboard_arrow_up_rounded,
               color: context.colors.textPrimary,
               size: 20,
             ),
@@ -661,7 +662,7 @@ class _WebinarViewerScreenState extends State<WebinarViewerScreen> {
                     : context.colors.brand,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+              child: const Icon(Symbols.send_rounded, color: Colors.white, size: 18),
             ),
           ),
         ],
@@ -701,7 +702,7 @@ class _LiveBadge extends StatelessWidget {
           const SizedBox(width: 6),
           Row(
             children: [
-              Icon(Icons.visibility_outlined, size: 13, color: context.colors.textTertiary),
+              Icon(Symbols.visibility_rounded, size: 13, color: context.colors.textTertiary),
               const SizedBox(width: 3),
               Text(
                 '$viewerCount',
@@ -749,7 +750,7 @@ class _VideoErrorPlaceholder extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.signal_wifi_bad_rounded, color: Color(0xFFF5C542), size: 40),
+            const Icon(Symbols.signal_wifi_bad_rounded, color: Color(0xFFF5C542), size: 40),
             const SizedBox(height: 10),
             const Text(
               'Stream unavailable',
@@ -810,7 +811,7 @@ class _UpcomingVideoPlaceholder extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.live_tv_rounded, color: Color(0xFFF5C542), size: 44),
+            const Icon(Symbols.live_tv_rounded, color: Color(0xFFF5C542), size: 44),
             const SizedBox(height: 12),
             const Text(
               'Session starts at',
@@ -881,7 +882,7 @@ class _FullscreenVideoScreenState extends State<_FullscreenVideoScreen> {
                       IconButton(
                         onPressed: () => Navigator.of(context).pop(),
                         icon: const Icon(
-                          Icons.fullscreen_exit_rounded,
+                          Symbols.fullscreen_exit_rounded,
                           color: Colors.white,
                           size: 28,
                           shadows: [Shadow(color: Colors.black54, blurRadius: 6)],

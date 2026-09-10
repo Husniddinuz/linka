@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../theme/app_colors.dart';
 
 class NumKey extends StatelessWidget {
@@ -22,7 +23,7 @@ class NumKey extends StatelessWidget {
         ),
         child: label == '⌫'
             ? Icon(
-                Icons.backspace_outlined,
+                Symbols.backspace_rounded,
                 color: context.colors.textPrimary,
                 size: 22,
               )

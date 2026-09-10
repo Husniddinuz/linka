@@ -48,6 +48,17 @@ class MockTestService {
     return ApiService.post('/writing-prompts/$promptId/submit/', {'essay_text': essayText});
   }
 
+  /// Answers the task a published Writing sample answers, and grades it.
+  ///
+  /// Returns the same graded attempt shape as [submitWriting] — the server
+  /// mirrors the sample's task into a hidden prompt, so the answer lands in
+  /// `/writing-attempts/` and spends the same free quota. A sample the student
+  /// cannot open is one they cannot answer: this 403s on the same Plus window
+  /// as reading it does.
+  static Future<Map<String, dynamic>> submitWritingSampleAnswer(int sampleId, String essayText) {
+    return ApiService.post('/writing-samples/$sampleId/submit/', {'essay_text': essayText});
+  }
+
   static Future<List<Map<String, dynamic>>> fetchWritingAttempts() async {
     final data = await ApiService.getList('/writing-attempts/');
     return data.cast<Map<String, dynamic>>();
@@ -79,16 +90,32 @@ class MockTestService {
   /// Speaking sample answers, each covering Part 1/2/3 (some tutors may only
   /// have 2 of the 3 parts). Optionally scoped to a single tutor via
   /// [tutorId] (preferred) or [tutorName] (for admin-authored samples with no
-  /// real tutor account, where `tutor_id` is null).
+  /// real tutor account, where `tutor_id` is null), or to a single curated
+  /// topic via [topicId] — every tutor's take on the same question.
   static Future<List<Map<String, dynamic>>> fetchSpeakingSamples({
     int? tutorId,
     String? tutorName,
+    int? topicId,
   }) async {
     final params = <String>[];
     if (tutorId != null) params.add('tutor_id=$tutorId');
     if (tutorName != null) params.add('tutor_name=${Uri.encodeQueryComponent(tutorName)}');
+    if (topicId != null) params.add('topic_id=$topicId');
     final qs = params.isNotEmpty ? '?${params.join('&')}' : '';
     final data = await ApiService.getList('/speaking-samples/$qs');
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  /// The whole curated Speaking topic bank — every topic with its Part 1/2/3
+  /// questions and `sample_count`, the number of tutors who recorded an answer
+  /// to it.
+  ///
+  /// This is the question library behind the samples, and unlike the samples it
+  /// is not Plus-gated: what Plus buys is a tutor's recording, not the
+  /// examiner's question. Answering one still spends the AI marking quota (see
+  /// [fetchSpeakingAnswerQuota]), which is the budget that costs money.
+  static Future<List<Map<String, dynamic>>> fetchSpeakingTopics() async {
+    final data = await ApiService.getList('/speaking-topics/');
     return data.cast<Map<String, dynamic>>();
   }
 
@@ -149,6 +176,24 @@ class MockTestService {
   }) {
     return ApiService.postMultipart(
       '/speaking-sample-parts/$partId/submit/',
+      files: {'audio_file': audio},
+      fields: {'duration_seconds': '$durationSeconds'},
+    );
+  }
+
+  /// The same as [submitSpeakingAnswer], for a question picked straight out of
+  /// the topic bank rather than from under a tutor's recording.
+  ///
+  /// [partId] is a *topic* part id — the ids in a topic's `parts` and the ids
+  /// in a sample's `parts` come from different tables and are not
+  /// interchangeable, which is why this is a separate call rather than a flag.
+  static Future<Map<String, dynamic>> submitSpeakingTopicAnswer({
+    required int partId,
+    required File audio,
+    required int durationSeconds,
+  }) {
+    return ApiService.postMultipart(
+      '/speaking-topic-parts/$partId/submit/',
       files: {'audio_file': audio},
       fields: {'duration_seconds': '$durationSeconds'},
     );

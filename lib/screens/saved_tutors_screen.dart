@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import 'tutor_profile_screen.dart';
@@ -61,7 +62,7 @@ class _SavedTutorsScreenState extends State<SavedTutorsScreen> {
                   GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
                     child: Icon(
-                      Icons.chevron_left_rounded,
+                      Symbols.chevron_left_rounded,
                       size: 30,
                       color: context.colors.textPrimary,
                     ),
@@ -204,12 +205,12 @@ class _SavedTutorCard extends StatelessWidget {
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) => Container(
                         color: context.colors.border,
-                        child: Icon(Icons.person, size: 40, color: context.colors.textTertiary),
+                        child: Icon(Symbols.person_rounded, size: 40, color: context.colors.textTertiary),
                       ),
                     )
                   : Container(
                       color: context.colors.border,
-                      child: Icon(Icons.person, size: 40, color: context.colors.textTertiary),
+                      child: Icon(Symbols.person_rounded, size: 40, color: context.colors.textTertiary),
                     ),
             ),
           ),

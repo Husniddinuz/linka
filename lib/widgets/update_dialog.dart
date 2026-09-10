@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/update_service.dart';
@@ -87,7 +88,7 @@ class _UpdateDialog extends StatelessWidget {
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(
-                                Icons.close_rounded,
+                                Symbols.close_rounded,
                                 color: Colors.white,
                                 size: 16,
                               ),

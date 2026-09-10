@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -805,7 +806,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
             onTap: () => Navigator.of(context).pop(),
             child: const Padding(
               padding: EdgeInsets.all(4),
-              child: Icon(Icons.chevron_left_rounded,
+              child: Icon(Symbols.chevron_left_rounded,
                   size: 24, color: Colors.white),
             ),
           ),
@@ -833,7 +834,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded,
+            const Icon(Symbols.error_rounded,
                 size: 44, color: Colors.white38),
             const SizedBox(height: 12),
             Text(
@@ -916,7 +917,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.remove_red_eye_outlined,
+                    const Icon(Symbols.remove_red_eye_rounded,
                         size: 12, color: Colors.white70),
                     const SizedBox(width: 4),
                     Text(
@@ -998,7 +999,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.shield_outlined, size: 15, color: color),
+              Icon(Symbols.shield_rounded, size: 15, color: color),
               const SizedBox(width: 5),
               Flexible(
                 child: Text(
@@ -1120,7 +1121,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
               color: color.withValues(alpha: 0.9),
             ),
             child:
-                const Icon(Icons.mic_rounded, size: 16, color: Colors.white),
+                const Icon(Symbols.mic_rounded, size: 16, color: Colors.white),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -1167,7 +1168,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
             color: _micOn ? _cLive : Colors.white.withValues(alpha: 0.12),
           ),
           child: Icon(
-            _micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
+            _micOn ? Symbols.mic_rounded : Symbols.mic_off_rounded,
             size: 16,
             color: Colors.white,
           ),
@@ -1264,7 +1265,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
                         const SizedBox(width: 10),
                         GestureDetector(
                           onTap: _seedRosterFromState,
-                          child: Icon(Icons.refresh_rounded,
+                          child: Icon(Symbols.refresh_rounded,
                               size: 20, color: context.colors.textPrimary),
                         ),
                       ],
@@ -1472,7 +1473,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
                         ),
                       ),
                     )
-                  : const Icon(Icons.arrow_upward_rounded,
+                  : const Icon(Symbols.arrow_upward_rounded,
                       color: Colors.white, size: 20),
             ),
           ),
@@ -1500,7 +1501,7 @@ class _DebateRoomScreenState extends State<DebateRoomScreen> {
           child: const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.groups_rounded, size: 18, color: Colors.white),
+              Icon(Symbols.groups_rounded, size: 18, color: Colors.white),
               SizedBox(width: 8),
               Text(
                 'Manage',

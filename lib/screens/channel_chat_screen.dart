@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -21,6 +22,8 @@ import '../services/podcast_playback_service.dart';
 import '../services/user_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
+import '../widgets/phone_call_icon.dart';
+import '../widgets/plus_badge.dart';
 import '../widgets/skeleton.dart';
 import 'plus_subscription_screen.dart';
 import 'video_call_screen.dart';
@@ -1806,24 +1809,36 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
       scrolledUnderElevation: 0,
       leadingWidth: 48,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+        icon: const Icon(Symbols.arrow_back_ios_new_rounded, size: 18),
         color: context.colors.textPrimary,
         onPressed: () => Navigator.pop(context),
       ),
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            // A person, not a room: no emoji tile and no leading hash.
-            widget.direct != null
-                ? widget.direct!.displayName
-                : '${widget.channel.emoji}  ${widget.channel.name}',
-            style: TextStyle(
-              fontFamily: 'SF Pro',
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: context.colors.textPrimary,
-            ),
+          Row(
+            children: [
+              Flexible(
+                child: Text(
+                  // A person, not a room: no emoji tile and no leading hash.
+                  widget.direct != null
+                      ? widget.direct!.displayName
+                      : '${widget.channel.emoji}  ${widget.channel.name}',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: context.colors.textPrimary,
+                  ),
+                ),
+              ),
+              // Their badge, not yours: it says who you are talking to.
+              if (widget.direct?.isPlus == true) ...[
+                const SizedBox(width: 6),
+                const PlusBadge(compact: true),
+              ],
+            ],
           ),
           Text(
             widget.direct != null
@@ -1850,11 +1865,10 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         // closes it — the server says which, and the tap just relays.
         if (widget.direct != null && !widget.direct!.isBlocked)
           IconButton(
-            icon: Icon(
-              Icons.videocam_rounded,
-              size: 24,
-              color: context.colors.textPrimary,
-            ),
+            // A handset, not a camera: this is the "call this person" control,
+            // and the camera silhouette read as "record a video" to enough
+            // students that they never tapped it.
+            icon: PhoneCallIcon(size: 24, color: context.colors.textPrimary),
             tooltip: 'Video call',
             onPressed: _startVideoCall,
           ),
@@ -1863,7 +1877,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
         if (widget.direct != null)
           PopupMenuButton<String>(
             icon: Icon(
-              Icons.more_vert_rounded,
+              Symbols.more_vert_rounded,
               size: 20,
               color: context.colors.textSecondary,
             ),
@@ -1877,7 +1891,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen>
                 child: Row(
                   children: [
                     Icon(
-                      Icons.delete_outline_rounded,
+                      Symbols.delete_rounded,
                       size: 20,
                       color: context.colors.error,
                     ),
@@ -2217,7 +2231,7 @@ class _MessageBubble extends StatelessWidget {
           children: [
             if (canPin)
               ListTile(
-                leading: Icon(Icons.push_pin_outlined, color: context.colors.textPrimary),
+                leading: Icon(Symbols.push_pin_rounded, color: context.colors.textPrimary),
                 title: Text(
                   'Pin message',
                   style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textPrimary),
@@ -2229,7 +2243,7 @@ class _MessageBubble extends StatelessWidget {
               ),
             if (canUnpin)
               ListTile(
-                leading: Icon(Icons.push_pin, color: context.colors.textPrimary),
+                leading: Icon(Symbols.push_pin_rounded, color: context.colors.textPrimary),
                 title: Text(
                   'Unpin message',
                   style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textPrimary),
@@ -2244,7 +2258,7 @@ class _MessageBubble extends StatelessWidget {
             if (canMessage)
               ListTile(
                 leading: Icon(
-                  Icons.chat_bubble_outline_rounded,
+                  Symbols.chat_bubble_rounded,
                   color: context.colors.textPrimary,
                 ),
                 title: Text(
@@ -2261,7 +2275,7 @@ class _MessageBubble extends StatelessWidget {
               ),
             if (canReply)
               ListTile(
-                leading: Icon(Icons.reply_rounded, color: context.colors.textPrimary),
+                leading: Icon(Symbols.reply_rounded, color: context.colors.textPrimary),
                 title: Text(
                   'Reply',
                   style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textPrimary),
@@ -2273,7 +2287,7 @@ class _MessageBubble extends StatelessWidget {
               ),
             if (canDelete)
               ListTile(
-                leading: Icon(Icons.delete_outline_rounded, color: context.colors.error),
+                leading: Icon(Symbols.delete_rounded, color: context.colors.error),
                 title: Text(
                   'Delete',
                   style: TextStyle(fontFamily: 'SF Pro', color: context.colors.error),
@@ -2285,7 +2299,7 @@ class _MessageBubble extends StatelessWidget {
               ),
             if (canReport)
               ListTile(
-                leading: Icon(Icons.flag_outlined, color: context.colors.textPrimary),
+                leading: Icon(Symbols.flag_rounded, color: context.colors.textPrimary),
                 title: Text(
                   'Report',
                   style: TextStyle(fontFamily: 'SF Pro', color: context.colors.textPrimary),
@@ -2297,7 +2311,7 @@ class _MessageBubble extends StatelessWidget {
               ),
             if (canBlock)
               ListTile(
-                leading: Icon(Icons.block, color: context.colors.error),
+                leading: Icon(Symbols.block_rounded, color: context.colors.error),
                 title: Text(
                   'Block sender',
                   style: TextStyle(fontFamily: 'SF Pro', color: context.colors.error),
@@ -2587,7 +2601,7 @@ class _ReplyBlock extends StatelessWidget {
       content = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.image_outlined, size: 13, color: textColor),
+          Icon(Symbols.image_rounded, size: 13, color: textColor),
           const SizedBox(width: 4),
           Text(
             'Image',
@@ -2599,7 +2613,7 @@ class _ReplyBlock extends StatelessWidget {
       content = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.mic_rounded, size: 13, color: textColor),
+          Icon(Symbols.mic_rounded, size: 13, color: textColor),
           const SizedBox(width: 4),
           Text(
             'Voice message',
@@ -2689,7 +2703,7 @@ class _ReplyBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.reply_rounded, size: 18, color: context.colors.accentBlue),
+          Icon(Symbols.reply_rounded, size: 18, color: context.colors.accentBlue),
           const SizedBox(width: 10),
           Container(
             width: 3,
@@ -2732,7 +2746,7 @@ class _ReplyBar extends StatelessWidget {
             onTap: onDismiss,
             child: Padding(
               padding: const EdgeInsets.all(4),
-              child: Icon(Icons.close_rounded, size: 18, color: context.colors.textTertiary),
+              child: Icon(Symbols.close_rounded, size: 18, color: context.colors.textTertiary),
             ),
           ),
         ],
@@ -2775,7 +2789,7 @@ class _PinnedBanner extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(Icons.push_pin_rounded, size: 16, color: context.colors.accentBlue),
+            Icon(Symbols.push_pin_rounded, size: 16, color: context.colors.accentBlue),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -2810,7 +2824,7 @@ class _PinnedBanner extends StatelessWidget {
                 onTap: onUnpin,
                 child: Padding(
                   padding: const EdgeInsets.all(4),
-                  child: Icon(Icons.close_rounded, size: 18, color: context.colors.textTertiary),
+                  child: Icon(Symbols.close_rounded, size: 18, color: context.colors.textTertiary),
                 ),
               ),
           ],
@@ -2991,7 +3005,7 @@ class _ImageBubble extends StatelessWidget {
                         alignment: Alignment.center,
                         color: context.colors.surfaceAlt,
                         child: Icon(
-                          Icons.broken_image_outlined,
+                          Symbols.broken_image_rounded,
                           color: context.colors.textTertiary,
                           size: 32,
                         ),
@@ -3158,10 +3172,10 @@ class _VoiceBubbleState extends State<_VoiceBubble> {
                     ),
                     child: Icon(
                       downloading
-                          ? Icons.hourglass_empty_rounded
+                          ? Symbols.hourglass_empty_rounded
                           : isPlaying
-                              ? Icons.pause_rounded
-                              : Icons.play_arrow_rounded,
+                              ? Symbols.pause_rounded
+                              : Symbols.play_arrow_rounded,
                       color: fg,
                       size: 18,
                     ),
@@ -3271,18 +3285,18 @@ class _TextInputBar extends StatelessWidget {
         children: [
           if (onCreateQuiz != null)
             IconButton(
-              icon: Icon(Icons.poll, color: context.colors.textTertiary),
+              icon: Icon(Symbols.poll_rounded, color: context.colors.textTertiary),
               onPressed: onCreateQuiz,
               tooltip: 'Create Quiz',
             ),
           if (onAudioLibrary != null)
             IconButton(
-              icon: Icon(Icons.headphones, color: context.colors.textTertiary),
+              icon: Icon(Symbols.headphones_rounded, color: context.colors.textTertiary),
               onPressed: onAudioLibrary,
               tooltip: 'Send MP3 file',
             ),
           IconButton(
-            icon: Icon(Icons.image_outlined, color: context.colors.textTertiary),
+            icon: Icon(Symbols.image_rounded, color: context.colors.textTertiary),
             onPressed: onImagePick,
             tooltip: 'Send image',
           ),
@@ -3330,7 +3344,7 @@ class _TextInputBar extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.send_rounded,
+                Symbols.send_rounded,
                 color: context.colors.onBrand,
                 size: 18,
               ),
@@ -3405,7 +3419,7 @@ class _VoiceInputBar extends StatelessWidget {
                 if (onCreateQuiz != null)
                   TextButton.icon(
                     onPressed: onCreateQuiz,
-                    icon: const Icon(Icons.poll, size: 16),
+                    icon: const Icon(Symbols.poll_rounded, size: 16),
                     label: const Text('Quiz'),
                     style: TextButton.styleFrom(
                       foregroundColor: context.colors.textSecondary,
@@ -3418,7 +3432,7 @@ class _VoiceInputBar extends StatelessWidget {
                 if (onAudioLibrary != null)
                   TextButton.icon(
                     onPressed: onAudioLibrary,
-                    icon: const Icon(Icons.headphones, size: 16),
+                    icon: const Icon(Symbols.headphones_rounded, size: 16),
                     label: const Text('MP3 file'),
                     style: TextButton.styleFrom(
                       foregroundColor: context.colors.textSecondary,
@@ -3477,7 +3491,7 @@ class _VoiceInputBar extends StatelessWidget {
                 ],
               ),
               child: Icon(
-                isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+                isRecording ? Symbols.stop_rounded : Symbols.mic_rounded,
                 color: Colors.white,
                 size: isRecording ? 30 : 26,
               ),
@@ -3522,7 +3536,7 @@ class _VoiceInputBar extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _PreviewBtn(
-                icon: Icons.delete_outline_rounded,
+                icon: Symbols.delete_rounded,
                 iconColor: context.colors.error,
                 bg: context.colors.error,
                 bgAlpha: 0.1,
@@ -3533,8 +3547,8 @@ class _VoiceInputBar extends StatelessWidget {
               const SizedBox(width: 24),
               _PreviewBtn(
                 icon: previewPlaying
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded,
+                    ? Symbols.pause_rounded
+                    : Symbols.play_arrow_rounded,
                 iconColor: Colors.white,
                 bg: previewPlaying
                     ? context.colors.accentBlue
@@ -3546,7 +3560,7 @@ class _VoiceInputBar extends StatelessWidget {
               ),
               const SizedBox(width: 24),
               _PreviewBtn(
-                icon: Icons.send_rounded,
+                icon: Symbols.send_rounded,
                 iconColor: Colors.white,
                 bg: context.colors.brand,
                 size: 50,
@@ -3700,7 +3714,7 @@ class _AnnouncementBar extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.lock_outline_rounded,
+            Symbols.lock_rounded,
             size: 14,
             color: context.colors.textTertiary,
           ),
@@ -3745,7 +3759,7 @@ class _ReadOnlyBanner extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            blocked ? Icons.block_rounded : Icons.lock_outline_rounded,
+            blocked ? Symbols.block_rounded : Symbols.lock_rounded,
             size: 14,
             color: context.colors.textTertiary,
           ),
@@ -3877,8 +3891,8 @@ class _QuizBubble extends StatelessWidget {
             if (locked && quiz.hasAnswered) {
               leadIcon = Icon(
                 isCorrect == true
-                    ? Icons.check_circle_rounded
-                    : Icons.cancel_rounded,
+                    ? Symbols.check_circle_rounded
+                    : Symbols.cancel_rounded,
                 size: 18,
                 color: isCorrect == true
                     ? context.colors.success
@@ -3886,7 +3900,7 @@ class _QuizBubble extends StatelessWidget {
               );
             } else {
               leadIcon = Icon(
-                Icons.radio_button_unchecked_rounded,
+                Symbols.radio_button_unchecked_rounded,
                 size: 18,
                 color: isPending
                     ? context.colors.accentBlue
@@ -4118,7 +4132,7 @@ class _CreateQuizSheetState extends State<_CreateQuizSheet> {
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: Icon(Icons.close_rounded,
+                  icon: Icon(Symbols.close_rounded,
                       color: context.colors.textTertiary),
                   onPressed: () => Navigator.pop(context),
                 ),
@@ -4230,7 +4244,7 @@ class _CreateQuizSheetState extends State<_CreateQuizSheet> {
                                 ),
                               ),
                               child: isCorrect
-                                  ? const Icon(Icons.check_rounded,
+                                  ? const Icon(Symbols.check_rounded,
                                       size: 16, color: Colors.white)
                                   : null,
                             ),
@@ -4280,7 +4294,7 @@ class _CreateQuizSheetState extends State<_CreateQuizSheet> {
                           if (_optionControllers.length > 2)
                             IconButton(
                               icon: Icon(
-                                  Icons.remove_circle_outline_rounded,
+                                  Symbols.remove_circle_rounded,
                                   color: context.colors.error,
                                   size: 20),
                               onPressed: () => _removeOption(i),
@@ -4292,7 +4306,7 @@ class _CreateQuizSheetState extends State<_CreateQuizSheet> {
                   if (_optionControllers.length < 6)
                     TextButton.icon(
                       onPressed: _addOption,
-                      icon: const Icon(Icons.add_rounded, size: 18),
+                      icon: const Icon(Symbols.add_rounded, size: 18),
                       label: const Text('Add option'),
                       style: TextButton.styleFrom(
                         foregroundColor: context.colors.accentBlue,
@@ -4438,7 +4452,7 @@ class _SwipeToReplyState extends State<_SwipeToReply>
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        Icons.reply_rounded,
+                        Symbols.reply_rounded,
                         color: context.colors.accentBlue,
                         size: 17,
                       ),
@@ -4520,7 +4534,7 @@ class _ReportSheetState extends State<_ReportSheet> {
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: Icon(Icons.close_rounded, color: context.colors.textTertiary),
+                  icon: Icon(Symbols.close_rounded, color: context.colors.textTertiary),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -4715,7 +4729,7 @@ class _ReplyBadge extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            const Icon(Icons.keyboard_arrow_down_rounded,
+            const Icon(Symbols.keyboard_arrow_down_rounded,
                 color: Colors.white54, size: 16),
           ],
         ),
@@ -4757,7 +4771,7 @@ class _ScrollToBottomFab extends StatelessWidget {
                 ],
               ),
               child: const Icon(
-                Icons.keyboard_arrow_down_rounded,
+                Symbols.keyboard_arrow_down_rounded,
                 color: Colors.white,
                 size: 26,
               ),

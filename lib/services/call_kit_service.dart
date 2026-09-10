@@ -59,6 +59,9 @@ class CallKitService {
 
   static const _fullScreenAskedKey = 'callkit_full_screen_intent_asked';
 
+  /// `extra` flag telling an outgoing call apart from an incoming one.
+  static const _outgoingKey = 'linka_outgoing';
+
   /// The call this phone last answered, on disk rather than in memory: the
   /// "answered" push that tells this person's *other* phones to stop ringing
   /// also lands here, and when the app is in the background it is handled in
@@ -230,6 +233,11 @@ class CallKitService {
         extra: {
           'call_id': call.id.toString(),
           'conversation_id': call.conversationId.toString(),
+          // Marks this entry as one *we* placed. Android's plugin files an
+          // outgoing call as `isAccepted: true` — it means "not ringing any
+          // more", not "this user answered" — so without this flag
+          // `resumeAcceptedCall` would try to answer our own call.
+          _outgoingKey: '1',
         },
         callingNotification: const NotificationParams(
           showNotification: true,
@@ -301,6 +309,16 @@ class CallKitService {
   }
 
   static Future<void> _acceptFromNative(CallKitParams params) async {
+    // Not every "accept" from the native layer is the callee picking up.
+    // `setCallConnected` requests a CXAnswerCallAction, and CallKit answers it
+    // by emitting ACTION_CALL_ACCEPT right back — so the *caller's* own phone
+    // reports an accept the moment the media connects. Answering there is a
+    // call the server rightly refuses (`Only the person being called can
+    // accept`), and the refusal used to hang up a call that was working.
+    if (params.id == activeCallUuid ||
+        params.extra?[_outgoingKey]?.toString() == '1') {
+      return;
+    }
     final callId = int.tryParse(params.extra?['call_id']?.toString() ?? '');
     if (callId == null || !_acceptsHandled.add(params.id)) {
       return;

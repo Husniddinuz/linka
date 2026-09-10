@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import 'otp_screen.dart';
 import '../services/auth_service.dart';
@@ -118,7 +119,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
                       height: 40,
                       alignment: Alignment.centerLeft,
                       child: Icon(
-                        Icons.arrow_back_ios_rounded,
+                        Symbols.arrow_back_ios_rounded,
                         color: colors.textPrimary,
                         size: 20,
                       ),

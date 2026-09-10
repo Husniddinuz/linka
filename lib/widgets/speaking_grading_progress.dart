@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import 'writing_report.dart';
 
@@ -141,7 +142,7 @@ class _SpeakingGradingProgressState extends State<SpeakingGradingProgress>
                   gradient: LinearGradient(colors: [wr.accent, wr.colors.brand]),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.graphic_eq_rounded, color: Colors.white, size: 24),
+                child: const Icon(Symbols.graphic_eq_rounded, color: Colors.white, size: 24),
               ),
             ),
           ),
@@ -192,7 +193,7 @@ class _SpeakingGradingProgressState extends State<SpeakingGradingProgress>
                     height: 20,
                     child: Center(
                       child: i < active
-                          ? Icon(Icons.check_circle_rounded, size: 17, color: wr.good)
+                          ? Icon(Symbols.check_circle_rounded, size: 17, color: wr.good)
                           : i == active
                               ? SizedBox(
                                   width: 15,
@@ -234,7 +235,7 @@ class _SpeakingGradingProgressState extends State<SpeakingGradingProgress>
             const SizedBox(height: 14),
             TextButton.icon(
               onPressed: widget.onOpenHistory,
-              icon: Icon(Icons.history_rounded, size: 17, color: wr.muted),
+              icon: Icon(Symbols.history_rounded, size: 17, color: wr.muted),
               label: Text(
                 'All your answers',
                 style: TextStyle(

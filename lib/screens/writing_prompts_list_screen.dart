@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/mock_test_service.dart';
 import '../services/random_test_picker.dart';
 import '../theme/app_colors.dart';
 import '../widgets/mock_test_styles.dart';
 import '../widgets/random_test_card.dart';
+import '../widgets/task_segments.dart';
 import '../widgets/writing_report.dart';
 import 'writing_progress_screen.dart';
 import 'writing_test_screen.dart';
@@ -115,12 +117,12 @@ class _WritingPromptsListScreenState extends State<WritingPromptsListScreen>
               // scroll) so Task 2 stays a single tap away no matter how many
               // Task 1 prompts there are — burying it below a long Task 1 list
               // made students think only Task 1 existed.
-              _TaskSegments(
+              TaskSegments(
                 selected: _tabIndex,
                 onSelect: _tabController.animateTo,
                 labels: [
-                  _SegmentLabel('Task 1', 'Charts & data', task1.length),
-                  _SegmentLabel('Task 2', 'Essays', task2.length),
+                  TaskSegmentLabel('Task 1', 'Charts & data', task1.length),
+                  TaskSegmentLabel('Task 2', 'Essays', task2.length),
                 ],
               ),
               Expanded(
@@ -135,111 +137,6 @@ class _WritingPromptsListScreenState extends State<WritingPromptsListScreen>
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-class _SegmentLabel {
-  const _SegmentLabel(this.title, this.caption, this.count);
-  final String title;
-  final String caption;
-  final int count;
-}
-
-/// The task switcher, as a segmented control rather than an underlined TabBar.
-///
-/// The old bar sat on a hardcoded white plate, which in dark mode was a white
-/// stripe across the top of a dark screen. This one is built from theme
-/// tokens, and being a filled pill it also carries what the underline could
-/// not: what each paper actually is, and how many tasks are behind it.
-class _TaskSegments extends StatelessWidget {
-  const _TaskSegments({required this.selected, required this.onSelect, required this.labels});
-
-  final int selected;
-  final ValueChanged<int> onSelect;
-  final List<_SegmentLabel> labels;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: colors.surfaceAlt,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            for (var i = 0; i < labels.length; i++)
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => onSelect(i),
-                  behavior: HitTestBehavior.opaque,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOut,
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                    decoration: BoxDecoration(
-                      color: selected == i ? colors.brand : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              labels[i].title,
-                              style: TextStyle(
-                                fontFamily: 'SF Pro',
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: selected == i ? colors.onBrand : colors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: selected == i
-                                    ? colors.onBrand.withValues(alpha: 0.22)
-                                    : colors.background,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                '${labels[i].count}',
-                                style: TextStyle(
-                                  fontFamily: 'SF Pro',
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: selected == i ? colors.onBrand : colors.textSecondary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 1),
-                        Text(
-                          labels[i].caption,
-                          style: TextStyle(
-                            fontFamily: 'SF Pro',
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w500,
-                            color: selected == i
-                                ? colors.onBrand.withValues(alpha: 0.75)
-                                : colors.textTertiary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }
@@ -263,7 +160,7 @@ class _ProgressCta extends StatelessWidget {
           decoration: mtSoftCard(context, radius: 14, border: Border.all(color: colors.border)),
           child: Row(
             children: [
-              Icon(Icons.insights_rounded, size: 20, color: colors.accentBlue),
+              Icon(Symbols.insights_rounded, size: 20, color: colors.accentBlue),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -286,7 +183,7 @@ class _ProgressCta extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, size: 22, color: colors.textTertiary),
+              Icon(Symbols.chevron_right_rounded, size: 22, color: colors.textTertiary),
             ],
           ),
         ),
@@ -316,11 +213,11 @@ class _SearchField extends StatelessWidget {
           fillColor: colors.surfaceAlt,
           hintText: 'Search topics',
           hintStyle: TextStyle(fontFamily: 'SF Pro', fontSize: 14.5, color: colors.textTertiary),
-          prefixIcon: Icon(Icons.search_rounded, size: 20, color: colors.textTertiary),
+          prefixIcon: Icon(Symbols.search_rounded, size: 20, color: colors.textTertiary),
           suffixIcon: controller.text.isEmpty
               ? null
               : IconButton(
-                  icon: Icon(Icons.close_rounded, size: 18, color: colors.textTertiary),
+                  icon: Icon(Symbols.close_rounded, size: 18, color: colors.textTertiary),
                   onPressed: () {
                     controller.clear();
                     onChanged('');
@@ -441,7 +338,7 @@ class _PromptCard extends StatelessWidget {
                     imageUrl,
                     fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) => Icon(
-                      Icons.insert_chart_outlined_rounded,
+                      Symbols.insert_chart_rounded,
                       size: 28,
                       color: colors.textTertiary,
                     ),
@@ -487,7 +384,7 @@ class _PromptCard extends StatelessWidget {
                             style: TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: colors.textSecondary),
                           ),
                         ),
-                        Icon(Icons.chevron_right_rounded, color: colors.textTertiary, size: 22),
+                        Icon(Symbols.chevron_right_rounded, color: colors.textTertiary, size: 22),
                       ],
                     ),
                   ],

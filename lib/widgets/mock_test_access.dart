@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../screens/plus_subscription_screen.dart';
 import '../services/mock_test_service.dart';
 import '../theme/app_colors.dart';
@@ -39,7 +40,7 @@ void mtShowPlusPrompt(BuildContext context) {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.workspace_premium_rounded, color: context.colors.accentYellow, size: 40),
+          Icon(Symbols.workspace_premium_rounded, color: context.colors.accentYellow, size: 40),
           const SizedBox(height: 12),
           Text(
             'You\'ve used your $mtFreeSolvedTestsLimit free tests',

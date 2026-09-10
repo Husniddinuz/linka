@@ -102,7 +102,7 @@ class CourseCard extends StatelessWidget {
                           ),
                         ),
                         if (tutorView)
-                          Icon(Icons.chevron_right,
+                          Icon(Symbols.chevron_right_rounded,
                               size: 20, color: colors.textTertiary),
                       ],
                     ),

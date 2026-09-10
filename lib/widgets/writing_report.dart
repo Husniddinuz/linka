@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../theme/app_colors.dart';
 
@@ -204,6 +205,30 @@ List<String> wPromptParagraphs(String? html) {
       .toList();
 }
 
+/// Splits [text] on markdown `**bold**` markers into spans.
+///
+/// Both the AI grader and the tutors writing sample commentary use light
+/// markdown, and it arrives intact — an examiner comment routinely opens
+/// `**Estimated Band Score: 8.5**` and names each criterion in bold. Rendered
+/// raw that reads as a paragraph full of asterisks, so every surface showing
+/// written-by-hand prose goes through here.
+///
+/// Deliberately only bold: it is the one marker that actually shows up in this
+/// content, and a general markdown renderer would start reinterpreting the
+/// student's own punctuation.
+List<InlineSpan> wInlineBoldSpans(String text, {TextStyle? boldStyle}) {
+  final bold = boldStyle ?? const TextStyle(fontWeight: FontWeight.w700);
+  final spans = <InlineSpan>[];
+  var cursor = 0;
+  for (final match in RegExp(r'\*\*(.+?)\*\*', dotAll: true).allMatches(text)) {
+    if (match.start > cursor) spans.add(TextSpan(text: text.substring(cursor, match.start)));
+    spans.add(TextSpan(text: match.group(1), style: bold));
+    cursor = match.end;
+  }
+  if (cursor < text.length) spans.add(TextSpan(text: text.substring(cursor)));
+  return spans;
+}
+
 // ---------------------------------------------------------------------------
 // Labels
 // ---------------------------------------------------------------------------
@@ -231,10 +256,10 @@ const wCriterionShort = <String, String>{
 };
 
 const wCriterionIcons = <String, IconData>{
-  'task_achievement': Icons.flag_rounded,
-  'coherence_cohesion': Icons.hub_rounded,
-  'lexical_resource': Icons.menu_book_rounded,
-  'grammar_accuracy': Icons.rule_rounded,
+  'task_achievement': Symbols.flag_rounded,
+  'coherence_cohesion': Symbols.hub_rounded,
+  'lexical_resource': Symbols.menu_book_rounded,
+  'grammar_accuracy': Symbols.rule_rounded,
 };
 
 /// The server's closed grammar vocabulary. A key it adds before the app knows
@@ -881,7 +906,7 @@ class WCorrectionCard extends StatelessWidget {
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Icon(Icons.subdirectory_arrow_right_rounded, size: 16, color: wr.good),
+                    child: Icon(Symbols.subdirectory_arrow_right_rounded, size: 16, color: wr.good),
                   ),
                   const SizedBox(width: 6),
                   Expanded(
@@ -1072,7 +1097,7 @@ class _WAnnotatedEssayState extends State<WAnnotatedEssay> {
         children: [
           Row(
             children: [
-              Icon(Icons.description_rounded, size: 16, color: wr.muted),
+              Icon(Symbols.description_rounded, size: 16, color: wr.muted),
               const SizedBox(width: 7),
               Expanded(
                 child: Text(
@@ -1133,7 +1158,7 @@ class WVocabularyUpgrades extends StatelessWidget {
                         decoration: TextDecoration.lineThrough,
                       ),
                     ),
-                    Icon(Icons.arrow_forward_rounded, size: 14, color: wr.muted),
+                    Icon(Symbols.arrow_forward_rounded, size: 14, color: wr.muted),
                     Text(
                       upgrade['suggestion']?.toString() ?? '',
                       style: TextStyle(
@@ -1325,7 +1350,7 @@ class WTaskCard extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.zoom_in_rounded, size: 15, color: wr.accent),
+                  Icon(Symbols.zoom_in_rounded, size: 15, color: wr.accent),
                   const SizedBox(width: 5),
                   Text(
                     'Tap the chart to enlarge',
@@ -1496,7 +1521,7 @@ class _WChartViewerState extends State<WChartViewer> with SingleTickerProviderSt
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white24),
                     ),
-                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                    child: const Icon(Symbols.close_rounded, color: Colors.white, size: 20),
                   ),
                 ),
               ),

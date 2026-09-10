@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../services/chat_service.dart';
 import '../theme/app_colors.dart';
@@ -82,7 +83,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
         scrolledUnderElevation: 0,
         leadingWidth: 48,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+          icon: const Icon(Symbols.arrow_back_ios_new_rounded, size: 18),
           color: context.colors.textPrimary,
           onPressed: () => Navigator.pop(context),
         ),

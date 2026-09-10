@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../services/mock_test_service.dart';
 import '../widgets/mock_test_styles.dart';
+import '../widgets/sample_list_widgets.dart';
 import 'plus_subscription_screen.dart';
-import 'speaking_attempts_screen.dart';
 import 'speaking_sample_screen.dart';
+import 'speaking_topics_screen.dart';
 import 'tutor_profile_screen.dart';
 import '../theme/app_colors.dart';
 
@@ -52,11 +54,11 @@ class _SpeakingSamplesListScreenState extends State<SpeakingSamplesListScreen> {
             return Center(child: CircularProgressIndicator(color: context.colors.accentYellow));
           }
           if (snapshot.hasError) {
-            return _ErrorState(error: snapshot.error);
+            return SampleErrorState(error: snapshot.error);
           }
           final tutors = snapshot.data ?? const [];
           if (tutors.isEmpty) {
-            return const _EmptyState(message: 'No speaking samples yet');
+            return const SampleEmptyState(message: 'No speaking samples yet');
           }
 
           final query = _query.trim().toLowerCase();
@@ -74,16 +76,27 @@ class _SpeakingSamplesListScreenState extends State<SpeakingSamplesListScreen> {
 
           return Column(
             children: [
-              _IntroHeader(
+              SampleIntroHeader(
+                icon: Symbols.headphones_rounded,
                 title: 'Listen to real high-band answers',
                 subtitle:
                     '$totalTopics recorded topics from ${tutors.length} tutors, with follow-along transcripts',
               ),
-              // Their own marked answers, offered where they are already
-              // hunting for a question to answer — rather than behind a nav
-              // entry of its own that nobody would look for.
-              const _YourAnswersRow(),
-              _SearchField(
+              // The way out of listening and into answering, offered where
+              // students already are when they go looking for a question — but
+              // it leads to the topic bank rather than to one tutor's
+              // questions: the same questions, none of them behind a face.
+              SampleCtaRow(
+                icon: Symbols.mic_rounded,
+                title: 'Answer a question yourself',
+                subtitle:
+                    'Pick any topic and AI marks your answer against the band descriptors',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SpeakingTopicsScreen()),
+                ),
+              ),
+              SampleSearchField(
                 controller: _searchController,
                 hint: 'Search a tutor',
                 query: _query,
@@ -91,7 +104,7 @@ class _SpeakingSamplesListScreenState extends State<SpeakingSamplesListScreen> {
               ),
               Expanded(
                 child: visible.isEmpty
-                    ? const _EmptyState(message: 'No tutors match that search.')
+                    ? const SampleEmptyState(message: 'No tutors match that search.')
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                         itemCount: visible.length,
@@ -138,7 +151,7 @@ class _TutorRow extends StatelessWidget {
         decoration: mtSoftCard(context, radius: 16),
         child: Row(
           children: [
-            _Artwork(imageUrl: imageUrl, size: 82),
+            SampleArtwork(imageUrl: imageUrl, size: 82, fallbackIcon: Symbols.mic_rounded),
             const SizedBox(width: 13),
             Expanded(
               child: Column(
@@ -160,7 +173,7 @@ class _TutorRow extends StatelessWidget {
                   const SizedBox(height: 7),
                   Row(
                     children: [
-                      Icon(Icons.headphones_rounded, size: 14, color: colors.textTertiary),
+                      Icon(Symbols.headphones_rounded, size: 14, color: colors.textTertiary),
                       const SizedBox(width: 5),
                       Text(
                         '$count topic${count == 1 ? '' : 's'}',
@@ -175,7 +188,7 @@ class _TutorRow extends StatelessWidget {
                   ),
                   if (score != null) ...[
                     const SizedBox(height: 8),
-                    _Chip(
+                    SampleChip(
                       label: 'IELTS SPEAKING $score',
                       color: colors.textPrimary,
                       background: colors.accentYellow.withValues(alpha: 0.25),
@@ -185,7 +198,7 @@ class _TutorRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            Icon(Icons.chevron_right_rounded, size: 22, color: colors.textTertiary),
+            Icon(Symbols.chevron_right_rounded, size: 22, color: colors.textTertiary),
           ],
         ),
       ),
@@ -282,14 +295,14 @@ class _SpeakingSampleTutorTopicsScreenState extends State<SpeakingSampleTutorTop
             return Center(child: CircularProgressIndicator(color: context.colors.accentYellow));
           }
           if (snapshot.hasError) {
-            return _ErrorState(error: snapshot.error);
+            return SampleErrorState(error: snapshot.error);
           }
           final samples = _Sample.fromResponse(
             snapshot.data ?? const [],
             contentLocked: _isLocked,
           );
           if (samples.isEmpty) {
-            return const _EmptyState(message: 'No speaking samples yet');
+            return const SampleEmptyState(message: 'No speaking samples yet');
           }
 
           final query = _query.trim().toLowerCase();
@@ -303,7 +316,7 @@ class _SpeakingSampleTutorTopicsScreenState extends State<SpeakingSampleTutorTop
             children: [
               _buildTutorHeader(samples.length),
               if (samples.length > 6)
-                _SearchField(
+                SampleSearchField(
                   controller: _searchController,
                   hint: 'Search a topic',
                   query: _query,
@@ -311,7 +324,7 @@ class _SpeakingSampleTutorTopicsScreenState extends State<SpeakingSampleTutorTop
                 ),
               Expanded(
                 child: visible.isEmpty
-                    ? const _EmptyState(message: 'No topics match that search.')
+                    ? const SampleEmptyState(message: 'No topics match that search.')
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                         itemCount: visible.length,
@@ -333,7 +346,11 @@ class _SpeakingSampleTutorTopicsScreenState extends State<SpeakingSampleTutorTop
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
       child: Row(
         children: [
-          _Artwork(imageUrl: widget.tutorImageUrl, size: 88),
+          SampleArtwork(
+            imageUrl: widget.tutorImageUrl,
+            size: 88,
+            fallbackIcon: Symbols.mic_rounded,
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -354,7 +371,7 @@ class _SpeakingSampleTutorTopicsScreenState extends State<SpeakingSampleTutorTop
                 ),
                 if (widget.tutorSpeakingScore != null) ...[
                   const SizedBox(height: 7),
-                  _Chip(
+                  SampleChip(
                     label: 'IELTS SPEAKING ${widget.tutorSpeakingScore}',
                     color: colors.textPrimary,
                     background: colors.accentYellow.withValues(alpha: 0.25),
@@ -408,7 +425,7 @@ class _BookTutorButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.event_available_rounded, size: 15, color: colors.onBrand),
+            Icon(Symbols.event_available_rounded, size: 15, color: colors.onBrand),
             const SizedBox(width: 6),
             Text(
               'Book a lesson',
@@ -459,7 +476,7 @@ class _TopicRow extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _BandTile(score: sample.bandScore),
+              SampleBandTile(score: sample.bandScore, emptyIcon: Symbols.mic_rounded),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -483,22 +500,22 @@ class _TopicRow extends StatelessWidget {
                       runSpacing: 5,
                       children: [
                         if (sample.partNumbers.isNotEmpty)
-                          _Chip(
+                          SampleChip(
                             label: 'PART ${sample.partNumbers.join(' · ')}',
                             color: colors.accentBlue,
                             background: colors.accentBlue.withValues(alpha: 0.12),
                           ),
                         if (sample.hasTranscript)
-                          _Chip(
+                          SampleChip(
                             label: 'TRANSCRIPT',
-                            icon: Icons.closed_caption_rounded,
+                            icon: Symbols.closed_caption_rounded,
                             color: colors.textSecondary,
                             background: colors.surface,
                           ),
                         if (locked)
-                          _Chip(
+                          SampleChip(
                             label: 'LINKA PLUS',
-                            icon: Icons.lock_rounded,
+                            icon: Symbols.lock_rounded,
                             color: colors.textPrimary,
                             background: colors.accentYellow.withValues(alpha: 0.25),
                           ),
@@ -516,7 +533,7 @@ class _TopicRow extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  locked ? Icons.lock_rounded : Icons.play_arrow_rounded,
+                  locked ? Symbols.lock_rounded : Symbols.play_arrow_rounded,
                   size: locked ? 17 : 22,
                   color: locked ? colors.textTertiary : colors.onBrand,
                 ),
@@ -580,362 +597,5 @@ class _Sample {
       ));
     }
     return result;
-  }
-}
-
-/// A way back to the answers this student has already recorded.
-///
-/// Always offered rather than only when there are some: a student who has
-/// never tried is exactly who should see that trying is possible, and the
-/// screen behind it says so itself when the list is empty.
-class _YourAnswersRow extends StatelessWidget {
-  const _YourAnswersRow();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: GestureDetector(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SpeakingAttemptsScreen()),
-        ),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
-          decoration: mtSoftCard(context, radius: 14),
-          child: Row(
-            children: [
-              Icon(Icons.mic_rounded, size: 18, color: colors.accentBlue),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Answer a question yourself',
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Record any topic and AI marks it against the band descriptors',
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 11.5,
-                        height: 1.3,
-                        color: colors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right_rounded, size: 20, color: colors.textTertiary),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Shared pieces ──────────────────────────────────────────────────────────
-
-/// Rounded tutor photo, sized by the caller. Falls back to a brand-filled
-/// mic tile so a missing or broken image never leaves a grey hole.
-class _Artwork extends StatelessWidget {
-  const _Artwork({required this.imageUrl, required this.size});
-  final String? imageUrl;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(15),
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: (imageUrl != null && imageUrl!.isNotEmpty)
-            ? Image.network(
-                imageUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => _ArtworkFallback(size: size),
-              )
-            : _ArtworkFallback(size: size),
-      ),
-    );
-  }
-}
-
-class _ArtworkFallback extends StatelessWidget {
-  const _ArtworkFallback({required this.size});
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [colors.brand, colors.brand.withValues(alpha: 0.78)],
-        ),
-      ),
-      alignment: Alignment.center,
-      child: Icon(Icons.mic_rounded, size: size * 0.36, color: colors.onBrand),
-    );
-  }
-}
-
-/// A topic row's artwork: the band score the answer earned.
-class _BandTile extends StatelessWidget {
-  const _BandTile({required this.score});
-  final String? score;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Container(
-      width: 62,
-      height: 62,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [colors.brand, colors.brand.withValues(alpha: 0.78)],
-        ),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (score == null)
-            Icon(Icons.mic_rounded, size: 26, color: colors.onBrand)
-          else ...[
-            Text(
-              'BAND',
-              style: TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 8.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.1,
-                color: colors.onBrand.withValues(alpha: 0.7),
-              ),
-            ),
-            const SizedBox(height: 1),
-            Text(
-              score!,
-              style: TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 21,
-                fontWeight: FontWeight.w800,
-                height: 1.1,
-                color: colors.onBrand,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// States outright what the page is. The old grid left students to infer it
-/// from tutor photos, which is how it got mistaken for the Tutors directory.
-class _IntroHeader extends StatelessWidget {
-  const _IntroHeader({required this.title, required this.subtitle});
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: colors.accentYellow.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(Icons.headphones_rounded, size: 20, color: colors.textPrimary),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontFamily: 'SF Pro',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: colors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontFamily: 'SF Pro',
-                    fontSize: 12,
-                    height: 1.3,
-                    color: colors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SearchField extends StatelessWidget {
-  const _SearchField({
-    required this.controller,
-    required this.hint,
-    required this.query,
-    required this.onChanged,
-  });
-
-  final TextEditingController controller;
-  final String hint;
-  final String query;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-      child: TextField(
-        controller: controller,
-        onChanged: onChanged,
-        style: TextStyle(fontFamily: 'SF Pro', fontSize: 14, color: colors.textPrimary),
-        decoration: InputDecoration(
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-          hintText: hint,
-          hintStyle: TextStyle(fontFamily: 'SF Pro', fontSize: 14, color: colors.textTertiary),
-          prefixIcon: Icon(Icons.search_rounded, size: 20, color: colors.textTertiary),
-          suffixIcon: query.isEmpty
-              ? null
-              : IconButton(
-                  icon: Icon(Icons.close_rounded, size: 18, color: colors.textTertiary),
-                  onPressed: () {
-                    controller.clear();
-                    onChanged('');
-                  },
-                ),
-          filled: true,
-          fillColor: colors.surfaceAlt,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Chip extends StatelessWidget {
-  const _Chip({
-    required this.label,
-    required this.color,
-    required this.background,
-    this.icon,
-  });
-
-  final String label;
-  final Color color;
-  final Color background;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 11, color: color),
-            const SizedBox(width: 3),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'SF Pro',
-              fontSize: 9.5,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.6,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.message});
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontFamily: 'SF Pro',
-            color: context.colors.textSecondary,
-            fontSize: 14,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.error});
-  final Object? error;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          'Failed to load: $error',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontFamily: 'SF Pro',
-            color: context.colors.textSecondary,
-            fontSize: 14,
-          ),
-        ),
-      ),
-    );
   }
 }

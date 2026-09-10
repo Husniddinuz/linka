@@ -175,7 +175,7 @@ class _TutorCourseManageScreenState extends State<TutorCourseManageScreen> {
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.chevron_left, color: colors.textPrimary, size: 28),
+          icon: Icon(Symbols.chevron_left_rounded, color: colors.textPrimary, size: 28),
         ),
         title: Text('Manage course',
             style: TextStyle(

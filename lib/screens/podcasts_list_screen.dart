@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../models/podcast.dart';
 import '../services/api_service.dart';
@@ -217,7 +218,7 @@ class _PodcastsListScreenState extends State<PodcastsListScreen> {
               ),
             ),
             _sheetAction(
-              icon: Icons.replay_rounded,
+              icon: Symbols.replay_rounded,
               label: 'Play from the beginning',
               onTap: () {
                 Navigator.pop(sheetContext);
@@ -226,7 +227,7 @@ class _PodcastsListScreenState extends State<PodcastsListScreen> {
             ),
             if (progress == null || !progress.completed)
               _sheetAction(
-                icon: Icons.check_circle_outline_rounded,
+                icon: Symbols.check_circle_rounded,
                 label: 'Mark as played',
                 onTap: () {
                   Navigator.pop(sheetContext);
@@ -238,7 +239,7 @@ class _PodcastsListScreenState extends State<PodcastsListScreen> {
               ),
             if (progress != null)
               _sheetAction(
-                icon: Icons.restart_alt_rounded,
+                icon: Symbols.restart_alt_rounded,
                 label: 'Reset progress',
                 onTap: () {
                   Navigator.pop(sheetContext);
@@ -414,11 +415,11 @@ class _PodcastsListScreenState extends State<PodcastsListScreen> {
           fillColor: colors.surfaceAlt,
           hintText: 'Search episodes',
           hintStyle: TextStyle(fontSize: 15, color: colors.textTertiary),
-          prefixIcon: Icon(Icons.search_rounded, color: colors.textTertiary),
+          prefixIcon: Icon(Symbols.search_rounded, color: colors.textTertiary),
           suffixIcon: _query.isEmpty
               ? null
               : IconButton(
-                  icon: Icon(Icons.close_rounded,
+                  icon: Icon(Symbols.close_rounded,
                       size: 18, color: colors.textTertiary),
                   onPressed: () {
                     _searchController.clear();
@@ -499,7 +500,7 @@ class _PodcastsHeader extends StatelessWidget {
       elevation: 0,
       leading: IconButton(
         onPressed: () => Navigator.pop(context),
-        icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
+        icon: const Icon(Symbols.chevron_left_rounded, color: Colors.white, size: 28),
       ),
       flexibleSpace: FlexibleSpaceBar(
         titlePadding: const EdgeInsetsDirectional.only(start: 56, bottom: 16),
@@ -527,7 +528,7 @@ class _PodcastsHeader extends StatelessWidget {
               right: -40,
               top: -30,
               child: Icon(
-                Icons.graphic_eq_rounded,
+                Symbols.graphic_eq_rounded,
                 size: 200,
                 color: Colors.white.withValues(alpha: 0.06),
               ),
@@ -653,7 +654,7 @@ class _ContinueCard extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.headphones_rounded,
+                            Icon(Symbols.headphones_rounded,
                                 size: 13,
                                 color: Colors.white.withValues(alpha: 0.75)),
                             const SizedBox(width: 5),
@@ -694,7 +695,7 @@ class _ContinueCard extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        playing ? Symbols.pause_rounded : Symbols.play_arrow_rounded,
                         color: gradient.last,
                         size: 26,
                       ),
@@ -861,7 +862,7 @@ class _EpisodeTile extends StatelessWidget {
         'TRANSCRIPT',
         color: colors.textSecondary,
         background: colors.surfaceAlt,
-        icon: Icons.closed_caption_rounded,
+        icon: Symbols.closed_caption_rounded,
       ));
     }
     if (chips.isEmpty) return const SizedBox.shrink();
@@ -916,7 +917,7 @@ class _EpisodeTile extends StatelessWidget {
       parts.add(Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.check_circle_rounded, size: 14, color: colors.success),
+          Icon(Symbols.check_circle_rounded, size: 14, color: colors.success),
           const SizedBox(width: 4),
           Text(
             'Played',
@@ -988,7 +989,7 @@ class _EpisodeTile extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         child: Icon(
-          isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+          isPlaying ? Symbols.pause_rounded : Symbols.play_arrow_rounded,
           size: 24,
           color: isCurrent ? colors.onBrand : colors.textPrimary,
         ),
@@ -1062,10 +1063,10 @@ class _EmptyState extends StatelessWidget {
         children: [
           Icon(
             failed
-                ? Icons.cloud_off_rounded
+                ? Symbols.cloud_off_rounded
                 : filtered
-                    ? Icons.search_off_rounded
-                    : Icons.podcasts_rounded,
+                    ? Symbols.search_off_rounded
+                    : Symbols.podcasts_rounded,
             size: 56,
             color: colors.textTertiary,
           ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/lesson_card.dart';
@@ -347,7 +348,7 @@ class _CalendarCard extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: onPrevMonth,
-                child: Icon(Icons.chevron_left, color: context.colors.textPrimary, size: 24),
+                child: Icon(Symbols.chevron_left_rounded, color: context.colors.textPrimary, size: 24),
               ),
               Expanded(
                 child: Center(
@@ -365,7 +366,7 @@ class _CalendarCard extends StatelessWidget {
               ),
               GestureDetector(
                 onTap: onNextMonth,
-                child: Icon(Icons.chevron_right, color: context.colors.textPrimary, size: 24),
+                child: Icon(Symbols.chevron_right_rounded, color: context.colors.textPrimary, size: 24),
               ),
             ],
           ),
@@ -647,7 +648,7 @@ class _CancelLessonSheetState extends State<CancelLessonSheet> {
             ),
             child: Center(
               child: Icon(
-                Icons.warning_amber_rounded,
+                Symbols.warning_amber_rounded,
                 color: context.colors.error,
                 size: 40,
               ),
@@ -675,7 +676,7 @@ class _CancelLessonSheetState extends State<CancelLessonSheet> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info_outline_rounded, color: context.colors.error, size: 18),
+                Icon(Symbols.info_rounded, color: context.colors.error, size: 18),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(

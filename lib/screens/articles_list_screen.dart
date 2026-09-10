@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/new_badge.dart';
@@ -102,7 +103,7 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.chevron_left, color: colors.textPrimary, size: 28),
+          icon: Icon(Symbols.chevron_left_rounded, color: colors.textPrimary, size: 28),
         ),
         title: Text(
           'Articles',
@@ -147,7 +148,7 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
                       decoration: InputDecoration(
                         hintText: 'Keyword search',
                         hintStyle: TextStyle(color: colors.textTertiary, fontSize: 14),
-                        prefixIcon: Icon(Icons.search, color: colors.textTertiary, size: 20),
+                        prefixIcon: Icon(Symbols.search_rounded, color: colors.textTertiary, size: 20),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(vertical: 10),
                       ),
@@ -311,7 +312,7 @@ class _ArticlesListScreenState extends State<ArticlesListScreen> {
                                                     children: [
                                                       if (hasPdf) ...[
                                                         const Icon(
-                                                          Icons.picture_as_pdf_outlined,
+                                                          Symbols.picture_as_pdf_rounded,
                                                           size: 10,
                                                           color: Colors.white,
                                                         ),

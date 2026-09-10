@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:video_player/video_player.dart';
 import '../models/social.dart';
 import '../services/social_service.dart';
@@ -357,7 +358,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
   Widget _avatarFallback() => Container(
     color: const Color(0xFF444444),
-    child: const Icon(Icons.person, color: Colors.white54, size: 20),
+    child: const Icon(Symbols.person_rounded, color: Colors.white54, size: 20),
   );
 
   @override
@@ -410,7 +411,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                   fit: BoxFit.contain,
                   errorBuilder: (_, _, _) => const Center(
                     child: Icon(
-                      Icons.broken_image,
+                      Symbols.broken_image_rounded,
                       color: Colors.white54,
                       size: 64,
                     ),
@@ -554,7 +555,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
-                          Icons.delete_outline,
+                          Symbols.delete_rounded,
                           color: Colors.white,
                           size: 20,
                         ),
@@ -572,7 +573,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
-                        Icons.close,
+                        Symbols.close_rounded,
                         color: Colors.white,
                         size: 22,
                       ),

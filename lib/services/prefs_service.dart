@@ -7,7 +7,8 @@ class PrefsService {
   static const _viewedNewsKey = 'viewed_news';
   static const _speakingTermsKey = 'speaking_terms_agreed';
   static const _passageHighlightPrefix = 'passage_highlights_';
-  static const _readerBgColorKey = 'reading_passage_bg_color';
+  static const _readerBgIndexKey = 'reading_passage_bg_index';
+  static const _readerBgColorKey = 'reading_passage_bg_color'; // legacy
   static const _readerFontScaleKey = 'reading_passage_font_scale';
 
   static SharedPreferences? _prefs;
@@ -120,15 +121,24 @@ class PrefsService {
 
   // ─── Reading Passage Display Settings ──────────────────────────────────
 
-  static Future<int?> getReaderBackgroundColor() async {
+  /// Index into `kPassageBackgroundOptions`. Null when the learner has never
+  /// picked a paper tint (or only picked one on a pre-dark-mode build — see
+  /// [getLegacyReaderBackgroundColor]).
+  static Future<int?> getReaderBackgroundIndex() async {
     final prefs = await _instance;
-    final value = prefs.getInt(_readerBgColorKey);
-    return value;
+    return prefs.getInt(_readerBgIndexKey);
   }
 
-  static Future<void> setReaderBackgroundColor(int colorValue) async {
+  static Future<void> setReaderBackgroundIndex(int index) async {
     final prefs = await _instance;
-    await prefs.setInt(_readerBgColorKey, colorValue);
+    await prefs.setInt(_readerBgIndexKey, index);
+  }
+
+  /// The ARGB paper color written by builds before the passage tints became
+  /// theme-aware. Read only to migrate that pick onto an index.
+  static Future<int?> getLegacyReaderBackgroundColor() async {
+    final prefs = await _instance;
+    return prefs.getInt(_readerBgColorKey);
   }
 
   static Future<double> getReaderFontScale() async {

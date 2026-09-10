@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:material_symbols_icons/symbols.dart';
 import '../services/api_constants.dart';
 import '../theme/app_colors.dart';
 
@@ -63,7 +64,7 @@ class _PublicOfferScreenState extends State<PublicOfferScreen> {
         backgroundColor: context.colors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: context.colors.textPrimary, size: 20),
+          icon: Icon(Symbols.arrow_back_ios_rounded, color: context.colors.textPrimary, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
