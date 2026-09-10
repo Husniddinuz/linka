@@ -7,8 +7,9 @@ import '../services/user_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/cached_avatar.dart';
+import '../widgets/phone_call_icon.dart';
 import '../widgets/plus_badge.dart';
-import 'chats_screen.dart' show openDirectConversation;
+import 'chats_screen.dart' show openDirectConversation, startDirectCall;
 import 'home_screen.dart' show StoryData;
 import 'story_viewer_screen.dart';
 import 'tutor_profile_screen.dart';
@@ -50,6 +51,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   bool _loading = true;
   bool _missing = false;
   bool _followPending = false;
+  bool _placingCall = false;
 
   @override
   void initState() {
@@ -71,12 +73,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       }
 
       // The three lists are independent; the profile had to come first only
-      // because `canViewStories` decides whether asking for stories is even
-      // allowed.
+      // for `storiesCount`, which says whether there is anything live to ask
+      // for. Stories themselves are public — following gates nothing.
       final results = await Future.wait([
         SocialService.followers(widget.userId),
         SocialService.following(widget.userId),
-        if (profile.canViewStories && profile.storiesCount > 0)
+        if (profile.storiesCount > 0)
           // Your own stories come from a different endpoint than anyone
           // else's — `/stories/my/` needs no follow check.
           profile.isMe
@@ -114,7 +116,6 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
         isFollowing: next,
         followersCount:
             (profile.followersCount + (next ? 1 : -1)).clamp(0, 1 << 30),
-        canViewStories: next,
       );
     });
 
@@ -126,8 +127,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       if (count != null) {
         setState(() => _profile = _profile!.copyWith(followersCount: count));
       }
-      // Following someone changes what their profile will show — their stories
-      // become readable, or stop being — so the page reloads behind the button.
+      // The counts on both sides moved, so the page reloads behind the button.
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -135,6 +135,21 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       AppNotify.show(context, message: 'Could not update follow.');
     } finally {
       if (mounted) setState(() => _followPending = false);
+    }
+  }
+
+  /// Rings this person, the same control the chat header carries — a profile
+  /// reached from a chat is where the reader already is when they decide to
+  /// call, and sending them back into the thread to find the button is a
+  /// detour. The thread and the Plus check are the helper's business.
+  Future<void> _startVideoCall() async {
+    final profile = _profile;
+    if (profile == null || _placingCall) return;
+    setState(() => _placingCall = true);
+    try {
+      await startDirectCall(context, userId: profile.userId);
+    } finally {
+      if (mounted) setState(() => _placingCall = false);
     }
   }
 
@@ -191,6 +206,17 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             fontWeight: FontWeight.w800,
           ),
         ),
+        actions: [
+          // Placed where the chat header keeps it. A call is student-to-
+          // student, so it appears on exactly the profiles that offer the
+          // Message button below — never on your own, never on a tutor's.
+          if (profile != null && !profile.isMe && !profile.isTutor)
+            IconButton(
+              icon: PhoneCallIcon(size: 24, color: colors.textPrimary),
+              tooltip: 'Video call',
+              onPressed: _placingCall ? null : _startVideoCall,
+            ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -421,16 +447,6 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
   Widget _storiesSection(SocialProfile profile) {
     final colors = context.colors;
-
-    if (!profile.canViewStories) {
-      // The server would refuse the story list, so say why rather than showing
-      // an empty shelf that reads as "posts nothing".
-      return _EmptyState(
-        icon: Symbols.lock_rounded,
-        title: 'Stories are for followers',
-        body: 'Follow this account to see what they post.',
-      );
-    }
 
     if (_stories.isEmpty) {
       return _EmptyState(

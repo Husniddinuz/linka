@@ -140,6 +140,23 @@ class SocialUserCard {
       );
 }
 
+/// One page of a follower or following list.
+class SocialUserPage {
+  final List<SocialUserCard> results;
+
+  /// The whole list's length, not this page's.
+  final int count;
+
+  /// Where the next page starts, or null when this was the last one.
+  final int? nextOffset;
+
+  const SocialUserPage({
+    required this.results,
+    required this.count,
+    this.nextOffset,
+  });
+}
+
 /// A student's or tutor's public account page.
 class SocialProfile {
   final int userId;
@@ -166,8 +183,9 @@ class SocialProfile {
   /// profile header. Absent from older backends, which reads as no badge.
   final bool isPlus;
 
-  /// False means the story endpoints will answer 403. Render the locked state
-  /// rather than firing a request already known to be refused.
+  /// Always true against a current backend: stories are public to any signed-in
+  /// account. Kept because the field is still sent, and because a client built
+  /// against the followers-only backend is still in the wild.
   final bool canViewStories;
 
   const SocialProfile({

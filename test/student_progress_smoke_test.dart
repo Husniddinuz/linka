@@ -157,9 +157,10 @@ void main() {
       // Hours: 150 minutes is 2.5 hours from 3 lessons.
       expect(find.text('2.5'), findsOneWidget);
       expect(find.text('from 3 lessons'), findsOneWidget);
-      // A skill with nothing done says so instead of printing a zero.
+      // A skill with nothing done still shows a number — zero — with the
+      // caption saying what earns the first band.
       expect(find.text('Sit a listening test to get a band'), findsOneWidget);
-      expect(find.text('0.0'), findsNothing);
+      expect(find.text('0.0'), findsWidgets);
 
       // Per-skill cards, scrolled into view one by one (the list is lazy).
       expect(find.byType(BandChart), findsOneWidget);
@@ -173,6 +174,29 @@ void main() {
         scrollable: find.byType(Scrollable),
       );
       expect(find.text('Record a speaking answer to get a band.'), findsOneWidget);
+    });
+
+    testWidgets('a brand-new student sees the same screen, reading zeros', (tester) async {
+      const nothing = StudentProgress(
+        writing: SkillProgress.empty,
+        listening: SkillProgress.empty,
+        reading: SkillProgress.empty,
+        speaking: SkillProgress.empty,
+        lessons: LessonProgress.empty,
+      );
+      await tester.pumpWidget(_app(Scaffold(body: StudentProgressView(progress: nothing))));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Writing band'), findsOneWidget);
+      expect(find.text('Hours studied'), findsOneWidget);
+      // Three band tiles at 0.0, the hours tile at 0, each with its prompt.
+      expect(find.text('0.0'), findsWidgets);
+      expect(find.text('0'), findsWidgets);
+      expect(find.text('Write an essay to get a band'), findsOneWidget);
+      expect(find.text('Book your first lesson'), findsOneWidget);
+      // The skill card keeps its stat row and offers the way in.
+      expect(find.text('Latest band'), findsWidgets);
+      expect(find.text('Write an essay'), findsOneWidget);
     });
 
     testWidgets('renders in dark mode', (tester) async {

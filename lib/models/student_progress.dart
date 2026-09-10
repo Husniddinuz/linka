@@ -205,8 +205,8 @@ class StudentProgress {
     return writing.change;
   }
 
-  /// Nothing done in any skill means nothing to say. A row of em dashes is a
-  /// worse welcome than no row at all.
+  /// Whether anything at all has been done. The screen shows zeros either way;
+  /// this is for callers that want to know a student is starting from nothing.
   bool get hasAny =>
       writing.attempts > 0 ||
       listening.attempts > 0 ||

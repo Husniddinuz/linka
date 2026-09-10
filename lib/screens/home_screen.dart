@@ -66,8 +66,8 @@ class StoryData {
 
   /// Which table the story came from.
   ///
-  /// Ids are per-table — a tutor story, a Linka story and a followed student's
-  /// story can all be id 5 — so anything that remembers "seen" must key on
+  /// Ids are per-table — a tutor story, a Linka story and a student's story can
+  /// all be id 5 — so anything that remembers "seen" must key on
   /// [viewKey] rather than on [id]. Keying on the bare id marked unrelated
   /// stories as watched.
   final StorySource source;
@@ -133,9 +133,9 @@ List<StoryTutor> _groupStories(List<dynamic> raw) {
   return tutors;
 }
 
-/// Turns the followed-accounts feed into rings, dropping the tutor rows the
-/// tutor feed already supplied. See `_loadStoryTutors`.
-List<StoryTutor> _groupFollowedStories(List<SocialFeedAuthor> authors) {
+/// Turns the social feed into rings, dropping the tutor rows the tutor feed
+/// already supplied. See `_loadStoryTutors`.
+List<StoryTutor> _groupSocialStories(List<SocialFeedAuthor> authors) {
   final rings = <StoryTutor>[];
   for (final author in authors) {
     final stories = author.stories
@@ -391,8 +391,9 @@ class _HomeScreenState extends State<HomeScreen> {
   /// The rail has two sources, in this order.
   ///
   /// `/tutors/stories/` is Linka's own stories plus every active tutor's, shown
-  /// to everyone. `/social/feed/stories/` is the accounts this user actually
-  /// chose to follow, plus their own.
+  /// to everyone. `/social/feed/stories/` is every student who posted in the
+  /// last day, this account's own stories first — following decides the order
+  /// of that rail, not who is on it.
   ///
   /// Only the feed's `social` rows are taken: it also carries stories from
   /// followed *tutors*, but those are the same rows the first call already
@@ -415,16 +416,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
       setState(() {
-        _storyTutors = [
+        _storyTutors = _ownRingFirst([
           ..._groupStories(tutorRows),
-          ..._groupFollowedStories(feed),
-        ];
+          ..._groupSocialStories(feed),
+        ]);
         _loadingStories = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() => _loadingStories = false);
     }
+  }
+
+  /// Hoists this account's own ring to the front of the rail.
+  ///
+  /// The server already puts it first in the social feed, but the rail renders
+  /// the tutor feed ahead of that one, so without this the author's own story
+  /// sits behind every tutor — and now behind the community too.
+  List<StoryTutor> _ownRingFirst(List<StoryTutor> rings) {
+    final myId = UserService.current?.id;
+    if (myId == null) return rings;
+    final mine = rings.indexWhere((r) => r.userId == myId);
+    if (mine <= 0) return rings;
+    final ordered = [...rings];
+    ordered.insert(0, ordered.removeAt(mine));
+    return ordered;
   }
 
   /// Marks a whole ring as seen — arriving at it marks all of its stories, the
@@ -1129,8 +1145,8 @@ class _HeaderState extends State<_Header> {
           ),
 
           // Compose. The two roles post to different places: a tutor's story
-          // goes to the tutor feed, which the whole platform sees; a student's
-          // goes to the social feed, visible to their followers for 24 hours.
+          // goes to the tutor feed; a student's goes to the social feed. Both
+          // are seen by the whole platform, and both last 24 hours.
           if (widget.showAddStory)
             GestureDetector(
               onTap: () async {
@@ -1139,7 +1155,7 @@ class _HeaderState extends State<_Header> {
                     builder: (_) => StoryUploadScreen(
                       audience: widget.isTutor
                           ? StoryAudience.tutor
-                          : StoryAudience.followers,
+                          : StoryAudience.social,
                     ),
                   ),
                 );

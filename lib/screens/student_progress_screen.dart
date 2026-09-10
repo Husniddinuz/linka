@@ -7,7 +7,6 @@ import '../services/student_progress_service.dart';
 import '../widgets/band_chart.dart';
 import '../widgets/mock_test_styles.dart';
 import '../widgets/writing_report.dart';
-import 'mock_exams_screen.dart';
 import 'mock_test_list_screen.dart';
 import 'mock_test_result_screen.dart';
 import 'speaking_attempts_screen.dart';
@@ -64,18 +63,6 @@ class _StudentProgressScreenState extends State<StudentProgressScreen> {
             );
           }
           final progress = snapshot.data!;
-          if (!progress.hasAny) {
-            return _Message(
-              icon: Symbols.insights_rounded,
-              title: 'Nothing to show yet',
-              body: 'Sit a mock test, write an essay or book a lesson, and your bands will start to appear here.',
-              actionLabel: 'Open Mock Exams',
-              onAction: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const MockExamsScreen()),
-              ),
-            );
-          }
           return RefreshIndicator(
             color: wr.accent,
             onRefresh: () {
@@ -219,8 +206,9 @@ class StudentProgressView extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 /// Writing band, listening band, reading band, hours studied. Each tile links
-/// into the detail behind it, and a tile with no history says so instead of
-/// printing a zero: "Band 0.0" is a mark, and it is not the one they got.
+/// into the detail behind it. A skill with no history reads 0.0 rather than a
+/// dash — the strip is the same shape on day one as on day fifty — and its
+/// caption says what to do to move the number.
 class ProgressTiles extends StatelessWidget {
   const ProgressTiles({super.key, required this.progress, this.onOpen});
 
@@ -252,43 +240,51 @@ class ProgressTiles extends StatelessWidget {
       _Tile(
         icon: Symbols.edit_note_rounded,
         label: 'Writing band',
-        value: writing.hasBand ? wFormatBand(writing.latest) : null,
-        fill: writing.latest,
+        value: wFormatBand(writing.latest ?? 0),
+        fill: writing.latest ?? 0,
+        hasData: writing.hasBand,
         change: writing.hasBand ? progress.writingChange : null,
-        caption: writing.attempts > 0 ? wPlural(writing.attempts, 'essay marked', 'essays marked') : null,
-        empty: 'Write an essay to get a band',
+        caption: writing.attempts > 0
+            ? wPlural(writing.attempts, 'essay marked', 'essays marked')
+            : 'Write an essay to get a band',
         onTap: () => _open(context, ProgressTileKind.writing),
       ),
       _Tile(
         icon: Symbols.headphones_rounded,
         label: 'Listening band',
-        value: listening.hasBand ? wFormatBand(listening.latest) : null,
-        fill: listening.latest,
-        caption: listening.attempts > 0 ? wPlural(listening.attempts, 'test taken', 'tests taken') : null,
-        empty: 'Sit a listening test to get a band',
+        value: wFormatBand(listening.latest ?? 0),
+        fill: listening.latest ?? 0,
+        hasData: listening.hasBand,
+        caption: listening.attempts > 0
+            ? wPlural(listening.attempts, 'test taken', 'tests taken')
+            : 'Sit a listening test to get a band',
         onTap: () => _open(context, ProgressTileKind.listening),
       ),
       _Tile(
         icon: Symbols.menu_book_rounded,
         label: 'Reading band',
-        value: reading.hasBand ? wFormatBand(reading.latest) : null,
-        fill: reading.latest,
-        caption: reading.attempts > 0 ? wPlural(reading.attempts, 'test taken', 'tests taken') : null,
-        empty: 'Sit a reading test to get a band',
+        value: wFormatBand(reading.latest ?? 0),
+        fill: reading.latest ?? 0,
+        hasData: reading.hasBand,
+        caption: reading.attempts > 0
+            ? wPlural(reading.attempts, 'test taken', 'tests taken')
+            : 'Sit a reading test to get a band',
         onTap: () => _open(context, ProgressTileKind.reading),
       ),
       _Tile(
         icon: Symbols.schedule_rounded,
         label: 'Hours studied',
-        value: lessons.count > 0 ? lessons.hoursLabel : null,
-        caption: lessons.count > 0 ? 'from ${wPlural(lessons.count, 'lesson', 'lessons')}' : null,
-        empty: 'Book your first lesson',
+        value: lessons.hoursLabel,
+        hasData: lessons.count > 0,
+        caption: lessons.count > 0
+            ? 'from ${wPlural(lessons.count, 'lesson', 'lessons')}'
+            : 'Book your first lesson',
         onTap: () => _open(context, ProgressTileKind.hours),
       ),
     ];
 
-    // Two per row, each pair stretched to the taller of the two so an empty
-    // tile's two-line hint does not leave its neighbour short.
+    // Two per row, each pair stretched to the taller of the two so a tile's
+    // two-line caption does not leave its neighbour short.
     Widget pair(Widget a, Widget b) => IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -313,32 +309,35 @@ class _Tile extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
-    required this.empty,
+    required this.caption,
     required this.onTap,
+    this.hasData = true,
     this.fill,
     this.change,
-    this.caption,
   });
 
   final IconData icon;
   final String label;
 
-  /// Null when there is no history — the tile then shows [empty] in place of
-  /// the caption and a dash in place of the number.
-  final String? value;
-  final String empty;
+  /// Always a number — zero when there is no history yet.
+  final String value;
+
+  /// The count behind the number, or what to do to earn one.
+  final String caption;
   final VoidCallback onTap;
+
+  /// False before the first sitting: the meter stays neutral so a zero does
+  /// not read as a low band.
+  final bool hasData;
 
   /// A band, for the meter under the number. Null for the hours tile, which
   /// has no ceiling to fill towards.
   final double? fill;
   final double? change;
-  final String? caption;
 
   @override
   Widget build(BuildContext context) {
     final wr = context.wr;
-    final hasValue = value != null;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -372,16 +371,16 @@ class _Tile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  value ?? '—',
+                  value,
                   style: TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 26,
                     height: 1,
                     fontWeight: FontWeight.w800,
-                    color: hasValue ? wr.text : wr.faint,
+                    color: hasData ? wr.text : wr.faint,
                   ),
                 ),
-                if (hasValue && change != null) ...[
+                if (change != null) ...[
                   const SizedBox(width: 8),
                   Padding(
                     padding: const EdgeInsets.only(bottom: 2),
@@ -392,11 +391,11 @@ class _Tile extends StatelessWidget {
             ),
             if (fill != null) ...[
               const SizedBox(height: 10),
-              WBandBar(band: fill!, height: 5, color: hasValue ? wr.accent : wr.line),
+              WBandBar(band: fill!, height: 5, color: hasData ? wr.accent : wr.line),
             ],
             const SizedBox(height: 8),
             Text(
-              hasValue ? (caption ?? '') : empty,
+              caption,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontFamily: 'SF Pro', fontSize: 12, height: 1.3, color: wr.muted),
@@ -468,43 +467,14 @@ class _SkillCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final wr = context.wr;
+    final hasBand = skill.hasBand;
 
-    if (!skill.hasBand) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(18),
-        decoration: wCardDecoration(context),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                emptyBody,
-                style: TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, height: 1.4, color: wr.muted),
-              ),
-            ),
-            const SizedBox(width: 12),
-            TextButton(
-              onPressed: onEmptyAction,
-              style: TextButton.styleFrom(
-                foregroundColor: wr.accent,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: Text(
-                emptyAction,
-                style: const TextStyle(fontFamily: 'SF Pro', fontSize: 13, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
+    // Before the first sitting the card keeps its shape and reads zero, with
+    // the prompt where the history would be.
     final tiles = <List<String>>[
-      [wFormatBand(skill.latest), 'Latest band'],
-      [wFormatBand(skill.average), 'Average'],
-      [wFormatBand(skill.best), 'Best'],
+      [wFormatBand(skill.latest ?? 0), 'Latest band'],
+      [wFormatBand(skill.average ?? 0), 'Average'],
+      [wFormatBand(skill.best ?? 0), 'Best'],
       ['${skill.attempts}', '${skill.attempts == 1 ? unit.one : unit.many} marked'],
     ];
     final recent = skill.recent.take(_recentShown).toList();
@@ -526,7 +496,10 @@ class _SkillCard extends StatelessWidget {
                       Text(
                         tiles[i][0],
                         style: TextStyle(
-                            fontFamily: 'SF Pro', fontSize: 21, fontWeight: FontWeight.w800, color: wr.text),
+                            fontFamily: 'SF Pro',
+                            fontSize: 21,
+                            fontWeight: FontWeight.w800,
+                            color: hasBand ? wr.text : wr.faint),
                       ),
                       const SizedBox(height: 3),
                       Text(
@@ -578,8 +551,36 @@ class _SkillCard extends StatelessWidget {
           const SizedBox(height: 16),
           Container(height: 1, color: wr.line),
           const SizedBox(height: 6),
+          if (!hasBand)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      emptyBody,
+                      style: TextStyle(fontFamily: 'SF Pro', fontSize: 13.5, height: 1.4, color: wr.muted),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  TextButton(
+                    onPressed: onEmptyAction,
+                    style: TextButton.styleFrom(
+                      foregroundColor: wr.accent,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      emptyAction,
+                      style: const TextStyle(fontFamily: 'SF Pro', fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           for (final entry in recent) _EntryRow(entry: entry, onTap: () => onOpen(entry)),
-          if (onDetail != null) ...[
+          if (hasBand && onDetail != null) ...[
             const SizedBox(height: 6),
             GestureDetector(
               onTap: onDetail,

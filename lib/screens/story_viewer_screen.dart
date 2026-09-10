@@ -83,8 +83,8 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   /// True while a delete is in flight, so the control cannot be double-fired.
   bool _deleting = false;
 
-  /// Only the author can take a story down, and only the followers-only kind:
-  /// tutor and Linka stories live in a different table with a different owner.
+  /// Only the author can take a story down, and only the social kind: tutor and
+  /// Linka stories live in a different table with a different owner.
   bool get _canDeleteCurrent =>
       _current.source == StorySource.social &&
       _tutor.userId != null &&

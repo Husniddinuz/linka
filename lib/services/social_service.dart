@@ -5,10 +5,10 @@ import 'api_service.dart';
 
 /// The social API: public profiles, the follow graph, and stories.
 ///
-/// One rule governs the whole surface: **a story is visible to its author and to
-/// that author's followers, and to nobody else.** Following is instant and
-/// public — there is no request or approval step — but profiles are readable by
-/// any signed-in account while stories are not.
+/// One rule governs the whole surface: **a live story is visible to every
+/// signed-in account.** Stories were followers-only until the rail was widened;
+/// following is instant and public, and now decides only what the feed puts
+/// first, not what it puts in.
 ///
 /// `/tutors/stories/` is untouched by any of this and still returns every active
 /// tutor's stories to everyone. This service only decides what belongs in *your*
@@ -54,14 +54,38 @@ class SocialService {
   }
 
   /// These two are paginated upstream — `{count, next, previous, results}` —
-  /// unlike most list endpoints here, which return a bare array. Only the first
-  /// page is read: no screen shows more, and a follower list long enough to
-  /// need paging does not exist yet.
+  /// unlike most list endpoints here, which return a bare array. These read
+  /// only the first page, which is all a profile's preview shows; the full
+  /// lists page through [followersPage] and [followingPage].
   static Future<List<SocialUserCard>> followers(int userId) =>
       _cards('/social/users/$userId/followers/');
 
   static Future<List<SocialUserCard>> following(int userId) =>
       _cards('/social/users/$userId/following/');
+
+  /// One page of followers, starting [offset] rows in. Upstream pages by
+  /// limit/offset, 30 rows at a time by default.
+  static Future<SocialUserPage> followersPage(int userId, {int offset = 0}) =>
+      _page('/social/users/$userId/followers/?offset=$offset', offset);
+
+  static Future<SocialUserPage> followingPage(int userId, {int offset = 0}) =>
+      _page('/social/users/$userId/following/?offset=$offset', offset);
+
+  static Future<SocialUserPage> _page(String path, int offset) async {
+    final json = await ApiService.get(path);
+    final results = json['results'];
+    final cards = results is List
+        ? results
+            .whereType<Map<String, dynamic>>()
+            .map(SocialUserCard.fromJson)
+            .toList()
+        : const <SocialUserCard>[];
+    return SocialUserPage(
+      results: cards,
+      count: (json['count'] as num?)?.toInt() ?? cards.length,
+      nextOffset: json['next'] != null ? offset + cards.length : null,
+    );
+  }
 
   /// Accounts matching [query] by name.
   ///
@@ -84,8 +108,9 @@ class SocialService {
         .toList();
   }
 
-  /// Live stories from every account you follow, plus your own, grouped by
-  /// author and ordered by the server.
+  /// Live stories from the whole community, grouped by author and ordered by
+  /// the server: your own first, then rings you have not watched, then the
+  /// accounts you follow, then whatever is newest.
   static Future<List<SocialFeedAuthor>> storyFeed() async {
     final raw = await ApiService.getList('/social/feed/stories/');
     return raw
@@ -106,12 +131,11 @@ class SocialService {
         .toList();
   }
 
-  /// Another account's live stories.
+  /// Another account's live stories. No follow required.
   ///
-  /// Answers 403 unless you follow them, which is the followers-only rule being
-  /// enforced rather than merely advertised — check `canViewStories` on the
-  /// profile first and this never fires. A refusal returns an empty list rather
-  /// than throwing, so a stale profile cannot break the screen.
+  /// A refusal still returns an empty list rather than throwing: an app running
+  /// against a backend that predates public stories answers 403 here, and an
+  /// empty shelf beats a broken screen.
   static Future<List<SocialStory>> userStories(int userId) async {
     try {
       final raw = await ApiService.getList('/social/users/$userId/stories/');
@@ -125,7 +149,7 @@ class SocialService {
     }
   }
 
-  /// Post a story, visible to your followers for 24 hours.
+  /// Post a story, visible to everyone for 24 hours.
   ///
   /// Streams the file from disk rather than sending base64 in JSON, so a large
   /// video is never held in memory whole. The server re-encodes video in the

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../models/social.dart';
 import '../widgets/cached_avatar.dart';
 import '../widgets/plus_badge.dart';
 import '../widgets/plus_member_card.dart';
@@ -10,6 +11,7 @@ import '../services/app_feature_service.dart';
 import '../services/auth_service.dart';
 import '../services/plus_service.dart';
 import '../services/share_service.dart';
+import '../services/social_service.dart';
 import '../services/theme_service.dart';
 import '../services/token_service.dart';
 import '../theme/app_colors.dart';
@@ -18,6 +20,7 @@ import '../services/wallet_service.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/skeleton.dart';
 import 'affiliate_screen.dart';
+import 'follow_list_screen.dart';
 import 'profile_setup_screen.dart';
 import 'plus_subscription_screen.dart';
 import 'saved_tutors_screen.dart';
@@ -51,6 +54,11 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
   bool _isExemptFromPlus = false;
   PlusStatus? _plusStatus;
 
+  /// Your public profile, for the follower counts in the hero. Null while it
+  /// loads, and after a failure — [_socialFailed] tells the two apart.
+  SocialProfile? _social;
+  bool _socialFailed = false;
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +72,42 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
     }
     _loadProfile();
     _loadPlusStatus();
+    _loadSocial();
+  }
+
+  Future<void> _loadSocial() async {
+    try {
+      final social = await SocialService.myProfile();
+      if (!mounted) return;
+      setState(() {
+        _social = social;
+        _socialFailed = social == null;
+      });
+    } catch (_) {
+      // Keep counts already on screen; only a first load that fails hides them.
+      if (mounted && _social == null) setState(() => _socialFailed = true);
+    }
+  }
+
+  Future<void> _openFollowList(FollowListTab tab) async {
+    final userId = _social?.userId ?? UserService.current?.id;
+    if (userId == null) return;
+    final name =
+        '${_profile?['first_name'] ?? ''} ${_profile?['last_name'] ?? ''}'
+            .trim();
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FollowListScreen(
+          userId: userId,
+          title: name.isEmpty ? 'My profile' : name,
+          initialTab: tab,
+          followersCount: _social?.followersCount,
+          followingCount: _social?.followingCount,
+        ),
+      ),
+    );
+    // Following back and unfollowing from the list change the counts here.
+    if (mounted) _loadSocial();
   }
 
   Future<void> _loadPlusStatus() async {
@@ -223,7 +267,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
         body: RefreshIndicator(
           color: Colors.white,
           backgroundColor: colors.brand,
-          onRefresh: _loadProfile,
+          onRefresh: () => Future.wait([_loadProfile(), _loadSocial()]),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
@@ -460,6 +504,16 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
       // Students get extra bottom room for the overlapping balance card.
       bottomPadding: _isTeacher ? 28.0 : 56.0,
       onEdit: _openEditProfile,
+      // Hidden only when the counts could not be read at all; while they load
+      // the row holds its place, so the hero does not jump when they land.
+      follow: _socialFailed
+          ? null
+          : _FollowCounts(
+              followers: _social?.followersCount,
+              following: _social?.followingCount,
+              onFollowers: () => _openFollowList(FollowListTab.followers),
+              onFollowing: () => _openFollowList(FollowListTab.following),
+            ),
     );
     if (_isTeacher) return hero;
 
@@ -488,6 +542,7 @@ class _HeroPanel extends StatelessWidget {
   final bool isPlus;
   final double bottomPadding;
   final VoidCallback onEdit;
+  final Widget? follow;
 
   const _HeroPanel({
     required this.profile,
@@ -496,6 +551,7 @@ class _HeroPanel extends StatelessWidget {
     required this.isPlus,
     required this.bottomPadding,
     required this.onEdit,
+    this.follow,
   });
 
   @override
@@ -639,6 +695,10 @@ class _HeroPanel extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (follow != null) ...[
+                  const SizedBox(height: 16),
+                  follow!,
+                ],
                 SizedBox(height: bottomPadding),
               ],
             ),
@@ -718,6 +778,105 @@ class _RoleChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Followers and following, side by side in a frosted strip; each half opens
+/// its tab of the follow list. A null count is still loading.
+class _FollowCounts extends StatelessWidget {
+  final int? followers;
+  final int? following;
+  final VoidCallback onFollowers;
+  final VoidCallback onFollowing;
+
+  const _FollowCounts({
+    required this.followers,
+    required this.following,
+    required this.onFollowers,
+    required this.onFollowing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              Expanded(
+                child: _FollowCount(
+                  value: followers,
+                  label: followers == 1 ? 'Follower' : 'Followers',
+                  onTap: onFollowers,
+                ),
+              ),
+              Container(
+                width: 1,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                color: Colors.white.withValues(alpha: 0.15),
+              ),
+              Expanded(
+                child: _FollowCount(
+                  value: following,
+                  label: 'Following',
+                  onTap: onFollowing,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FollowCount extends StatelessWidget {
+  final int? value;
+  final String label;
+  final VoidCallback onTap;
+
+  const _FollowCount({
+    required this.value,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Column(
+          children: [
+            Text(
+              value?.toString() ?? '–',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.white.withValues(alpha: 0.75),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

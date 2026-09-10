@@ -5,6 +5,8 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/social.dart';
 import '../services/api_service.dart';
+import '../services/call_kit_service.dart';
+import '../services/call_service.dart';
 import '../services/chat_service.dart';
 import '../services/social_service.dart';
 import '../services/user_service.dart';
@@ -12,6 +14,7 @@ import '../theme/app_colors.dart';
 import '../widgets/skeleton.dart';
 import 'channel_chat_screen.dart';
 import 'plus_subscription_screen.dart';
+import 'video_call_screen.dart';
 
 // ─── Models ────────────────────────────────────────────────────────────────────
 
@@ -258,6 +261,63 @@ Future<void> openDirectConversation(
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(e.toString())),
+    );
+  }
+}
+
+/// Rings whoever [userId] is from outside their thread — a profile opened from
+/// a chat, where the call control sits in the same place as the one in the
+/// chat header.
+///
+/// A call lives in a conversation, so the thread is opened first; the server
+/// hands back the existing one when there already is one. Both steps cost
+/// Plus, exactly as starting the thread does, and both refusals route the
+/// same way.
+Future<void> startDirectCall(
+  BuildContext context, {
+  required int userId,
+}) async {
+  try {
+    final raw = await ChatService.startConversation(userId: userId);
+    if (!context.mounted) return;
+    final session = await CallService.start(DirectConversation.fromJson(raw).id);
+    if (!context.mounted) return;
+    CallKitService.activeCallUuid = session.call.roomId;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VideoCallScreen(session: session, incoming: false),
+        fullscreenDialog: true,
+      ),
+    );
+  } on ConversationRefused catch (e) {
+    if (!context.mounted) return;
+    if (e.needsPlus) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PlusSubscriptionScreen()),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(e.message)),
+    );
+  } on CallRefused catch (e) {
+    if (!context.mounted) return;
+    if (e.needsPlus) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PlusSubscriptionScreen()),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(e.message)),
+    );
+  } catch (_) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not start the call.')),
     );
   }
 }

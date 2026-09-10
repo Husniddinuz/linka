@@ -8,11 +8,10 @@ import '../theme/app_colors.dart';
 /// Where the student stands, on the screen they actually land on — the
 /// website's dashboard strip, on the phone.
 ///
-/// Self-contained: it fetches, and it collapses to nothing while loading, on
-/// failure, or when there is no history at all. A student who signed up a
-/// minute ago should see the practice grid, not a row of dashes; the numbers
-/// appear once there is something to count. Every tile opens the full
-/// progress screen.
+/// Self-contained: it fetches, and it collapses to nothing only while loading
+/// or after a failure. A student who signed up a minute ago still sees the
+/// strip, reading zeros with a line under each tile saying what earns the
+/// first number. Every tile opens the full progress screen.
 class ProgressStrip extends StatefulWidget {
   const ProgressStrip({super.key});
 
@@ -50,7 +49,7 @@ class ProgressStripState extends State<ProgressStrip> {
   @override
   Widget build(BuildContext context) {
     final progress = _progress;
-    if (progress == null || !progress.hasAny) return const SizedBox.shrink();
+    if (progress == null) return const SizedBox.shrink();
     final colors = context.colors;
     return Padding(
       padding: const EdgeInsets.only(bottom: 28),

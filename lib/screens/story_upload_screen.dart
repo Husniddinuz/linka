@@ -15,13 +15,14 @@ import '../utils/format.dart';
 ///
 /// - [StoryAudience.tutor] posts to the tutor story table, which every signed-in
 ///   account can see. Tutors only.
-/// - [StoryAudience.followers] posts to the social story table, visible to the
-///   author's followers for 24 hours. Open to anyone, and the only kind a
-///   student can post.
+/// - [StoryAudience.social] posts to the social story table, live for 24 hours
+///   and — since the rail was widened past the follow graph — also visible to
+///   every signed-in account. Open to anyone, and the only kind a student can
+///   post.
 ///
 /// One screen rather than two because the difference is the endpoint; a second
 /// copy is how one of them quietly stops streaming large files.
-enum StoryAudience { tutor, followers }
+enum StoryAudience { tutor, social }
 
 class StoryUploadScreen extends StatefulWidget {
   final StoryAudience audience;
@@ -164,7 +165,7 @@ class _StoryUploadScreenState extends State<StoryUploadScreen> {
       // Stream the media straight from disk so large videos are never loaded
       // into memory whole (unlike the old base64-in-JSON approach).
       await ApiService.postMultipart(
-        widget.audience == StoryAudience.followers
+        widget.audience == StoryAudience.social
             ? '/social/stories/'
             : '/tutor/stories/',
         files: {'media_file': _media!},
