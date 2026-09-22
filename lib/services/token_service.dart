@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'course_reels_resume_service.dart';
+
 class TokenService {
   static const _accessKey = 'access_token';
   static const _refreshKey = 'refresh_token';
@@ -33,6 +35,8 @@ class TokenService {
     final prefs = await _instance;
     await prefs.remove(_accessKey);
     await prefs.remove(_refreshKey);
+    // The Course Reels resume point belongs to the account signing out.
+    await CourseReelsResumeService.clear();
   }
 
   static Future<bool> isLoggedIn() async {

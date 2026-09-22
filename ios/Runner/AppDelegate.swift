@@ -7,6 +7,8 @@ import flutter_callkit_incoming
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, PKPushRegistryDelegate {
+  private var screenSecurity: ScreenSecurity?
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -38,6 +40,9 @@ import flutter_callkit_incoming
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "ScreenSecurity") {
+      screenSecurity = ScreenSecurity(messenger: registrar.messenger())
+    }
   }
 
   // MARK: - PushKit
@@ -93,6 +98,57 @@ import flutter_callkit_incoming
     // `completion` must run once CallKit has it. The plugin does both.
     SwiftFlutterCallkitIncomingPlugin.sharedInstance?.showCallkitIncoming(data, fromPushKit: true) {
       completion()
+    }
+  }
+}
+
+// MARK: - Screen security
+
+/// Course Reels: iOS can't block screen recording, so this reports it instead.
+/// Dart (lib/services/screen_security_service.dart) asks `isCaptured` and gets
+/// `captureChanged(Bool)` whenever recording, AirPlay or mirroring starts or
+/// stops, and hides the video while it's on. `setSecure` is a no-op here —
+/// it exists so Dart can call one API on both platforms.
+final class ScreenSecurity: NSObject {
+  private let channel: FlutterMethodChannel
+
+  init(messenger: FlutterBinaryMessenger) {
+    channel = FlutterMethodChannel(name: "linka/screen_security", binaryMessenger: messenger)
+    super.init()
+    channel.setMethodCallHandler { [weak self] call, result in
+      switch call.method {
+      case "isCaptured":
+        result(self?.isCaptured ?? false)
+      case "setSecure":
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(captureChanged),
+      name: UIScreen.capturedDidChangeNotification,
+      object: nil
+    )
+  }
+
+  deinit {
+    NotificationCenter.default.removeObserver(self)
+  }
+
+  private var isCaptured: Bool {
+    if #available(iOS 17.0, *) {
+      let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+      return scenes.contains { $0.traitCollection.sceneCaptureState == .active }
+    }
+    return UIScreen.main.isCaptured
+  }
+
+  @objc private func captureChanged() {
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.channel.invokeMethod("captureChanged", arguments: self.isCaptured)
     }
   }
 }

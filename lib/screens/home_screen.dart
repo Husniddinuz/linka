@@ -49,9 +49,12 @@ import 'ielts_booking_screen.dart';
 import 'mock_exams_screen.dart';
 import 'speaking_samples_list_screen.dart';
 import 'writing_samples_list_screen.dart';
+import 'course_reels_screen.dart';
 import 'courses_list_screen.dart';
 import '../models/course.dart';
+import '../models/course_reel.dart';
 import '../models/social.dart';
+import '../services/course_reels_service.dart';
 import '../services/course_service.dart';
 import '../services/social_service.dart';
 
@@ -258,6 +261,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadPodcasts();
     _loadArticles();
     _loadCourses();
+    _loadCourseReels();
     _loadSavedArticles();
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
     NotificationService.registerDevice().catchError((_) {});
@@ -500,6 +504,39 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _loadCourseReels() async {
+    if (!AppFeatureService.isEnabled('course_reels')) return;
+    try {
+      final resume = await CourseReelsService.fetchResume();
+      final hasCourses = resume.course != null ||
+          (await CourseReelsService.fetchLanguages()).isNotEmpty;
+      if (!mounted) return;
+      setState(() {
+        _reelResume = resume;
+        _hasReelCourses = hasCourses;
+      });
+    } catch (_) {
+      // Leave it hidden on failure (also before the backend ships the API).
+    }
+  }
+
+  Future<void> _openCourseReels() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CourseReelsScreen()),
+    );
+    if (mounted) _loadCourseReels();
+  }
+
+  Future<void> _continueCourseReel(ReelResume resume) async {
+    await openCourseReel(
+      context,
+      courseId: resume.course!.id,
+      lessonId: resume.lesson?.id,
+    );
+    if (mounted) _loadCourseReels();
+  }
+
   Future<void> _loadCourses() async {
     try {
       final list = await CourseService.fetchCourses();
@@ -582,6 +619,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadPodcasts(),
       _loadArticles(),
       _loadCourses(),
+      _loadCourseReels(),
       _loadSavedArticles(),
       _loadProfile(),
       // The webinar/debate blocks manage their own state, so explicitly ask
@@ -710,6 +748,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<_Article> _articles = [];
 
   List<Course> _courses = [];
+  ReelResume? _reelResume;
+  bool _hasReelCourses = false;
 
   Widget _buildStudentHomeBody() {
     return SafeArea(
@@ -837,6 +877,31 @@ class _HomeScreenState extends State<HomeScreen> {
                                   AppFeatureService.isEnabled(
                                       'mock_tests')) ...[
                                 const _IeltsSection(),
+                                const SizedBox(height: 28),
+                              ],
+
+                              if (AppFeatureService.isEnabled('course_reels') &&
+                                  _hasReelCourses) ...[
+                                _SectionHeader(
+                                  title: 'COURSE REELS',
+                                  onSeeAll: _openCourseReels,
+                                ),
+                                const SizedBox(height: 12),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                  ),
+                                  child: _reelResume?.course != null
+                                      ? ReelContinueCard(
+                                          course: _reelResume!.course!,
+                                          lesson: _reelResume!.lesson,
+                                          onTap: () =>
+                                              _continueCourseReel(_reelResume!),
+                                        )
+                                      : ReelsPromoBanner(
+                                          onTap: _openCourseReels,
+                                        ),
+                                ),
                                 const SizedBox(height: 28),
                               ],
 

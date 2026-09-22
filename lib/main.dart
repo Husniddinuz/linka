@@ -14,6 +14,7 @@ import 'services/api_service.dart';
 import 'services/app_feature_service.dart';
 import 'services/auth_service.dart';
 import 'services/call_kit_service.dart';
+import 'services/course_reels_resume_service.dart';
 import 'services/facebook_events_service.dart';
 import 'services/notification_service.dart';
 import 'services/podcast_progress_service.dart';
@@ -47,6 +48,8 @@ void main() async {
   // Resume points are read synchronously from cache while building podcast
   // lists, so they have to be in memory before the first frame.
   await PodcastProgressService.load();
+  // Same for the Course Reels resume point behind the home "Continue" card.
+  await CourseReelsResumeService.load();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   // Global session-expired handler: any 401 that can't be recovered by
@@ -104,6 +107,11 @@ class _LinkaAppState extends State<LinkaApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Refresh remote feature flags when the app returns to the foreground so
     // toggles flipped server-side land without a restart.
+    if (state == AppLifecycleState.paused) {
+      // Get the Course Reels playback position to the server before the OS
+      // can kill the app.
+      CourseReelsResumeService.flush();
+    }
     if (state == AppLifecycleState.resumed) {
       AppFeatureService.refresh();
       CallKitService.resumeAcceptedCall();
