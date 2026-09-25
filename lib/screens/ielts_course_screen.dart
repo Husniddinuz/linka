@@ -6,6 +6,7 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../models/course_reel.dart';
 import '../services/api_service.dart';
+import '../services/course_reels_resume_service.dart';
 import '../services/course_reels_service.dart';
 import '../services/wallet_service.dart';
 import '../theme/app_colors.dart';
@@ -116,9 +117,15 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
   bool _loading = true;
   bool _failed = false;
 
-  // Sections whose intro the student has been through. Unit 1 stays locked
-  // until then. Local only for now.
-  final Set<IeltsPart> _introSeen = {};
+  // Whether the student has been through a section's intro; unit 1 stays
+  // locked until then. Saved on the device, and a section with any progress
+  // counts as seen too, so a reinstall or another phone doesn't lock
+  // finished units again.
+  bool _introSeen(IeltsPart part) =>
+      CourseReelsResumeService.introSeen(part.id) ||
+      part.lessons.any(
+        (l) => l.progress.watched || l.progress.positionSeconds > 0,
+      );
 
   Map<IeltsPart, int> get _completed => {
     for (final p in _parts) p: p.completed,
@@ -155,7 +162,10 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
       _failed = false;
     });
     try {
-      final course = await CourseReelsService.fetchCourse(widget.courseId);
+      final (course, _) = await (
+        CourseReelsService.fetchCourse(widget.courseId),
+        CourseReelsResumeService.load(),
+      ).wait;
       if (!mounted) return;
       final parts = [
         for (final (i, section) in course.sections.indexed)
@@ -189,7 +199,7 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
   /// [i] is the unit index; -1 is the section's intro, which always comes
   /// first.
   _UnitState _state(IeltsPart part, int i) {
-    final seen = _introSeen.contains(part);
+    final seen = _introSeen(part);
     if (i < 0) return seen ? _UnitState.done : _UnitState.current;
     if (!seen) return _UnitState.locked;
     final done = _completed[part]!;
@@ -361,7 +371,8 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
       ),
     );
     if (!mounted || started != true) return;
-    setState(() => _introSeen.add(part));
+    await CourseReelsResumeService.markIntroSeen(part.id);
+    if (mounted) setState(() {});
   }
 
   void _openUnit(IeltsPart part, int i) {
@@ -378,7 +389,7 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            _introSeen.contains(part)
+            _introSeen(part)
                 ? 'Finish ${part.label} · Unit ${_completed[part]! + 1} first'
                 : 'Start with the ${part.label} intro',
           ),
@@ -647,7 +658,7 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
     // Green once the student has moved past the lower end.
     final done = switch (lower.kind) {
       _NodeKind.unit => _state(lower.part!, lower.index) == _UnitState.done,
-      _NodeKind.banner => _introSeen.contains(lower.part),
+      _NodeKind.banner => _introSeen(lower.part!),
       _NodeKind.certificate => false,
     };
     return _Segment(

@@ -62,6 +62,7 @@ class CourseReelsResumeService {
   CourseReelsResumeService._();
 
   static const _key = 'course_reels_resume_v1';
+  static const _introsKey = 'course_reels_intros_seen_v1';
 
   /// How often a playing video reports its position to the server.
   static const syncInterval = Duration(seconds: 6);
@@ -75,6 +76,9 @@ class CourseReelsResumeService {
   /// lesson reached its end and must be reported as watched.
   static final Map<int, ReelResumePoint> _pending = {};
   static final Set<int> _pendingCompleted = {};
+
+  /// Course sections whose intro this student has been through.
+  static final Set<int> _introsSeen = {};
 
   static Timer? _syncTimer;
   static Future<void>? _flushing;
@@ -90,6 +94,11 @@ class CourseReelsResumeService {
     _loaded = true;
     try {
       _prefs = await SharedPreferences.getInstance();
+      _introsSeen.addAll(
+        (_prefs?.getStringList(_introsKey) ?? const [])
+            .map(int.tryParse)
+            .whereType<int>(),
+      );
       final raw = _prefs?.getString(_key);
       if (raw == null || raw.isEmpty) return;
       final decoded = jsonDecode(raw);
@@ -109,6 +118,18 @@ class CourseReelsResumeService {
     } catch (_) {
       // A corrupt blob only costs the local resume point; the server has one.
     }
+  }
+
+  /// Whether the student has been through section [sectionId]'s intro on
+  /// this device. Call [load] first.
+  static bool introSeen(int sectionId) => _introsSeen.contains(sectionId);
+
+  static Future<void> markIntroSeen(int sectionId) async {
+    await load();
+    if (!_introsSeen.add(sectionId)) return;
+    await _prefs?.setStringList(_introsKey, [
+      for (final id in _introsSeen) '$id',
+    ]);
   }
 
   /// Where to start [lessonId]: this device's position while it is still
@@ -214,7 +235,9 @@ class CourseReelsResumeService {
     _last = null;
     _pending.clear();
     _pendingCompleted.clear();
+    _introsSeen.clear();
     await _prefs?.remove(_key);
+    await _prefs?.remove(_introsKey);
     revision.value++;
   }
 }
