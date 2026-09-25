@@ -24,6 +24,33 @@ class CourseReelsService {
     );
   }
 
+  /// Courses split into sections — the home screen's subject tiles. Listed
+  /// even before their first lesson is uploaded.
+  static Future<List<ReelCourse>> fetchSectionedCourses() async =>
+      ReelCourse.listFromJson(
+        await ApiService.getList('/course-reels/courses/?with_sections=1'),
+      );
+
+  /// Unlocks a paid section with the wallet balance. Buying one the student
+  /// already owns charges nothing. Throws [ReelInsufficientBalance] (nothing
+  /// charged) when the balance is short.
+  static Future<void> buySection(int sectionId) async {
+    try {
+      await ApiService.post('/course-reels/sections/$sectionId/buy/', const {});
+    } on ApiException catch (e) {
+      if (e.errorCode == 'insufficient_balance') {
+        int uzs(String key) =>
+            double.tryParse('${e.data?[key] ?? ''}')?.ceil() ?? 0;
+        throw ReelInsufficientBalance(
+          priceUzs: uzs('required_uzs'),
+          balanceUzs: uzs('balance_uzs'),
+          shortfallUzs: uzs('shortfall_uzs'),
+        );
+      }
+      rethrow;
+    }
+  }
+
   /// The course with every lesson — the feed and the progress map both read it.
   static Future<ReelCourse> fetchCourse(int id) async =>
       ReelCourse.fromJson(await ApiService.get('/course-reels/courses/$id/'));
@@ -114,4 +141,21 @@ class CourseReelsService {
       'answer': answer,
     }),
   );
+}
+
+/// The wallet can't cover a section; [shortfallUzs] is what a top-up needs
+/// to add before [CourseReelsService.buySection] goes through.
+class ReelInsufficientBalance implements Exception {
+  const ReelInsufficientBalance({
+    required this.priceUzs,
+    required this.balanceUzs,
+    required this.shortfallUzs,
+  });
+
+  final int priceUzs;
+  final int balanceUzs;
+  final int shortfallUzs;
+
+  @override
+  String toString() => 'Insufficient wallet balance';
 }

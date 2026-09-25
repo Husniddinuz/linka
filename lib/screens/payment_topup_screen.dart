@@ -21,8 +21,15 @@ extension on PaymentMethod {
   }
 }
 
+/// Pops with the topped-up amount once the bank confirms it, or null.
 class PaymentTopUpScreen extends StatefulWidget {
-  const PaymentTopUpScreen({super.key});
+  const PaymentTopUpScreen({super.key, this.initialAmount, this.purpose});
+
+  /// Prefills the amount, e.g. exactly what a purchase is short by.
+  final int? initialAmount;
+
+  /// One line above the amount saying what the money is for.
+  final String? purpose;
 
   @override
   State<PaymentTopUpScreen> createState() => _PaymentTopUpScreenState();
@@ -43,6 +50,8 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    final amount = widget.initialAmount;
+    if (amount != null && amount > 0) _amountController.text = '$amount';
   }
 
   @override
@@ -291,6 +300,17 @@ class _PaymentTopUpScreenState extends State<PaymentTopUpScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 16),
+                  if (widget.purpose != null) ...[
+                    Text(
+                      widget.purpose!,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.4,
+                        color: context.colors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   Text(
                     'AMOUNT',
                     style: TextStyle(

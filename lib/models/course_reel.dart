@@ -99,10 +99,19 @@ class ReelLesson {
     required this.saved,
     required this.practiceRequired,
     required this.progress,
+    this.sectionId,
+    this.locked = false,
   });
 
   final int id;
   final int courseId;
+
+  /// The course section this lesson is a unit of; null outside any section.
+  final int? sectionId;
+
+  /// In a paid section the student hasn't bought: listed on the path, but
+  /// the server sends no video and refuses progress and practice.
+  final bool locked;
   final String courseTitle;
   final String title;
   final String description;
@@ -135,6 +144,8 @@ class ReelLesson {
   factory ReelLesson.fromJson(Map<String, dynamic> json) => ReelLesson(
     id: _asInt(json['id']),
     courseId: _asInt(json['course_id']),
+    sectionId: json['section_id'] == null ? null : _asInt(json['section_id']),
+    locked: json['locked'] as bool? ?? false,
     courseTitle: json['course_title']?.toString() ?? '',
     title: json['title']?.toString() ?? '',
     description: json['description']?.toString() ?? '',
@@ -163,6 +174,56 @@ class ReelLesson {
       .toList();
 }
 
+/// A part of a course (e.g. Speaking in Linka IELTS). Its lessons, in
+/// order, are the section's units on the course path.
+class ReelSection {
+  const ReelSection({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.plannedLessons,
+    required this.priceUzs,
+    required this.lessonsCount,
+    required this.owned,
+  });
+
+  final int id;
+  final String title;
+  final String description;
+
+  /// Material Symbols name; see `courseIcon`.
+  final String icon;
+
+  /// Free, or bought by this student — every unit is open.
+  final bool owned;
+
+  /// How many units the section will have once fully uploaded.
+  final int plannedLessons;
+
+  /// What unlocks the section; 0 = free.
+  final int priceUzs;
+
+  /// Units uploaded and published so far.
+  final int lessonsCount;
+
+  factory ReelSection.fromJson(Map<String, dynamic> json) => ReelSection(
+    id: _asInt(json['id']),
+    title: json['title']?.toString() ?? '',
+    description: json['description']?.toString() ?? '',
+    icon: json['icon']?.toString() ?? '',
+    plannedLessons: _asInt(json['planned_lessons']),
+    priceUzs: _asInt(json['price_uzs']),
+    lessonsCount: _asInt(json['lessons_count']),
+    owned: json['owned'] as bool? ?? _asInt(json['price_uzs']) == 0,
+  );
+
+  static List<ReelSection> listFromJson(List? raw) => (raw ?? const [])
+      .whereType<Map<String, dynamic>>()
+      .map(ReelSection.fromJson)
+      .toList();
+}
+
 class ReelCourse {
   const ReelCourse({
     required this.id,
@@ -176,6 +237,8 @@ class ReelCourse {
     required this.completedCount,
     required this.lastLessonId,
     required this.started,
+    this.icon = '',
+    this.sections = const [],
     this.lessons = const [],
   });
 
@@ -190,6 +253,13 @@ class ReelCourse {
   final int completedCount;
   final int? lastLessonId;
   final bool started;
+
+  /// Material Symbols name; see `courseIcon`.
+  final String icon;
+
+  /// Only filled by the detail endpoint, in path order. Empty for a course
+  /// that is one flat list of lessons.
+  final List<ReelSection> sections;
 
   /// Only filled by the detail endpoint.
   final List<ReelLesson> lessons;
@@ -211,6 +281,8 @@ class ReelCourse {
         ? null
         : _asInt(json['last_lesson_id']),
     started: json['started'] as bool? ?? false,
+    icon: json['icon']?.toString() ?? '',
+    sections: ReelSection.listFromJson(json['sections'] as List?),
     lessons: ReelLesson.listFromJson(json['lessons'] as List?),
   );
 

@@ -121,7 +121,9 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
       await CourseReelsResumeService.flush();
       final course = await CourseReelsService.fetchCourse(widget.courseId);
       if (!mounted) return;
-      final lessons = course.lessons;
+      // Units of a section the student hasn't bought come without a video;
+      // the course path is where they get unlocked.
+      final lessons = course.lessons.where((l) => !l.locked).toList();
       final start = _startIndex(course, lessons);
       if (lessons.isNotEmpty) {
         final lesson = lessons[start];

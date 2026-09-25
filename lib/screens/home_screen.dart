@@ -12,7 +12,8 @@ import '../widgets/podcast_artwork.dart';
 import '../widgets/lesson_card.dart';
 import '../widgets/mini_player_bar.dart';
 import '../widgets/skeleton.dart';
-import '../widgets/progress_strip.dart';
+import '../widgets/category_grid.dart';
+import 'ielts_course_screen.dart';
 import '../services/api_service.dart';
 import '../services/announcement_service.dart';
 import '../services/app_feature_service.dart';
@@ -242,7 +243,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Keys to drive the self-contained webinar/debate blocks on pull-to-refresh.
   final GlobalKey<_WebinarBlockState> _webinarKey = GlobalKey();
-  final GlobalKey<ProgressStripState> _progressKey = GlobalKey();
+  final GlobalKey<CategoryGridState> _categoryKey = GlobalKey();
   final GlobalKey<_DebateBlockState> _debateKey = GlobalKey();
 
   bool get _isInitialLoading =>
@@ -626,7 +627,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // them to re-fetch — otherwise a freshly created session won't appear.
       _webinarKey.currentState?.refresh() ?? Future.value(),
       _debateKey.currentState?.refresh() ?? Future.value(),
-      _progressKey.currentState?.refresh() ?? Future.value(),
+      _categoryKey.currentState?.refresh() ?? Future.value(),
     ]);
   }
 
@@ -745,6 +746,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Podcast> _podcasts = [];
 
+  /// A course path (e.g. Linka IELTS) replaces the home feed in the Home
+  /// tab, keeping the header and bottom nav around it.
+  int? _openCourseId;
+
   List<_Article> _articles = [];
 
   List<Course> _courses = [];
@@ -756,6 +761,8 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // The course path brings its own header with a back button.
+          if (_openCourseId == null)
           _Header(
             profileImage: _profileImage,
             isTutor: false,
@@ -766,6 +773,15 @@ class _HomeScreenState extends State<HomeScreen> {
             showAddStory: true,
             onStoryPosted: _loadStoryTutors,
           ),
+          if (_openCourseId != null)
+            Expanded(
+              child: IeltsCourseView(
+                key: ValueKey(_openCourseId),
+                courseId: _openCourseId!,
+                onBack: () => setState(() => _openCourseId = null),
+              ),
+            )
+          else
           Expanded(
             child: _isInitialLoading
                 ? Align(
@@ -868,10 +884,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
                               const SizedBox(height: 32),
 
-                              // Collapses to nothing until the student has
-                              // a band or a finished lesson to show.
-                              if (AppFeatureService.isEnabled('mock_tests'))
-                                ProgressStrip(key: _progressKey),
+                              // "Your progress" + subject categories.
+                              CategoryGrid(
+                                key: _categoryKey,
+                                onOpenCourse: (course) =>
+                                    setState(() => _openCourseId = course.id),
+                              ),
 
                               if (AppFeatureService.isEnabled('ielts') ||
                                   AppFeatureService.isEnabled(
@@ -1034,7 +1052,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ).push(MaterialPageRoute(builder: (_) => const TutorEarningsScreen()));
         return;
       }
-      setState(() => _selectedTab = i);
+      setState(() {
+        // Tapping Home while on Home backs out of the course path.
+        if (i == 0 && _selectedTab == 0) _openCourseId = null;
+        _selectedTab = i;
+      });
     }
 
     if (isTablet) {
@@ -1065,7 +1087,13 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    return Scaffold(
+    return PopScope(
+      // System back closes the course path before it leaves the app.
+      canPop: !(_openCourseId != null && _selectedTab == 0),
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) setState(() => _openCourseId = null);
+      },
+      child: Scaffold(
       backgroundColor: context.colors.background,
       body: IndexedStack(index: _selectedTab, children: children),
       bottomNavigationBar: Column(
@@ -1079,6 +1107,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 }

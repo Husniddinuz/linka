@@ -3,7 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:linka/models/course_reel.dart';
 import 'package:linka/screens/course_reels_map_screen.dart';
 import 'package:linka/screens/reel_practice_screen.dart';
+import 'package:linka/screens/ielts_course_screen.dart';
 import 'package:linka/theme/app_colors.dart';
+import 'package:linka/utils/course_icons.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 MaterialApp _app(Widget child, {bool dark = false}) {
   return MaterialApp(
@@ -40,6 +43,56 @@ Map<String, dynamic> _lessonJson(int id, {bool watched = false, bool completed =
     };
 
 void main() {
+  group('course sections', () {
+    test('detail parses sections, icons and each lesson\'s section', () {
+      final course = ReelCourse.fromJson({
+        'id': 7,
+        'title': 'Linka IELTS',
+        'icon': 'language',
+        'sections': [
+          {
+            'id': 3,
+            'title': 'Speaking',
+            'description': 'Talk every day.',
+            'icon': 'record_voice_over',
+            'planned_lessons': 10,
+            'price_uzs': 250000,
+            'lessons_count': 2,
+            'owned': false,
+          },
+        ],
+        'lessons': [
+          {..._lessonJson(1, watched: true, completed: true), 'section_id': 3},
+          {..._lessonJson(2), 'section_id': 3, 'locked': true},
+          _lessonJson(3),
+        ],
+      });
+      expect(courseIcon(course.icon), Symbols.language_rounded);
+      final section = course.sections.single;
+      expect(section.priceUzs, 250000);
+      expect(courseIcon(section.icon), Symbols.record_voice_over_rounded);
+      expect(course.lessons.map((l) => l.sectionId), [3, 3, null]);
+      expect(section.owned, isFalse);
+      expect(course.lessons.map((l) => l.locked), [false, true, false]);
+
+      final part = IeltsPart(section, 0, course.lessons.take(2).toList());
+      expect(part.unitCount, 10); // planned, not just uploaded
+      expect(part.completed, 1);
+      expect(part.priceLabel, '250 000 UZS');
+    });
+
+    test('a free section counts as owned when the server omits it', () {
+      final free = ReelSection.fromJson({'id': 1, 'price_uzs': 0});
+      final paid = ReelSection.fromJson({'id': 2, 'price_uzs': 1000});
+      expect([free.owned, paid.owned], [true, false]);
+    });
+
+    test('unknown or empty icon names fall back', () {
+      expect(courseIcon(''), Symbols.school_rounded);
+      expect(courseIcon('from_a_newer_admin'), Symbols.school_rounded);
+    });
+  });
+
   group('models', () {
     test('course detail parses lessons and progress', () {
       final course = ReelCourse.fromJson({
