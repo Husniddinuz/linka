@@ -317,7 +317,9 @@ class _ReelCommentsSheetState extends State<_ReelCommentsSheet> {
             children: [
               Flexible(
                 child: Text(
-                  comment.authorName,
+                  comment.authorName.isEmpty
+                      ? 'Linka student'
+                      : comment.authorName,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
