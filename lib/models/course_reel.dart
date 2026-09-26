@@ -465,28 +465,45 @@ class ReelAnswerResult {
 }
 
 class ReelComment {
-  const ReelComment({
+  ReelComment({
     required this.id,
+    required this.parentId,
     required this.text,
     required this.authorName,
     required this.authorImage,
     required this.isMine,
+    required this.likeCount,
+    required this.isLiked,
+    required this.replyCount,
+    required this.isEdited,
     required this.createdAt,
   });
 
   final int id;
-  final String text;
+
+  /// The root comment this replies to; null for a top-level comment.
+  final int? parentId;
+  String text;
   final String authorName;
   final String? authorImage;
   final bool isMine;
+  int likeCount;
+  bool isLiked;
+  int replyCount;
+  bool isEdited;
   final DateTime? createdAt;
 
   factory ReelComment.fromJson(Map<String, dynamic> json) => ReelComment(
     id: _asInt(json['id']),
+    parentId: (json['parent'] as num?)?.toInt(),
     text: json['text']?.toString() ?? '',
     authorName: json['author_name']?.toString() ?? '',
     authorImage: _nonEmpty(json['author_image']),
     isMine: json['is_mine'] as bool? ?? false,
+    likeCount: _asInt(json['like_count']),
+    isLiked: json['is_liked'] as bool? ?? false,
+    replyCount: _asInt(json['reply_count']),
+    isEdited: json['is_edited'] as bool? ?? false,
     createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),
   );
 }

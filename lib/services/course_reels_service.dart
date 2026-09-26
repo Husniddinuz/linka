@@ -100,15 +100,26 @@ class CourseReelsService {
   static Future<List<ReelLesson>> fetchSaved() async =>
       ReelLesson.listFromJson(await ApiService.getList('/course-reels/saved/'));
 
-  /// One page of comments, newest first, plus the total count.
+  /// One page of top-level comments, newest first, plus how many there are.
   static Future<(List<ReelComment>, int)> fetchComments(
     int lessonId, {
     int offset = 0,
     int limit = 30,
-  }) async {
-    final data = await ApiService.get(
-      '/course-reels/lessons/$lessonId/comments/?limit=$limit&offset=$offset',
-    );
+  }) => _commentPage(
+    '/course-reels/lessons/$lessonId/comments/?limit=$limit&offset=$offset',
+  );
+
+  /// One page of replies to [commentId], oldest first, plus how many there are.
+  static Future<(List<ReelComment>, int)> fetchReplies(
+    int commentId, {
+    int offset = 0,
+    int limit = 30,
+  }) => _commentPage(
+    '/course-reels/comments/$commentId/replies/?limit=$limit&offset=$offset',
+  );
+
+  static Future<(List<ReelComment>, int)> _commentPage(String path) async {
+    final data = await ApiService.get(path);
     final items = (data['results'] as List? ?? const [])
         .whereType<Map<String, dynamic>>()
         .map(ReelComment.fromJson)
@@ -116,15 +127,40 @@ class CourseReelsService {
     return (items, (data['count'] as num?)?.toInt() ?? items.length);
   }
 
-  static Future<ReelComment> postComment(int lessonId, String text) async =>
+  /// Posts a comment, or a reply when [parentId] is set. The server moves a
+  /// reply to a reply onto its root.
+  static Future<ReelComment> postComment(
+    int lessonId,
+    String text, {
+    int? parentId,
+  }) async => ReelComment.fromJson(
+    await ApiService.post('/course-reels/lessons/$lessonId/comments/', {
+      'text': text,
+      'parent': ?parentId,
+    }),
+  );
+
+  static Future<ReelComment> editComment(int commentId, String text) async =>
       ReelComment.fromJson(
-        await ApiService.post('/course-reels/lessons/$lessonId/comments/', {
+        await ApiService.patch('/course-reels/comments/$commentId/', {
           'text': text,
         }),
       );
 
   static Future<void> deleteComment(int commentId) =>
       ApiService.delete('/course-reels/comments/$commentId/');
+
+  /// Returns (liked, likeCount) as the server now has them.
+  static Future<(bool, int)> setCommentLiked(int commentId, bool liked) async {
+    final path = '/course-reels/comments/$commentId/like/';
+    final data = liked
+        ? await ApiService.post(path, const {})
+        : await ApiService.delete(path);
+    return (
+      data['liked'] as bool? ?? liked,
+      (data['like_count'] as num?)?.toInt() ?? 0,
+    );
+  }
 
   static Future<ReelPractice> fetchPractice(int lessonId) async =>
       ReelPractice.fromJson(

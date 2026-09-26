@@ -12,6 +12,7 @@ import '../services/wallet_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/course_icons.dart';
 import 'course_reels_feed_screen.dart';
+import 'course_reels_screen.dart' show SavedReelsScreen;
 import 'ielts_section_intro_screen.dart';
 import 'payment_topup_screen.dart';
 
@@ -67,8 +68,9 @@ class IeltsPart {
 
 /// A sectioned course (e.g. Linka IELTS) as one game-style path: the first
 /// section at the bottom, each section's last unit leading into the next
-/// section's banner. The header dropdown jumps between sections and follows
-/// along as the student scrolls. Sections, icons, prices and unit counts all
+/// section's banner. The header has two dropdowns: one switches to another
+/// sectioned course, the other jumps between sections and follows along as
+/// the student scrolls. Sections, icons, prices and unit counts all
 /// come from the admin panel.
 ///
 /// Shown inside the Home tab, under the app header and above the bottom
@@ -78,10 +80,14 @@ class IeltsCourseView extends StatefulWidget {
     super.key,
     required this.courseId,
     required this.onBack,
+    required this.onOpenCourse,
   });
 
   final int courseId;
   final VoidCallback onBack;
+
+  /// Another course picked in the header; the Home tab owns which one is open.
+  final ValueChanged<int> onOpenCourse;
 
   @override
   State<IeltsCourseView> createState() => _IeltsCourseViewState();
@@ -114,6 +120,10 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
 
   ReelCourse? _course;
   List<IeltsPart> _parts = const [];
+
+  /// The sectioned courses the header can switch between. Kept across
+  /// switches, since each course gets a fresh view.
+  static List<ReelCourse> _courses = const [];
   bool _loading = true;
   bool _failed = false;
 
@@ -174,6 +184,7 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
               if (lesson.sectionId == section.id) lesson,
           ]),
       ];
+      _loadCourses();
       setState(() {
         _course = course;
         _parts = parts;
@@ -187,6 +198,16 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
         _failed = _course == null;
       });
     }
+  }
+
+  /// Fills the course switcher. Failing leaves the last list (or just this
+  /// course) in place; the path itself doesn't depend on it.
+  Future<void> _loadCourses() async {
+    try {
+      final courses = await CourseReelsService.fetchSectionedCourses();
+      if (!mounted) return;
+      setState(() => _courses = courses);
+    } catch (_) {}
   }
 
   @override
@@ -421,6 +442,14 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
     if (mounted) _load();
   }
 
+  Future<void> _openSaved() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SavedReelsScreen()),
+    );
+    if (mounted) _load();
+  }
+
   /// Places every banner, unit and the certificate, bottom to top.
   _Layout _layout(double width, double bottomInset) {
     final amplitude = math.min(width * 0.26, 110.0);
@@ -519,30 +548,48 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
                 icon: Icon(Symbols.arrow_back_rounded, color: c.textPrimary),
               ),
               Expanded(
-                child: Center(
-                  child: _SectionDropdown(
-                    courseTitle: _course!.title,
-                    entries: [
-                      for (final part in _parts)
-                        _DropdownEntry(
-                          icon: part.icon,
-                          label: part.label,
-                          progress: _owned.contains(part)
-                              ? '${part.completed}/${part.unitCount}'
-                              : null,
-                        ),
-                      _DropdownEntry(
-                        icon: Symbols.workspace_premium_rounded,
-                        label: 'Certificate',
-                        progress: _certificateEarned ? 'Earned' : null,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: _CourseDropdown(
+                        current: _course!,
+                        courses: _courses,
+                        onSelected: (id) {
+                          if (id != widget.courseId) widget.onOpenCourse(id);
+                        },
                       ),
-                    ],
-                    selected: _selected,
-                    onSelected: _jumpTo,
-                  ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: _SectionDropdown(
+                        entries: [
+                          for (final part in _parts)
+                            _DropdownEntry(
+                              icon: part.icon,
+                              label: part.label,
+                              progress: _owned.contains(part)
+                                  ? '${part.completed}/${part.unitCount}'
+                                  : null,
+                            ),
+                          _DropdownEntry(
+                            icon: Symbols.workspace_premium_rounded,
+                            label: 'Certificate',
+                            progress: _certificateEarned ? 'Earned' : null,
+                          ),
+                        ],
+                        selected: _selected,
+                        onSelected: _jumpTo,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 48), // balances the back button
+              IconButton(
+                tooltip: 'Saved lessons',
+                onPressed: _openSaved,
+                icon: Icon(Symbols.bookmark_rounded, color: c.textPrimary),
+              ),
             ],
           ),
         ),
@@ -733,15 +780,59 @@ class _DropdownEntry {
   final String? progress;
 }
 
+/// Switches the path to another sectioned course. Always a dropdown, even
+/// while this is the only course, so students know where to find more.
+class _CourseDropdown extends StatelessWidget {
+  const _CourseDropdown({
+    required this.current,
+    required this.courses,
+    required this.onSelected,
+  });
+
+  final ReelCourse current;
+  final List<ReelCourse> courses;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    // The list may still be loading (or have failed); the open course is
+    // always an option.
+    final options = [
+      if (!courses.any((course) => course.id == current.id)) current,
+      ...courses,
+    ];
+    return PopupMenuButton<int>(
+      onSelected: onSelected,
+      position: PopupMenuPosition.under,
+      offset: const Offset(0, 8),
+      color: c.surface,
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      itemBuilder: (context) => [
+        for (final course in options)
+          PopupMenuItem(
+            value: course.id,
+            height: 52,
+            child: _MenuRow(
+              icon: courseIcon(course.icon),
+              label: course.title,
+              selected: course.id == current.id,
+            ),
+          ),
+      ],
+      child: _HeaderPill(icon: courseIcon(current.icon), label: current.title),
+    );
+  }
+}
+
 class _SectionDropdown extends StatelessWidget {
   const _SectionDropdown({
-    required this.courseTitle,
     required this.entries,
     required this.selected,
     required this.onSelected,
   });
 
-  final String courseTitle;
   final List<_DropdownEntry> entries;
   final int selected;
   final ValueChanged<int> onSelected;
@@ -762,35 +853,12 @@ class _SectionDropdown extends StatelessWidget {
           PopupMenuItem(
             value: i,
             height: 52,
-            child: SizedBox(
-              width: 200,
-              child: Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: c.surfaceAlt,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(e.icon, size: 19, color: c.textPrimary),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      e.label,
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 15,
-                        fontWeight: i == selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: c.textPrimary,
-                      ),
-                    ),
-                  ),
-                  if (e.progress != null)
-                    Text(
+            child: _MenuRow(
+              icon: e.icon,
+              label: e.label,
+              selected: i == selected,
+              trailing: e.progress != null
+                  ? Text(
                       e.progress!,
                       style: TextStyle(
                         fontFamily: 'SF Pro',
@@ -799,65 +867,120 @@ class _SectionDropdown extends StatelessWidget {
                         color: c.textTertiary,
                       ),
                     )
-                  else
-                    Icon(Symbols.lock_rounded, size: 16, color: c.textTertiary),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Symbols.check_rounded,
-                    size: 18,
-                    color: i == selected ? c.textPrimary : Colors.transparent,
-                  ),
-                ],
-              ),
+                  : Icon(Symbols.lock_rounded, size: 16, color: c.textTertiary),
             ),
           ),
       ],
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-        decoration: BoxDecoration(
-          color: c.surfaceAlt,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(current.icon, size: 18, color: c.textPrimary),
-            const SizedBox(width: 8),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  courseTitle.toUpperCase(),
-                  style: TextStyle(
-                    fontFamily: 'SF Pro',
-                    fontSize: 9.5,
-                    letterSpacing: 0.8,
-                    fontWeight: FontWeight.w700,
-                    color: c.textTertiary,
-                    height: 1.1,
-                  ),
+      child: _HeaderPill(
+        icon: current.icon,
+        label: current.label,
+        labelKey: ValueKey(selected),
+      ),
+    );
+  }
+}
+
+/// The closed state of a header dropdown: icon, label, chevron.
+class _HeaderPill extends StatelessWidget {
+  const _HeaderPill({required this.icon, required this.label, this.labelKey});
+
+  final IconData icon;
+  final String label;
+
+  /// Set to cross-fade the label when it changes.
+  final Key? labelKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.fromLTRB(12, 0, 6, 0),
+      decoration: BoxDecoration(
+        color: c.surfaceAlt,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: c.textPrimary),
+          const SizedBox(width: 8),
+          Flexible(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Text(
+                label,
+                key: labelKey,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: c.textPrimary,
                 ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: Text(
-                    current.label,
-                    key: ValueKey(selected),
-                    style: TextStyle(
-                      fontFamily: 'SF Pro',
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: c.textPrimary,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(width: 4),
-            Icon(Symbols.expand_more_rounded, size: 22, color: c.textPrimary),
-          ],
-        ),
+          ),
+          const SizedBox(width: 2),
+          Icon(Symbols.expand_more_rounded, size: 22, color: c.textPrimary),
+        ],
+      ),
+    );
+  }
+}
+
+/// One option in a header dropdown's menu.
+class _MenuRow extends StatelessWidget {
+  const _MenuRow({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return SizedBox(
+      width: 200,
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: c.surfaceAlt,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 19, color: c.textPrimary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'SF Pro',
+                fontSize: 15,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: c.textPrimary,
+              ),
+            ),
+          ),
+          if (trailing != null) ...[trailing!, const SizedBox(width: 8)],
+          Icon(
+            Symbols.check_rounded,
+            size: 18,
+            color: selected ? c.textPrimary : Colors.transparent,
+          ),
+        ],
       ),
     );
   }

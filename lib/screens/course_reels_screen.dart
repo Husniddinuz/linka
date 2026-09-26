@@ -512,6 +512,18 @@ class _SavedReelsScreenState extends State<SavedReelsScreen> {
     }
   }
 
+  /// Plays the saved lessons one after another, starting at [lessonId].
+  Future<void> _play({int? lessonId}) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CourseReelsFeedScreen.saved(initialLessonId: lessonId),
+      ),
+    );
+    // Lessons may have been unsaved in the feed.
+    if (mounted) _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -530,6 +542,20 @@ class _SavedReelsScreenState extends State<SavedReelsScreen> {
           'Saved lessons',
           style: TextStyle(color: c.textPrimary, fontWeight: FontWeight.w700),
         ),
+        actions: [
+          if (lessons != null && lessons.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: TextButton.icon(
+                onPressed: _play,
+                icon: const Icon(Symbols.play_arrow_rounded),
+                label: const Text(
+                  'Play all',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+        ],
       ),
       body: _failed
           ? Center(
@@ -556,14 +582,7 @@ class _SavedReelsScreenState extends State<SavedReelsScreen> {
                 itemBuilder: (context, i) {
                   final lesson = lessons[i];
                   return ListTile(
-                    onTap: () async {
-                      await openCourseReel(
-                        context,
-                        courseId: lesson.courseId,
-                        lessonId: lesson.id,
-                      );
-                      if (mounted) _load();
-                    },
+                    onTap: () => _play(lessonId: lesson.id),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 6,

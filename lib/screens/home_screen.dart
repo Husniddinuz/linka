@@ -779,6 +779,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 key: ValueKey(_openCourseId),
                 courseId: _openCourseId!,
                 onBack: () => setState(() => _openCourseId = null),
+                onOpenCourse: (id) => setState(() => _openCourseId = id),
               ),
             )
           else

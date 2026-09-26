@@ -28,15 +28,24 @@ const double _watchedThreshold = 0.9;
 /// the saved position. The current, previous and next videos are kept
 /// initialised so a swipe starts playing immediately; everything further away
 /// is disposed.
+///
+/// [CourseReelsFeedScreen.saved] plays the student's saved lessons instead,
+/// across every course, newest save first.
 class CourseReelsFeedScreen extends StatefulWidget {
   const CourseReelsFeedScreen({
     super.key,
-    required this.courseId,
+    required int this.courseId,
     this.initialLessonId,
   });
 
-  final int courseId;
+  const CourseReelsFeedScreen.saved({super.key, this.initialLessonId})
+    : courseId = null;
+
+  /// Null in the saved feed.
+  final int? courseId;
   final int? initialLessonId;
+
+  bool get savedOnly => courseId == null;
 
   @override
   State<CourseReelsFeedScreen> createState() => _CourseReelsFeedScreenState();
@@ -119,13 +128,17 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
       // Anything a previous session couldn't send goes first, so the course
       // we fetch already reflects it.
       await CourseReelsResumeService.flush();
-      final course = await CourseReelsService.fetchCourse(widget.courseId);
+      final course = widget.savedOnly
+          ? null
+          : await CourseReelsService.fetchCourse(widget.courseId!);
+      final all = course?.lessons ?? await CourseReelsService.fetchSaved();
       if (!mounted) return;
       // Units of a section the student hasn't bought come without a video;
       // the course path is where they get unlocked.
-      final lessons = course.lessons.where((l) => !l.locked).toList();
+      final lessons = all.where((l) => !l.locked).toList();
       final start = _startIndex(course, lessons);
-      if (lessons.isNotEmpty) {
+      // A saved lesson starts from the beginning.
+      if (course != null && lessons.isNotEmpty) {
         final lesson = lessons[start];
         final seconds = CourseReelsResumeService.positionFor(
           lesson.id,
@@ -157,9 +170,13 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
     }
   }
 
-  int _startIndex(ReelCourse course, List<ReelLesson> lessons) {
+  int _startIndex(ReelCourse? course, List<ReelLesson> lessons) {
     int indexOf(int? id) =>
         id == null ? -1 : lessons.indexWhere((l) => l.id == id);
+    if (course == null) {
+      final i = indexOf(widget.initialLessonId);
+      return i < 0 ? 0 : i;
+    }
     for (final id in [
       widget.initialLessonId,
       CourseReelsResumeService.unsyncedLessonIn(course.id),
@@ -231,8 +248,10 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
   Future<void> _refreshVideoUrls() {
     return _refreshingUrls ??= () async {
       try {
-        final fresh = await CourseReelsService.fetchCourse(widget.courseId);
-        final byId = {for (final l in fresh.lessons) l.id: l};
+        final fresh = widget.savedOnly
+            ? await CourseReelsService.fetchSaved()
+            : (await CourseReelsService.fetchCourse(widget.courseId!)).lessons;
+        final byId = {for (final l in fresh) l.id: l};
         for (final lesson in _lessons) {
           final f = byId[lesson.id];
           if (f == null) continue;
@@ -315,6 +334,8 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
   /// Saves the current position locally (and queues it for the server).
   /// Throttled to once a second unless [force]d.
   void _recordCurrent({bool force = false}) {
+    // Rewatching a saved lesson mustn't move where the course resumes.
+    if (widget.savedOnly) return;
     if (_index >= _lessons.length) return;
     final c = _controllers[_index];
     if (c == null || !c.value.isInitialized) return;
@@ -327,7 +348,7 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
     final duration = c.value.duration.inMilliseconds / 1000;
     final reachedEnd = duration > 0 && position >= duration * _watchedThreshold;
     CourseReelsResumeService.record(
-      courseId: widget.courseId,
+      courseId: widget.courseId!,
       lessonId: lesson.id,
       positionSeconds: position,
       durationSeconds: duration,
@@ -477,17 +498,26 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
         backgroundColor: Colors.black,
         body: Stack(
           children: [
-            Positioned.fill(child: _body()),
+            // The header sits above the video rather than over it, so no
+            // part of the frame is hidden.
+            Column(
+              children: [
+                _TopBar(
+                  title: widget.savedOnly ? 'Saved' : _course?.title ?? '',
+                  subtitle: _lessons.isEmpty || _index >= _lessons.length
+                      ? ''
+                      : widget.savedOnly
+                      ? '${_lessons[_index].courseTitle} · '
+                            '${_index + 1} of ${_lessons.length}'
+                      : 'Lesson ${_index + 1} of ${_lessons.length}',
+                  onBack: () => Navigator.pop(context),
+                  onMap: _course == null || _lessons.isEmpty ? null : _openMap,
+                ),
+                Expanded(child: _body()),
+              ],
+            ),
             if (ScreenSecurityService.captured.value)
               const Positioned.fill(child: _CaptureShield()),
-            _TopBar(
-              title: _course?.title ?? '',
-              subtitle: _lessons.isEmpty || _index >= _lessons.length
-                  ? ''
-                  : 'Lesson ${_index + 1} of ${_lessons.length}',
-              onBack: () => Navigator.pop(context),
-              onMap: _course == null || _lessons.isEmpty ? null : _openMap,
-            ),
           ],
         ),
       ),
@@ -509,15 +539,18 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
       );
     }
     if (_lessons.isEmpty) {
-      return const _Message(
-        icon: Symbols.movie_rounded,
-        text: 'No lessons in this course yet.',
+      return _Message(
+        icon: widget.savedOnly ? Symbols.bookmark_rounded : Symbols.movie_rounded,
+        text: widget.savedOnly
+            ? 'Tap the bookmark on a lesson to keep it here.'
+            : 'No lessons in this course yet.',
       );
     }
     return PageView.builder(
       controller: _pageController,
       scrollDirection: Axis.vertical,
-      itemCount: _lessons.length + 1,
+      // The saved feed has no end-of-course page.
+      itemCount: _lessons.length + (widget.savedOnly ? 0 : 1),
       onPageChanged: _onPageChanged,
       itemBuilder: (context, i) {
         if (i == _lessons.length) {
@@ -606,76 +639,59 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.black.withValues(alpha: 0.55), Colors.transparent],
-          ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(4, 4, 8, 16),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: onBack,
-                  icon: const Icon(
-                    Symbols.arrow_back_rounded,
-                    color: Colors.white,
-                  ),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (subtitle.isNotEmpty)
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                if (onMap != null)
-                  TextButton.icon(
-                    onPressed: onMap,
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: Colors.white.withValues(alpha: 0.16),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      shape: const StadiumBorder(),
-                    ),
-                    icon: const Icon(Symbols.route_rounded, size: 18),
-                    label: const Text(
-                      'Map',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-              ],
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: onBack,
+              icon: const Icon(Symbols.arrow_back_rounded, color: Colors.white),
             ),
-          ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (subtitle.isNotEmpty)
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (onMap != null)
+              TextButton.icon(
+                onPressed: onMap,
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.white.withValues(alpha: 0.16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: const StadiumBorder(),
+                ),
+                icon: const Icon(Symbols.route_rounded, size: 18),
+                label: const Text(
+                  'Map',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -710,138 +726,137 @@ class _ReelPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = controller;
-    return Stack(
-      fit: StackFit.expand,
+    return Column(
       children: [
-        if (lesson.posterUrl != null)
-          Image.network(
-            lesson.posterUrl!,
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => const SizedBox.shrink(),
-          ),
-        if (c != null)
-          ValueListenableBuilder<VideoPlayerValue>(
-            valueListenable: c,
-            builder: (context, value, _) {
-              if (!value.isInitialized) {
-                return failed
-                    ? const SizedBox.shrink()
-                    : const Center(
-                        child: CircularProgressIndicator(color: Colors.white),
-                      );
-              }
-              return FittedBox(
-                fit: BoxFit.cover,
-                clipBehavior: Clip.hardEdge,
-                child: SizedBox(
-                  width: value.size.width,
-                  height: value.size.height,
-                  child: VideoPlayer(c),
+        // The frame always spans the full width: black bars above and below
+        // when it's shorter than the space between the header and the
+        // footer, trimmed top and bottom when it's taller.
+        Expanded(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (lesson.posterUrl != null)
+                Image.network(
+                  lesson.posterUrl!,
+                  fit: BoxFit.fitWidth,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
                 ),
-              );
-            },
-          ),
-        if (failed)
-          _Message(
-            icon: Symbols.error_rounded,
-            text: 'This video couldn\'t be played.',
-            actionLabel: 'Retry',
-            onAction: onRetry,
-          ),
-        // Tap anywhere to pause/play.
-        GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: onTap,
-          child: c == null
-              ? const SizedBox.expand()
-              : ValueListenableBuilder<VideoPlayerValue>(
+              if (c != null)
+                ValueListenableBuilder<VideoPlayerValue>(
                   valueListenable: c,
-                  builder: (context, value, _) => AnimatedOpacity(
-                    opacity: value.isInitialized && !value.isPlaying ? 1 : 0,
-                    duration: const Duration(milliseconds: 150),
-                    child: Center(
-                      child: Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.35),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Symbols.play_arrow_rounded,
-                          fill: 1,
-                          size: 44,
-                          color: Colors.white,
+                  builder: (context, value, _) {
+                    if (!value.isInitialized) {
+                      return failed
+                          ? const SizedBox.shrink()
+                          : const Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                              ),
+                            );
+                    }
+                    final size = value.size.isEmpty
+                        ? Size(value.aspectRatio, 1)
+                        : value.size;
+                    return ColoredBox(
+                      color: Colors.black,
+                      child: ClipRect(
+                        child: FittedBox(
+                          fit: BoxFit.fitWidth,
+                          child: SizedBox.fromSize(
+                            size: size,
+                            child: VideoPlayer(c),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
-        ),
-        // Bottom scrim so white text stays readable on bright video.
-        IgnorePointer(
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              height: 320,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.75),
-                    Colors.transparent,
-                  ],
+              if (failed)
+                _Message(
+                  icon: Symbols.error_rounded,
+                  text: 'This video couldn\'t be played.',
+                  actionLabel: 'Retry',
+                  onAction: onRetry,
                 ),
+              // Tap anywhere on the video to pause/play.
+              GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: onTap,
+                child: c == null
+                    ? const SizedBox.expand()
+                    : ValueListenableBuilder<VideoPlayerValue>(
+                        valueListenable: c,
+                        builder: (context, value, _) => AnimatedOpacity(
+                          opacity: value.isInitialized && !value.isPlaying
+                              ? 1
+                              : 0,
+                          duration: const Duration(milliseconds: 150),
+                          child: Center(
+                            child: Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Symbols.play_arrow_rounded,
+                                fill: 1,
+                                size: 44,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
               ),
-            ),
+            ],
           ),
         ),
         SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 10, 12),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: _Caption(lesson: lesson, number: number),
-                    ),
-                    const SizedBox(width: 8),
-                    _ActionRail(
-                      lesson: lesson,
-                      onLike: onLike,
-                      onComment: onComment,
-                      onSave: onSave,
-                    ),
-                  ],
+                // Scrubber right under the frame; the same height either
+                // way so the footer doesn't jump when the video loads.
+                SizedBox(
+                  height: 16,
+                  child: c == null
+                      ? null
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: VideoProgressIndicator(
+                            c,
+                            allowScrubbing: true,
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            colors: VideoProgressColors(
+                              playedColor: Colors.white,
+                              bufferedColor: Colors.white.withValues(
+                                alpha: 0.35,
+                              ),
+                              backgroundColor: Colors.white.withValues(
+                                alpha: 0.15,
+                              ),
+                            ),
+                          ),
+                        ),
                 ),
-                const SizedBox(height: 14),
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: _PracticeButton(lesson: lesson, onTap: onPractice),
+                const SizedBox(height: 8),
+                _Caption(
+                  lesson: lesson,
+                  number: number,
+                  actions: _ActionRail(
+                    lesson: lesson,
+                    onLike: onLike,
+                    onComment: onComment,
+                    onSave: onSave,
+                  ),
                 ),
                 const SizedBox(height: 12),
-                if (c != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(2),
-                      child: VideoProgressIndicator(
-                        c,
-                        allowScrubbing: true,
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        colors: VideoProgressColors(
-                          playedColor: Colors.white,
-                          bufferedColor: Colors.white.withValues(alpha: 0.35),
-                          backgroundColor: Colors.white.withValues(alpha: 0.15),
-                        ),
-                      ),
-                    ),
-                  ),
+                _PracticeButton(lesson: lesson, onTap: onPractice),
               ],
             ),
           ),
@@ -852,10 +867,17 @@ class _ReelPage extends StatelessWidget {
 }
 
 class _Caption extends StatelessWidget {
-  const _Caption({required this.lesson, required this.number});
+  const _Caption({
+    required this.lesson,
+    required this.number,
+    required this.actions,
+  });
 
   final ReelLesson lesson;
   final int number;
+
+  /// Like / comment / save, at the end of the badge row.
+  final Widget actions;
 
   @override
   Widget build(BuildContext context) {
@@ -888,9 +910,11 @@ class _Caption extends StatelessWidget {
               size: 18,
               onDark: true,
             ),
+            const Spacer(),
+            actions,
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Text(
           lesson.title,
           maxLines: 2,
@@ -935,7 +959,7 @@ class _ActionRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         _RailButton(
@@ -946,14 +970,14 @@ class _ActionRail extends StatelessWidget {
           semantic: lesson.liked ? 'Unlike' : 'Like',
           onTap: onLike,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(width: 4),
         _RailButton(
           icon: Symbols.chat_bubble_rounded,
           label: _compact(lesson.commentCount),
           semantic: 'Comments',
           onTap: onComment,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(width: 4),
         _RailButton(
           icon: Symbols.bookmark_rounded,
           filled: lesson.saved,
@@ -998,27 +1022,19 @@ class _RailButton extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
-        child: SizedBox(
-          width: 56,
-          child: Column(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.32),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, fill: filled ? 1 : 0, size: 26, color: color),
-              ),
-              const SizedBox(height: 4),
+              Icon(icon, fill: filled ? 1 : 0, size: 24, color: color),
+              const SizedBox(width: 4),
               Text(
                 label,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  shadows: [Shadow(blurRadius: 4, color: Colors.black54)],
                 ),
               ),
             ],
