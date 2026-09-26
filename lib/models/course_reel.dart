@@ -183,7 +183,6 @@ class ReelSection {
     required this.description,
     required this.icon,
     required this.plannedLessons,
-    required this.priceUzs,
     required this.lessonsCount,
     required this.owned,
   });
@@ -195,14 +194,12 @@ class ReelSection {
   /// Material Symbols name; see `courseIcon`.
   final String icon;
 
-  /// Free, or bought by this student — every unit is open.
+  /// Every unit is open: the student subscribes (or bought this section
+  /// before the subscription), or Course Reels are free right now.
   final bool owned;
 
   /// How many units the section will have once fully uploaded.
   final int plannedLessons;
-
-  /// What unlocks the section; 0 = free.
-  final int priceUzs;
 
   /// Units uploaded and published so far.
   final int lessonsCount;
@@ -213,9 +210,8 @@ class ReelSection {
     description: json['description']?.toString() ?? '',
     icon: json['icon']?.toString() ?? '',
     plannedLessons: _asInt(json['planned_lessons']),
-    priceUzs: _asInt(json['price_uzs']),
     lessonsCount: _asInt(json['lessons_count']),
-    owned: json['owned'] as bool? ?? _asInt(json['price_uzs']) == 0,
+    owned: json['owned'] as bool? ?? false,
   );
 
   static List<ReelSection> listFromJson(List? raw) => (raw ?? const [])
@@ -240,6 +236,7 @@ class ReelCourse {
     this.icon = '',
     this.sections = const [],
     this.lessons = const [],
+    this.subscription,
   });
 
   final int id;
@@ -264,6 +261,10 @@ class ReelCourse {
   /// Only filled by the detail endpoint.
   final List<ReelLesson> lessons;
 
+  /// The Course Reels subscription and the student's status. Only filled by
+  /// the detail endpoint.
+  final ReelSubscription? subscription;
+
   double get completedFraction =>
       lessonsCount == 0 ? 0 : (completedCount / lessonsCount).clamp(0.0, 1.0);
 
@@ -284,12 +285,53 @@ class ReelCourse {
     icon: json['icon']?.toString() ?? '',
     sections: ReelSection.listFromJson(json['sections'] as List?),
     lessons: ReelLesson.listFromJson(json['lessons'] as List?),
+    subscription: json['subscription'] is Map<String, dynamic>
+        ? ReelSubscription.fromJson(
+            json['subscription'] as Map<String, dynamic>,
+          )
+        : null,
   );
 
   static List<ReelCourse> listFromJson(List? raw) => (raw ?? const [])
       .whereType<Map<String, dynamic>>()
       .map(ReelCourse.fromJson)
       .toList();
+}
+
+/// The one Course Reels subscription (every section of every course, price
+/// from the admin panel) and whether the student has it. Prepaid: paying
+/// again while it runs adds another period; nothing renews on its own.
+class ReelSubscription {
+  const ReelSubscription({
+    required this.priceUzs,
+    required this.durationDays,
+    required this.isFree,
+    required this.active,
+    required this.endsAt,
+  });
+
+  /// Per period.
+  final int priceUzs;
+  final int durationDays;
+
+  /// Course Reels cost nothing right now; everything is open.
+  final bool isFree;
+  final bool active;
+
+  /// When the running period ends; null when not [active].
+  final DateTime? endsAt;
+
+  /// "month" for the usual 30 days, else "30 days".
+  String get periodLabel => durationDays == 30 ? 'month' : '$durationDays days';
+
+  factory ReelSubscription.fromJson(Map<String, dynamic> json) =>
+      ReelSubscription(
+        priceUzs: _asInt(json['price_uzs']),
+        durationDays: _asInt(json['duration_days'], 30),
+        isFree: json['is_free'] as bool? ?? false,
+        active: json['active'] as bool? ?? false,
+        endsAt: DateTime.tryParse(json['ends_at']?.toString() ?? '')?.toLocal(),
+      );
 }
 
 /// Where the student left off, according to the server.

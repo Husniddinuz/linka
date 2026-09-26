@@ -19,7 +19,9 @@ class IeltsSectionIntroScreen extends StatelessWidget {
   final IeltsPart part;
   final int unitCount;
   final bool owned;
-  final String priceLabel;
+
+  /// The subscription's price, e.g. "99 000 UZS/month"; null when unknown.
+  final String? priceLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -44,13 +46,15 @@ class IeltsSectionIntroScreen extends StatelessWidget {
       owned
           ? (
               Symbols.verified_rounded,
-              'You own this section',
+              'Unlocked',
               'All $unitCount units are open to you.',
             )
           : (
               Symbols.lock_open_rounded,
               'Unit 1 is free',
-              'Try it first, then unlock units 2–$unitCount for $priceLabel.',
+              'Try it first, then subscribe'
+                  '${priceLabel == null ? '' : ' for $priceLabel'} to open '
+                  'units 2–$unitCount and every other section.',
             ),
     ];
 

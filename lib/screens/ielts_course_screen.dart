@@ -27,8 +27,31 @@ String _formatUzs(int amount) {
   return '$out UZS';
 }
 
+/// 5 Oct 2026.
+String _formatDate(DateTime d) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${d.day} ${months[d.month - 1]} ${d.year}';
+}
+
+/// "99 000 UZS/month".
+String _subscriptionPrice(ReelSubscription s) =>
+    '${_formatUzs(s.priceUzs)}/${s.periodLabel}';
+
 /// One section of the course path (e.g. Speaking), as the admin set it up:
-/// its icon, price and planned units, plus the units uploaded so far.
+/// its icon and planned units, plus the units uploaded so far.
 class IeltsPart {
   IeltsPart(this.section, this.index, this.lessons);
 
@@ -43,8 +66,6 @@ class IeltsPart {
   int get id => section.id;
   String get label => section.title;
   IconData get icon => courseIcon(section.icon);
-  int get priceUzs => section.priceUzs;
-  String get priceLabel => _formatUzs(priceUzs);
 
   /// The path draws every planned unit, uploaded or not.
   int get unitCount =>
@@ -70,8 +91,8 @@ class IeltsPart {
 /// section at the bottom, each section's last unit leading into the next
 /// section's banner. The header has two dropdowns: one switches to another
 /// sectioned course, the other jumps between sections and follows along as
-/// the student scrolls. Sections, icons, prices and unit counts all
-/// come from the admin panel.
+/// the student scrolls. Sections, icons and unit counts come from the admin
+/// panel, as does the price of the one subscription that opens them all.
 ///
 /// Shown inside the Home tab, under the app header and above the bottom
 /// nav, rather than pushed as its own route.
@@ -141,13 +162,16 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
     for (final p in _parts) p: p.completed,
   };
 
-  // Sections the student can fully open: free, or bought.
+  // Sections the student can fully open: subscribed, free right now, or
+  // bought before the subscription.
   Set<IeltsPart> get _owned => {
     for (final p in _parts)
       if (p.section.owned) p,
   };
 
-  /// A purchase is in flight (including a top-up waiting to be used).
+  ReelSubscription? get _subscription => _course?.subscription;
+
+  /// A payment is in flight (including a top-up waiting to be used).
   bool _buying = false;
 
   /// Dropdown position: 0–3 are the sections, 4 is the certificate.
@@ -229,7 +253,7 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
     return _UnitState.locked;
   }
 
-  /// Unit 1 of every section is free; the rest needs the section bought.
+  /// Unit 1 of every section is free; the rest needs the subscription.
   /// The server decides for uploaded units (the section's first one is free
   /// to try); units still to come follow the same rule.
   bool _paywalled(IeltsPart part, int i) {
@@ -244,9 +268,10 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
   }
 
   /// Confirm, then pay from the wallet. When the balance is short, top up
-  /// exactly the difference and buy straight after the payment clears.
-  Future<void> _buy(IeltsPart part) async {
-    if (_buying) return;
+  /// exactly the difference and subscribe straight after the payment clears.
+  Future<void> _subscribe() async {
+    final subscription = _subscription;
+    if (_buying || subscription == null) return;
     int? balance;
     try {
       balance = await WalletService.getBalance();
@@ -261,23 +286,35 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => _BuySectionSheet(part: part, balanceUzs: balance),
+      builder: (_) => _SubscribeSheet(
+        subscription: subscription,
+        courseTitle: _course?.title ?? 'this course',
+        balanceUzs: balance,
+      ),
     );
     if (!mounted || confirmed != true) return;
     setState(() => _buying = true);
     try {
-      await _purchase(part, afterTopUp: false);
+      await _pay(subscription, afterTopUp: false);
     } finally {
       if (mounted) setState(() => _buying = false);
     }
   }
 
-  Future<void> _purchase(IeltsPart part, {required bool afterTopUp}) async {
+  Future<void> _pay(
+    ReelSubscription subscription, {
+    required bool afterTopUp,
+  }) async {
     try {
-      await CourseReelsService.buySection(part.id);
+      final paid = await CourseReelsService.subscribe();
       WalletService.getBalance().ignore(); // refresh the cached balance
       if (!mounted) return;
-      _snack('${part.label} unlocked — all ${part.unitCount} units are open');
+      final until = paid.endsAt;
+      _snack(
+        until == null
+            ? 'Every unit is open'
+            : 'Every unit is open until ${_formatDate(until)}',
+      );
       await _load();
     } on ReelInsufficientBalance catch (short) {
       if (!mounted) return;
@@ -285,7 +322,7 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
         // Topped up, but less than needed (the amount was edited down).
         _snack(
           'Still ${_formatUzs(short.shortfallUzs)} short. '
-          'Tap Buy again to top up the rest.',
+          'Tap Subscribe again to top up the rest.',
         );
         return;
       }
@@ -295,18 +332,18 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
           builder: (_) => PaymentTopUpScreen(
             initialAmount: short.shortfallUzs,
             purpose:
-                'Add ${_formatUzs(short.shortfallUzs)} to unlock '
-                '${part.label} (${part.priceLabel}). It unlocks as soon as '
-                'the payment goes through.',
+                'Add ${_formatUzs(short.shortfallUzs)} to subscribe to Course '
+                'Reels (${_subscriptionPrice(subscription)}). Every unit opens '
+                'as soon as the payment goes through.',
           ),
         ),
       );
       if (!mounted || paid == null) return;
-      await _purchase(part, afterTopUp: true);
+      await _pay(subscription, afterTopUp: true);
     } on ApiException catch (e) {
       if (mounted) _snack(e.message);
     } catch (_) {
-      if (mounted) _snack("Couldn't complete the purchase. Try again.");
+      if (mounted) _snack("Couldn't complete the payment. Try again.");
     }
   }
 
@@ -346,7 +383,7 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
   int get _sectionsFinished =>
       _parts.where((p) => p.completed >= p.unitCount).length;
 
-  /// Needs every section bought and every unit in it finished.
+  /// Needs every section open and every unit in it finished.
   bool get _certificateEarned =>
       _parts.isNotEmpty &&
       _owned.length == _parts.length &&
@@ -365,8 +402,8 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
     if (!mounted || result == null) return;
     final (action, part) = result;
     switch (action) {
-      case _CertificateAction.buy:
-        _buy(part!);
+      case _CertificateAction.subscribe:
+        _subscribe();
       case _CertificateAction.continueSection:
         _jumpTo(part!.index);
       case _CertificateAction.claim:
@@ -387,7 +424,9 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
           part: part,
           unitCount: part.unitCount,
           owned: _owned.contains(part),
-          priceLabel: part.priceLabel,
+          priceLabel: _subscription == null
+              ? null
+              : _subscriptionPrice(_subscription!),
         ),
       ),
     );
@@ -402,7 +441,7 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
       return;
     }
     if (_paywalled(part, i)) {
-      _buy(part);
+      _subscribe();
       return;
     }
     final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
@@ -642,7 +681,7 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
                                 done: n.part!.completed,
                                 total: n.part!.unitCount,
                                 owned: _owned.contains(n.part),
-                                onBuy: () => _buy(n.part!),
+                                onBuy: _subscribe,
                               ),
                             ),
                           ),
@@ -671,7 +710,7 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
                             height: _certificateHeight,
                             child: Center(
                               child: _CertificateCard(
-                                bought: _owned.length,
+                                unlocked: _owned.length,
                                 finished: _sectionsFinished,
                                 total: _parts.length,
                                 onTap: _openCertificate,
@@ -1085,7 +1124,7 @@ class _SectionBanner extends StatelessWidget {
                     Icon(Symbols.lock_open_rounded, size: 14, color: c.success),
                     const SizedBox(width: 4),
                     Text(
-                      part.priceLabel,
+                      'Unlock',
                       style: TextStyle(
                         fontFamily: 'SF Pro',
                         fontSize: 12,
@@ -1103,17 +1142,17 @@ class _SectionBanner extends StatelessWidget {
   }
 }
 
-/// The last stop: the certificate. Earned by buying every section and
+/// The last stop: the certificate. Earned by opening every section and
 /// finishing all of their units.
 class _CertificateCard extends StatelessWidget {
   const _CertificateCard({
-    required this.bought,
+    required this.unlocked,
     required this.finished,
     required this.total,
     required this.onTap,
   });
 
-  final int bought;
+  final int unlocked;
   final int finished;
   final int total;
   final VoidCallback onTap;
@@ -1121,7 +1160,7 @@ class _CertificateCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final earned = bought == total && finished == total;
+    final earned = unlocked == total && finished == total;
     final fill = earned ? c.accentYellow : c.surfaceAlt;
     final ink = earned ? Colors.white : c.textPrimary;
     final soft = earned ? Colors.white.withValues(alpha: 0.8) : c.textSecondary;
@@ -1225,7 +1264,7 @@ class _CertificateCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              requirement('Sections bought', bought),
+              requirement('Sections unlocked', unlocked),
               requirement('Sections finished', finished),
             ],
           ),
@@ -1236,7 +1275,7 @@ class _CertificateCard extends StatelessWidget {
 }
 
 /// What's between the student and the certificate, with a way forward:
-/// buy the missing sections, keep learning, or claim it.
+/// subscribe, keep learning, or claim it.
 class _CertificateSheet extends StatelessWidget {
   const _CertificateSheet({required this.parts, required this.owned});
 
@@ -1246,22 +1285,17 @@ class _CertificateSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final allBought = owned.length == parts.length;
+    final allOpen = owned.length == parts.length;
     final allFinished = parts.every((p) => p.completed >= p.unitCount);
-    final earned = allBought && allFinished;
-    final firstUnbought = parts.where((p) => !owned.contains(p)).firstOrNull;
+    final earned = allOpen && allFinished;
     final firstUnfinished = parts
         .where((p) => p.completed < p.unitCount)
         .firstOrNull;
 
     final (String cta, _CertificateAction action, IeltsPart? target) = earned
         ? ('Get my certificate', _CertificateAction.claim, null)
-        : !allBought
-        ? (
-            'Unlock ${firstUnbought!.label}',
-            _CertificateAction.buy,
-            firstUnbought,
-          )
+        : !allOpen
+        ? ('Subscribe to unlock', _CertificateAction.subscribe, null)
         : (
             'Continue ${firstUnfinished!.label}',
             _CertificateAction.continueSection,
@@ -1349,7 +1383,7 @@ class _CertificateSheet extends StatelessWidget {
   }
 }
 
-enum _CertificateAction { buy, continueSection, claim }
+enum _CertificateAction { subscribe, continueSection, claim }
 
 class _CertificateRow extends StatelessWidget {
   const _CertificateRow({
@@ -1395,7 +1429,7 @@ class _CertificateRow extends StatelessWidget {
           ),
           Text(
             !owned
-                ? 'Not bought'
+                ? 'Locked'
                 : finished
                 ? 'Finished'
                 : '$done/$total units',
@@ -1440,7 +1474,7 @@ class _UnitSquare extends StatelessWidget {
   final IconData icon;
   final _UnitState state;
 
-  /// The section isn't bought and this is its free first unit.
+  /// The section isn't open and this is its free first unit.
   final bool free;
   final Animation<double> pulse;
   final double size;
@@ -1661,19 +1695,24 @@ class _FreeTag extends StatelessWidget {
   }
 }
 
-/// What buying a section gets you, and the button to do it. Pops `true`
-/// when the student taps buy.
-class _BuySectionSheet extends StatelessWidget {
-  const _BuySectionSheet({required this.part, required this.balanceUzs});
+/// What the subscription gets you, and the button to pay for it. Pops
+/// `true` when the student taps subscribe.
+class _SubscribeSheet extends StatelessWidget {
+  const _SubscribeSheet({
+    required this.subscription,
+    required this.courseTitle,
+    required this.balanceUzs,
+  });
 
-  final IeltsPart part;
+  final ReelSubscription subscription;
+  final String courseTitle;
 
   /// Wallet balance, or null when it couldn't be read.
   final int? balanceUzs;
 
   /// Null when unknown — the server has the final say either way.
   bool? get _covered =>
-      balanceUzs == null ? null : balanceUzs! >= part.priceUzs;
+      balanceUzs == null ? null : balanceUzs! >= subscription.priceUzs;
 
   @override
   Widget build(BuildContext context) {
@@ -1699,6 +1738,7 @@ class _BuySectionSheet extends StatelessWidget {
       ),
     );
 
+    final price = _subscriptionPrice(subscription);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
@@ -1727,11 +1767,15 @@ class _BuySectionSheet extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Icon(part.icon, size: 36, color: Colors.white),
+              child: const Icon(
+                Symbols.lock_open_rounded,
+                size: 36,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(height: 18),
             Text(
-              'Unlock ${part.label}',
+              'Unlock every unit',
               style: TextStyle(
                 fontFamily: 'SF Pro',
                 fontSize: 21,
@@ -1741,22 +1785,24 @@ class _BuySectionSheet extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Unit 1 is free. Buy the section to open the rest.',
+              price,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'SF Pro',
-                fontSize: 14,
-                color: c.textSecondary,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: c.success,
               ),
             ),
             const SizedBox(height: 22),
             perk(
               Symbols.lock_open_rounded,
-              'Units 2–${part.unitCount} of ${part.label}',
+              'Every section of $courseTitle and all other courses',
             ),
             perk(
-              Symbols.shopping_bag_rounded,
-              'One-time payment for this section only',
+              Symbols.event_available_rounded,
+              'Open for ${subscription.durationDays} days — no auto-renewal, '
+              'pay again whenever you want more',
             ),
             if (balanceUzs != null)
               perk(
@@ -1764,8 +1810,8 @@ class _BuySectionSheet extends StatelessWidget {
                 _covered!
                     ? 'Paid from your balance (${_formatUzs(balanceUzs!)})'
                     : 'Your balance is ${_formatUzs(balanceUzs!)} — top up '
-                          '${_formatUzs(part.priceUzs - balanceUzs!)} and it '
-                          'unlocks right after',
+                          '${_formatUzs(subscription.priceUzs - balanceUzs!)} '
+                          'and it opens right after',
               ),
             const SizedBox(height: 10),
             SizedBox(
@@ -1782,8 +1828,8 @@ class _BuySectionSheet extends StatelessWidget {
                 ),
                 child: Text(
                   _covered == false
-                      ? 'Top up & buy'
-                      : 'Buy for ${part.priceLabel}',
+                      ? 'Top up & subscribe'
+                      : 'Subscribe for ${_formatUzs(subscription.priceUzs)}',
                   style: const TextStyle(
                     fontFamily: 'SF Pro',
                     fontSize: 16,

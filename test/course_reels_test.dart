@@ -56,11 +56,17 @@ void main() {
             'description': 'Talk every day.',
             'icon': 'record_voice_over',
             'planned_lessons': 10,
-            'price_uzs': 250000,
             'lessons_count': 2,
             'owned': false,
           },
         ],
+        'subscription': {
+          'price_uzs': 99000,
+          'duration_days': 30,
+          'is_free': false,
+          'active': false,
+          'ends_at': null,
+        },
         'lessons': [
           {..._lessonJson(1, watched: true, completed: true), 'section_id': 3},
           {..._lessonJson(2), 'section_id': 3, 'locked': true},
@@ -69,7 +75,9 @@ void main() {
       });
       expect(courseIcon(course.icon), Symbols.language_rounded);
       final section = course.sections.single;
-      expect(section.priceUzs, 250000);
+      expect(course.subscription!.priceUzs, 99000);
+      expect(course.subscription!.periodLabel, 'month');
+      expect(course.subscription!.active, isFalse);
       expect(courseIcon(section.icon), Symbols.record_voice_over_rounded);
       expect(course.lessons.map((l) => l.sectionId), [3, 3, null]);
       expect(section.owned, isFalse);
@@ -78,13 +86,18 @@ void main() {
       final part = IeltsPart(section, 0, course.lessons.take(2).toList());
       expect(part.unitCount, 10); // planned, not just uploaded
       expect(part.completed, 1);
-      expect(part.priceLabel, '250 000 UZS');
     });
 
-    test('a free section counts as owned when the server omits it', () {
-      final free = ReelSection.fromJson({'id': 1, 'price_uzs': 0});
-      final paid = ReelSection.fromJson({'id': 2, 'price_uzs': 1000});
-      expect([free.owned, paid.owned], [true, false]);
+    test('an active subscription carries its end date', () {
+      final sub = ReelSubscription.fromJson({
+        'price_uzs': '99000',
+        'duration_days': 7,
+        'active': true,
+        'ends_at': '2026-10-26T10:00:00Z',
+      });
+      expect(sub.priceUzs, 99000);
+      expect(sub.periodLabel, '7 days');
+      expect(sub.endsAt!.toUtc(), DateTime.utc(2026, 10, 26, 10));
     });
 
     test('unknown or empty icon names fall back', () {

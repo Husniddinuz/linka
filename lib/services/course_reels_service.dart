@@ -31,12 +31,14 @@ class CourseReelsService {
         await ApiService.getList('/course-reels/courses/?with_sections=1'),
       );
 
-  /// Unlocks a paid section with the wallet balance. Buying one the student
-  /// already owns charges nothing. Throws [ReelInsufficientBalance] (nothing
+  /// Pays one period of the Course Reels subscription from the wallet; a
+  /// running one is extended. Throws [ReelInsufficientBalance] (nothing
   /// charged) when the balance is short.
-  static Future<void> buySection(int sectionId) async {
+  static Future<ReelSubscription> subscribe() async {
     try {
-      await ApiService.post('/course-reels/sections/$sectionId/buy/', const {});
+      return ReelSubscription.fromJson(
+        await ApiService.post('/course-reels/subscription/', const {}),
+      );
     } on ApiException catch (e) {
       if (e.errorCode == 'insufficient_balance') {
         int uzs(String key) =>
@@ -180,7 +182,7 @@ class CourseReelsService {
 }
 
 /// The wallet can't cover a section; [shortfallUzs] is what a top-up needs
-/// to add before [CourseReelsService.buySection] goes through.
+/// to add before [CourseReelsService.subscribe] goes through.
 class ReelInsufficientBalance implements Exception {
   const ReelInsufficientBalance({
     required this.priceUzs,
