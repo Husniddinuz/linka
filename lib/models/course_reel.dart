@@ -81,6 +81,42 @@ class ReelLessonProgress {
   }
 }
 
+/// Spoken languages of Course Reels videos, as the backend's
+/// `AUDIO_LANGUAGES` codes.
+const reelAudioLanguageNames = {
+  'uz': "O'zbekcha",
+  'ru': 'Русский',
+  'en': 'English',
+};
+
+String reelAudioLanguageName(String code) =>
+    reelAudioLanguageNames[code] ?? code.toUpperCase();
+
+/// A lesson's video in one spoken language: the original recording, or a
+/// dub the server muxed onto the same picture. Every track is a complete
+/// video with its own signed link, so switching language just swaps the URL.
+class ReelAudioTrack {
+  const ReelAudioTrack({
+    required this.language,
+    required this.isOriginal,
+    required this.videoUrl,
+  });
+
+  final String language;
+  final bool isOriginal;
+  final String videoUrl;
+
+  static List<ReelAudioTrack> listFromJson(Object? raw) => [
+    for (final t in raw is List ? raw : const [])
+      if (t is Map && _nonEmpty(t['video_url']) != null)
+        ReelAudioTrack(
+          language: t['language']?.toString() ?? '',
+          isOriginal: t['is_original'] as bool? ?? false,
+          videoUrl: _nonEmpty(t['video_url'])!,
+        ),
+  ];
+}
+
 class ReelLesson {
   ReelLesson({
     required this.id,
@@ -101,6 +137,8 @@ class ReelLesson {
     required this.progress,
     this.sectionId,
     this.locked = false,
+    this.audioLanguage = '',
+    this.audioTracks = const [],
   });
 
   final int id;
@@ -124,6 +162,32 @@ class ReelLesson {
   /// [videoUrlExpiresAt]; the feed swaps in fresh ones (CDN links never expire).
   String? videoUrl;
   DateTime? videoUrlExpiresAt;
+
+  /// The language spoken in the original video.
+  final String audioLanguage;
+
+  /// The original first, then every ready dub. Refreshed with [videoUrl];
+  /// all links are signed together, so [videoUrlExpiresAt] covers them.
+  List<ReelAudioTrack> audioTracks;
+
+  bool get hasDubs => audioTracks.length > 1;
+
+  /// The track to play for [preferred] (a language code; null = original):
+  /// that language when this lesson has it, else the original.
+  ReelAudioTrack? trackFor(String? preferred) {
+    if (audioTracks.isEmpty) return null;
+    for (final t in audioTracks) {
+      if (t.language == preferred) return t;
+    }
+    return audioTracks.firstWhere(
+      (t) => t.isOriginal,
+      orElse: () => audioTracks.first,
+    );
+  }
+
+  /// What the feed plays for [preferred]; falls back to [videoUrl].
+  String? videoUrlFor(String? preferred) =>
+      trackFor(preferred)?.videoUrl ?? videoUrl;
 
   /// True when [videoUrl] is dead or about to be — fetch a new one first.
   bool get videoUrlExpiring {
@@ -155,6 +219,8 @@ class ReelLesson {
             (json['video_url_expires_at'] as num).toInt() * 1000,
           )
         : null,
+    audioLanguage: json['audio_language']?.toString() ?? '',
+    audioTracks: ReelAudioTrack.listFromJson(json['audio_tracks']),
     posterUrl: _nonEmpty(json['poster_url']),
     durationSeconds: _asInt(json['duration_seconds']),
     likeCount: _asInt(json['like_count']),
@@ -357,12 +423,30 @@ class ReelResume {
   );
 }
 
-enum ReelExerciseType { sentenceBuilding, fillGaps, writeSentence, unknown }
+enum ReelExerciseType {
+  sentenceBuilding,
+  fillGaps,
+  writeSentence,
+  multipleChoice,
+  transformSentence,
+  chooseGaps,
+  writingAi,
+  speakingAi,
+  unknown;
+
+  /// Marked by a model on the server rather than against an answer key.
+  bool get isAi => this == writingAi || this == speakingAi;
+}
 
 ReelExerciseType _exerciseType(String? raw) => switch (raw) {
   'sentence_building' => ReelExerciseType.sentenceBuilding,
   'fill_gaps' => ReelExerciseType.fillGaps,
   'write_sentence' => ReelExerciseType.writeSentence,
+  'multiple_choice' => ReelExerciseType.multipleChoice,
+  'transform_sentence' => ReelExerciseType.transformSentence,
+  'choose_gaps' => ReelExerciseType.chooseGaps,
+  'writing_ai' => ReelExerciseType.writingAi,
+  'speaking_ai' => ReelExerciseType.speakingAi,
   _ => ReelExerciseType.unknown,
 };
 
@@ -395,6 +479,10 @@ class ReelExercise {
     required this.prompt,
     required this.requiredWords,
     required this.minWords,
+    this.options = const [],
+    this.gapOptions = const [],
+    this.sentence = '',
+    this.passScore = 60,
     required this.solved,
     required this.attempts,
     required this.expected,
@@ -413,6 +501,18 @@ class ReelExercise {
   final List<String> requiredWords;
   final int minWords;
 
+  /// Choose the option: the options as plain text, already shuffled.
+  final List<String> options;
+
+  /// Choose for each gap: the options of each gap, in gap order.
+  final List<List<String>> gapOptions;
+
+  /// Rewrite the sentence: the one to change.
+  final String sentence;
+
+  /// Writing / Speaking (AI): the score (0-100) that counts as solved.
+  final int passScore;
+
   bool solved;
   int attempts;
   String? expected;
@@ -425,6 +525,11 @@ class ReelExercise {
       ReelExerciseType.sentenceBuilding => 'Put the words in the right order',
       ReelExerciseType.fillGaps => 'Fill in the gaps',
       ReelExerciseType.writeSentence => 'Write a complete sentence',
+      ReelExerciseType.multipleChoice => 'Choose the correct answer',
+      ReelExerciseType.transformSentence => 'Rewrite the sentence',
+      ReelExerciseType.chooseGaps => 'Choose the right word for each gap',
+      ReelExerciseType.writingAi => 'Write your answer',
+      ReelExerciseType.speakingAi => 'Record your answer',
       ReelExerciseType.unknown => 'Practice',
     };
   }
@@ -444,6 +549,16 @@ class ReelExercise {
     prompt: json['prompt']?.toString() ?? '',
     requiredWords: _asStrings(json['required_words']),
     minWords: _asInt(json['min_words']),
+    options: _asStrings(json['options']),
+    gapOptions: [
+      for (final g
+          in json['gap_options'] is List
+              ? json['gap_options'] as List
+              : const [])
+        _asStrings(g),
+    ],
+    sentence: json['sentence']?.toString() ?? '',
+    passScore: json['pass_score'] == null ? 60 : _asInt(json['pass_score']),
     solved: json['solved'] as bool? ?? false,
     attempts: _asInt(json['attempts']),
     expected: _nonEmpty(json['expected']),
@@ -478,11 +593,15 @@ class ReelAnswerResult {
     required this.expected,
     required this.sampleAnswer,
     required this.lessonProgress,
+    this.ai,
   });
 
   final bool correct;
   final String feedback;
   final List<bool>? gapResults;
+
+  /// Writing / Speaking (AI) only.
+  final ReelAiReview? ai;
   final bool solved;
   final int attempts;
   final String? expected;
@@ -503,7 +622,63 @@ class ReelAnswerResult {
         lessonProgress: ReelLessonProgress.fromJson(
           json['lesson_progress'] as Map<String, dynamic>?,
         ),
+        ai: json['ai'] is Map<String, dynamic>
+            ? ReelAiReview.fromJson(json['ai'] as Map<String, dynamic>)
+            : null,
       );
+}
+
+/// One mistake the AI found, quoted from the student's answer.
+class ReelAiCorrection {
+  const ReelAiCorrection({
+    required this.original,
+    required this.corrected,
+    required this.explanation,
+  });
+
+  final String original;
+  final String corrected;
+  final String explanation;
+}
+
+/// The AI's marking of a Writing / Speaking answer.
+class ReelAiReview {
+  const ReelAiReview({
+    required this.score,
+    required this.passScore,
+    required this.corrections,
+    required this.improved,
+    required this.transcript,
+  });
+
+  /// Null when the answer failed a basic rule (too short, a required word
+  /// missing) and was never sent to the model.
+  final int? score;
+  final int passScore;
+  final List<ReelAiCorrection> corrections;
+  final String? improved;
+
+  /// Speaking: what the student was heard to say.
+  final String? transcript;
+
+  factory ReelAiReview.fromJson(Map<String, dynamic> json) => ReelAiReview(
+    score: json['score'] == null ? null : _asInt(json['score']),
+    passScore: json['pass_score'] == null ? 60 : _asInt(json['pass_score']),
+    corrections: [
+      for (final c
+          in json['corrections'] is List
+              ? json['corrections'] as List
+              : const [])
+        if (c is Map)
+          ReelAiCorrection(
+            original: c['original']?.toString() ?? '',
+            corrected: c['corrected']?.toString() ?? '',
+            explanation: c['explanation']?.toString() ?? '',
+          ),
+    ],
+    improved: _nonEmpty(json['improved']),
+    transcript: _nonEmpty(json['transcript']),
+  );
 }
 
 class ReelComment {

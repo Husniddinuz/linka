@@ -8,6 +8,7 @@ import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../models/course_reel.dart';
+import '../services/course_reels_audio_service.dart';
 import '../services/course_reels_resume_service.dart';
 import '../services/course_reels_service.dart';
 import '../services/screen_security_service.dart';
@@ -62,6 +63,9 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
   int _index = 0;
 
   final Map<int, VideoPlayerController> _controllers = {};
+
+  /// The URL each controller plays — which audio track it was built for.
+  final Map<int, String> _controllerUrls = {};
   final Set<int> _failed = {};
 
   /// Seek target for a lesson that hasn't finished initialising yet.
@@ -127,7 +131,10 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
     try {
       // Anything a previous session couldn't send goes first, so the course
       // we fetch already reflects it.
-      await CourseReelsResumeService.flush();
+      await Future.wait([
+        CourseReelsResumeService.flush(),
+        CourseReelsAudioService.load(),
+      ]);
       final course = widget.savedOnly
           ? null
           : await CourseReelsService.fetchCourse(widget.courseId!);
@@ -203,13 +210,14 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
       });
       return null;
     }
-    final url = lesson.videoUrl;
+    final url = lesson.videoUrlFor(CourseReelsAudioService.language.value);
     if (url == null) {
       _failed.add(i);
       return null;
     }
     final controller = VideoPlayerController.networkUrl(Uri.parse(url));
     _controllers[i] = controller;
+    _controllerUrls[i] = url;
     controller.setLooping(true);
     controller
         .initialize()
@@ -239,6 +247,7 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
   }
 
   void _dropController(int i) {
+    _controllerUrls.remove(i);
     final c = _controllers.remove(i);
     c?.removeListener(_onTick);
     c?.dispose();
@@ -257,7 +266,8 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
           if (f == null) continue;
           lesson
             ..videoUrl = f.videoUrl
-            ..videoUrlExpiresAt = f.videoUrlExpiresAt;
+            ..videoUrlExpiresAt = f.videoUrlExpiresAt
+            ..audioTracks = f.audioTracks;
         }
       } catch (_) {
         // Offline: the retry button tries again.
@@ -274,11 +284,7 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
     // Keep a window of three players; the rest are disposed.
     final keep = {i - 1, i, i + 1};
     for (final key in _controllers.keys.toList()) {
-      if (!keep.contains(key)) {
-        final c = _controllers.remove(key)!;
-        c.removeListener(_onTick);
-        c.dispose();
-      }
+      if (!keep.contains(key)) _dropController(key);
     }
     final current = _controllerFor(i);
     current?.removeListener(_onTick);
@@ -377,6 +383,46 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
         c.play();
       }
     });
+  }
+
+  /// Switches the voice-over language for the whole feed. The current video
+  /// continues from the same moment in the new language; neighbours are
+  /// rebuilt so the next swipe plays it too.
+  Future<void> _chooseLanguage(String code) async {
+    if (code == CourseReelsAudioService.language.value) return;
+    _recordCurrent(force: true);
+    final current = _controllers[_index];
+    final position = current != null && current.value.isInitialized
+        ? current.value.position
+        : null;
+    await CourseReelsAudioService.choose(code);
+    if (!mounted) return;
+    for (final i in _controllers.keys.toList()) {
+      if (_controllerUrls[i] !=
+          _lessons[i].videoUrlFor(CourseReelsAudioService.language.value)) {
+        _dropController(i);
+        _failed.remove(i);
+        if (i == _index && position != null) _pendingSeek[i] = position;
+      }
+    }
+    setState(() {});
+    _activate(_index);
+  }
+
+  Future<void> _openLanguages(ReelLesson lesson) async {
+    final chosen = await _covering<String>(
+      () => showModalBottomSheet<String>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _LanguageSheet(
+          lesson: lesson,
+          selected: lesson
+              .trackFor(CourseReelsAudioService.language.value)
+              ?.language,
+        ),
+      ),
+    );
+    if (chosen != null && mounted) await _chooseLanguage(chosen);
   }
 
   Future<void> _retry(int i) async {
@@ -512,6 +558,12 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
                       : 'Lesson ${_index + 1} of ${_lessons.length}',
                   onBack: () => Navigator.pop(context),
                   onMap: _course == null || _lessons.isEmpty ? null : _openMap,
+                  audioLanguage: _currentDubbed
+                      ?.trackFor(CourseReelsAudioService.language.value)
+                      ?.language,
+                  onAudio: _currentDubbed == null
+                      ? null
+                      : () => _openLanguages(_currentDubbed!),
                 ),
                 Expanded(child: _body()),
               ],
@@ -522,6 +574,13 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
         ),
       ),
     );
+  }
+
+  /// The lesson on screen when it comes in more than one language.
+  ReelLesson? get _currentDubbed {
+    if (_index >= _lessons.length) return null;
+    final lesson = _lessons[_index];
+    return lesson.hasDubs ? lesson : null;
   }
 
   Widget _body() {
@@ -540,7 +599,9 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
     }
     if (_lessons.isEmpty) {
       return _Message(
-        icon: widget.savedOnly ? Symbols.bookmark_rounded : Symbols.movie_rounded,
+        icon: widget.savedOnly
+            ? Symbols.bookmark_rounded
+            : Symbols.movie_rounded,
         text: widget.savedOnly
             ? 'Tap the bookmark on a lesson to keep it here.'
             : 'No lessons in this course yet.',
@@ -630,12 +691,18 @@ class _TopBar extends StatelessWidget {
     required this.subtitle,
     required this.onBack,
     required this.onMap,
+    this.audioLanguage,
+    this.onAudio,
   });
 
   final String title;
   final String subtitle;
   final VoidCallback onBack;
   final VoidCallback? onMap;
+
+  /// Language code now playing; the pill shows only for dubbed lessons.
+  final String? audioLanguage;
+  final VoidCallback? onAudio;
 
   @override
   Widget build(BuildContext context) {
@@ -676,6 +743,23 @@ class _TopBar extends StatelessWidget {
                 ],
               ),
             ),
+            if (onAudio != null) ...[
+              TextButton.icon(
+                onPressed: onAudio,
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.white.withValues(alpha: 0.16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: const StadiumBorder(),
+                ),
+                icon: const Icon(Symbols.translate_rounded, size: 18),
+                label: Text(
+                  (audioLanguage ?? '').toUpperCase(),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
             if (onMap != null)
               TextButton.icon(
                 onPressed: onMap,
@@ -691,6 +775,76 @@ class _TopBar extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Picks the voice-over language; pops the chosen language code.
+class _LanguageSheet extends StatelessWidget {
+  const _LanguageSheet({required this.lesson, required this.selected});
+
+  final ReelLesson lesson;
+  final String? selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+              child: Text(
+                'Video language',
+                style: TextStyle(
+                  color: colors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                'Applies to every lesson that has it.',
+                style: TextStyle(color: colors.textSecondary, fontSize: 13),
+              ),
+            ),
+            for (final track in lesson.audioTracks)
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                title: Text(
+                  reelAudioLanguageName(track.language),
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  track.isOriginal ? 'Original' : 'Dubbed',
+                  style: TextStyle(color: colors.textSecondary),
+                ),
+                trailing: track.language == selected
+                    ? Icon(
+                        Symbols.check_circle_rounded,
+                        fill: 1,
+                        color: colors.success,
+                      )
+                    : null,
+                onTap: () => Navigator.pop(context, track.language),
+              ),
+            const SizedBox(height: 8),
           ],
         ),
       ),

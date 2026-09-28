@@ -222,4 +222,183 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  group('new exercise types', () {
+    ReelExercise ex(Map<String, dynamic> json) =>
+        ReelExercise.fromJson({'id': 1, 'solved': false, ...json});
+
+    test('parses options, gap options, sentence and the AI review', () {
+      final mc = ex({'type': 'multiple_choice', 'prompt': 'Q?', 'options': ['went', 'goes']});
+      expect(mc.type, ReelExerciseType.multipleChoice);
+      expect(mc.options, ['went', 'goes']);
+      final cg = ex({
+        'type': 'choose_gaps',
+        'gap_options': [
+          ['has', 'have'],
+          ['for', 'since'],
+        ],
+      });
+      expect(cg.gapOptions[1], ['for', 'since']);
+      expect(ex({'type': 'transform_sentence', 'sentence': 'He go.'}).sentence, 'He go.');
+      expect(ex({'type': 'speaking_ai'}).type.isAi, isTrue);
+      expect(ex({'type': 'fill_gaps'}).type.isAi, isFalse);
+
+      final r = ReelAnswerResult.fromJson({
+        'correct': true,
+        'ai': {
+          'score': 82,
+          'pass_score': 60,
+          'corrections': [
+            {'original': 'a park', 'corrected': 'the park', 'explanation': 'specific'},
+          ],
+          'improved': 'Better.',
+          'transcript': null,
+        },
+      });
+      expect(r.ai!.score, 82);
+      expect(r.ai!.corrections.single.corrected, 'the park');
+      expect(r.ai!.transcript, isNull);
+      expect(ReelAnswerResult.fromJson({'correct': false}).ai, isNull);
+    });
+
+    testWidgets('multiple choice reports the tapped option text', (tester) async {
+      String? answer;
+      await tester.pumpWidget(_app(Scaffold(
+        body: MultipleChoiceTask(
+          exercise: ex({'type': 'multiple_choice', 'prompt': 'Yesterday I ___.', 'options': ['went', 'goes', 'going']}),
+          locked: false,
+          wrong: false,
+          onChanged: (a) => answer = a,
+        ),
+      )));
+      await tester.tap(find.text('goes'));
+      expect(answer, 'goes');
+      await tester.tap(find.text('went'));
+      expect(answer, 'went');
+    });
+
+    testWidgets('choose gaps fills gap by gap and waits for all', (tester) async {
+      List<String>? answer;
+      await tester.pumpWidget(_app(Scaffold(
+        body: ChooseGapsTask(
+          exercise: ex({
+            'type': 'choose_gaps',
+            'segments': [
+              {'type': 'text', 'value': 'She '},
+              {'type': 'gap', 'index': 0},
+              {'type': 'text', 'value': ' lived here '},
+              {'type': 'gap', 'index': 1},
+            ],
+            'gap_options': [
+              ['has', 'have', 'had'],
+              ['for', 'since', 'from'],
+            ],
+          }),
+          locked: false,
+          gapResults: null,
+          onChanged: (a) => answer = a,
+        ),
+      )));
+      expect(find.text('GAP 1'), findsOneWidget);
+      await tester.tap(find.text('has'));
+      await tester.pump();
+      expect(answer, isNull);
+      expect(find.text('GAP 2'), findsOneWidget); // moved on by itself
+      await tester.tap(find.text('since'));
+      await tester.pump();
+      expect(answer, ['has', 'since']);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('transform sentence shows the sentence and reports the rewrite', (tester) async {
+      String? answer;
+      await tester.pumpWidget(_app(Scaffold(
+        body: TransformSentenceTask(
+          exercise: ex({'type': 'transform_sentence', 'sentence': 'They built it.'}),
+          locked: false,
+          onChanged: (a) => answer = a,
+        ),
+      )));
+      expect(find.text('They built it.'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), ' It was built. ');
+      expect(answer, 'It was built.');
+    });
+  });
+
+  group('practice page', () {
+    Map<String, dynamic> q(int id, String type, {bool solved = false}) => {
+          'id': id,
+          'type': type,
+          'tiles': ['a$id', 'b$id'],
+          'prompt': 'Write about $id',
+          'segments': [
+            {'type': 'text', 'value': 'x$id '},
+            {'type': 'gap', 'index': 0},
+          ],
+          'gap_count': 1,
+          'solved': solved,
+          'expected': solved ? 'answer $id' : null,
+        };
+
+    final practice = {
+      'exercises': [
+        q(1, 'sentence_building', solved: true),
+        q(2, 'fill_gaps'),
+        q(3, 'sentence_building'),
+        q(4, 'write_sentence'),
+      ],
+      'progress': {'watched': true},
+    };
+
+    test('splits questions into parts of 10, in lesson order', () {
+      final many = ReelPractice.fromJson({
+        'exercises': [for (var i = 1; i <= 23; i++) q(i, 'fill_gaps', solved: i <= 10)],
+        'progress': <String, dynamic>{},
+      }).exercises;
+      final parts = PracticePart.split(many);
+      expect(parts.map((p) => p.questions.length), [10, 10, 3]);
+      expect(parts.map((p) => '${p.first}-${p.last}'), ['1-10', '11-20', '21-23']);
+      expect(parts.first.done, isTrue);
+      expect(parts[1].solved, 0);
+    });
+
+    testWidgets('parts start collapsed; a part opens full screen, one question at a time', (tester) async {
+      tester.view.physicalSize = const Size(1170, 2532);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(_app(ReelPracticeScreen(
+        lesson: ReelLesson.fromJson(_lessonJson(9)),
+        practice: ReelPractice.fromJson(practice),
+      )));
+      expect(find.text('1 part · 4 questions'), findsOneWidget);
+      expect(find.text('Questions 1–4'), findsOneWidget);
+      expect(find.text('Continue'), findsOneWidget); // 1 of 4 solved
+      expect(find.text('a3'), findsNothing);
+
+      await tester.tap(find.text('Questions 1–4'));
+      await tester.pumpAndSettle();
+      // Q1 was solved earlier, so the runner starts at Q2.
+      expect(find.text('2/4'), findsOneWidget);
+      expect(find.textContaining('x2'), findsOneWidget);
+      expect(find.text('a3'), findsNothing);
+
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
+      expect(find.text('3/4'), findsOneWidget);
+      expect(find.text('a3'), findsOneWidget);
+
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
+      expect(find.text('Part 1 finished'), findsOneWidget);
+      expect(find.text('Retry 3 unsolved'), findsOneWidget);
+      expect(find.text('Back to parts'), findsOneWidget);
+
+      await tester.tap(find.text('Back to parts'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 part · 4 questions'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
 }

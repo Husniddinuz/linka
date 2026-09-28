@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import '../models/course_reel.dart';
 import 'api_service.dart';
 
@@ -178,6 +180,17 @@ class CourseReelsService {
     await ApiService.post('/course-reels/exercises/$exerciseId/submit/', {
       'answer': answer,
     }),
+  );
+
+  /// Speaking (AI): uploads the recording; the server transcribes and marks it.
+  static Future<ReelAnswerResult> submitSpeaking(
+    int exerciseId,
+    File recording,
+  ) async => ReelAnswerResult.fromJson(
+    await ApiService.postMultipart(
+      '/course-reels/exercises/$exerciseId/submit/',
+      files: {'audio': recording},
+    ),
   );
 }
 
