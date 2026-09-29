@@ -558,12 +558,12 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
                       : 'Lesson ${_index + 1} of ${_lessons.length}',
                   onBack: () => Navigator.pop(context),
                   onMap: _course == null || _lessons.isEmpty ? null : _openMap,
-                  audioLanguage: _currentDubbed
+                  audioLanguage: _currentWithAudio
                       ?.trackFor(CourseReelsAudioService.language.value)
                       ?.language,
-                  onAudio: _currentDubbed == null
+                  onAudio: _currentWithAudio == null
                       ? null
-                      : () => _openLanguages(_currentDubbed!),
+                      : () => _openLanguages(_currentWithAudio!),
                 ),
                 Expanded(child: _body()),
               ],
@@ -576,11 +576,13 @@ class _CourseReelsFeedScreenState extends State<CourseReelsFeedScreen>
     );
   }
 
-  /// The lesson on screen when it comes in more than one language.
-  ReelLesson? get _currentDubbed {
+  /// The lesson on screen when the server told us its spoken language(s).
+  /// The pill shows even with only the original track, so students can see
+  /// which languages a video has (the rest are listed as not dubbed yet).
+  ReelLesson? get _currentWithAudio {
     if (_index >= _lessons.length) return null;
     final lesson = _lessons[_index];
-    return lesson.hasDubs ? lesson : null;
+    return lesson.audioTracks.isEmpty ? null : lesson;
   }
 
   Widget _body() {
@@ -789,6 +791,12 @@ class _LanguageSheet extends StatelessWidget {
   final ReelLesson lesson;
   final String? selected;
 
+  /// Every language the admin can dub into, plus any extra the server sent.
+  List<String> get _languages => {
+    ...reelAudioLanguageNames.keys,
+    for (final t in lesson.audioTracks) t.language,
+  }.toList();
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -821,28 +829,42 @@ class _LanguageSheet extends StatelessWidget {
                 style: TextStyle(color: colors.textSecondary, fontSize: 13),
               ),
             ),
-            for (final track in lesson.audioTracks)
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                title: Text(
-                  reelAudioLanguageName(track.language),
-                  style: TextStyle(
-                    color: colors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  track.isOriginal ? 'Original' : 'Dubbed',
-                  style: TextStyle(color: colors.textSecondary),
-                ),
-                trailing: track.language == selected
-                    ? Icon(
-                        Symbols.check_circle_rounded,
-                        fill: 1,
-                        color: colors.success,
-                      )
-                    : null,
-                onTap: () => Navigator.pop(context, track.language),
+            for (final code in _languages)
+              Builder(
+                builder: (context) {
+                  final track = lesson.audioTracks
+                      .where((t) => t.language == code)
+                      .firstOrNull;
+                  return ListTile(
+                    enabled: track != null,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                    title: Text(
+                      reelAudioLanguageName(code),
+                      style: TextStyle(
+                        color: track == null
+                            ? colors.textSecondary
+                            : colors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      track == null
+                          ? 'Not available for this video yet'
+                          : track.isOriginal
+                          ? 'Original'
+                          : 'Dubbed',
+                      style: TextStyle(color: colors.textSecondary),
+                    ),
+                    trailing: code == selected
+                        ? Icon(
+                            Symbols.check_circle_rounded,
+                            fill: 1,
+                            color: colors.success,
+                          )
+                        : null,
+                    onTap: () => Navigator.pop(context, code),
+                  );
+                },
               ),
             const SizedBox(height: 8),
           ],

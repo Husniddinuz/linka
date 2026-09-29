@@ -483,6 +483,7 @@ class ReelExercise {
     this.gapOptions = const [],
     this.sentence = '',
     this.passScore = 60,
+    this.imageUrl,
     required this.solved,
     required this.attempts,
     required this.expected,
@@ -512,6 +513,9 @@ class ReelExercise {
 
   /// Writing / Speaking (AI): the score (0-100) that counts as solved.
   final int passScore;
+
+  /// Optional picture shown above the task (any type).
+  final String? imageUrl;
 
   bool solved;
   int attempts;
@@ -559,6 +563,7 @@ class ReelExercise {
     ],
     sentence: json['sentence']?.toString() ?? '',
     passScore: json['pass_score'] == null ? 60 : _asInt(json['pass_score']),
+    imageUrl: _nonEmpty(json['image_url']),
     solved: json['solved'] as bool? ?? false,
     attempts: _asInt(json['attempts']),
     expected: _nonEmpty(json['expected']),

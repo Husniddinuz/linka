@@ -947,6 +947,10 @@ class _QuestionView extends StatelessWidget {
               ],
             ),
           ],
+          if (question.imageUrl != null) ...[
+            const SizedBox(height: 16),
+            _ExerciseImage(url: question.imageUrl!),
+          ],
           const SizedBox(height: 24),
           if (solvedBefore)
             Container(
@@ -2188,6 +2192,65 @@ class _AiSpeakingTaskState extends State<AiSpeakingTask> {
         const SizedBox(height: 12),
         const Align(alignment: Alignment.centerRight, child: _AiBadge()),
       ],
+    );
+  }
+}
+
+/// The exercise's picture; tap to open it full screen and zoom.
+class _ExerciseImage extends StatelessWidget {
+  const _ExerciseImage({required this.url});
+
+  final String url;
+
+  void _openFullScreen(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (dialogContext) => GestureDetector(
+        onTap: () => Navigator.pop(dialogContext),
+        child: InteractiveViewer(
+          maxScale: 5,
+          child: Center(child: Image.network(url, fit: BoxFit.contain)),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return GestureDetector(
+      onTap: () => _openFullScreen(context),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 280),
+          child: Container(
+            width: double.infinity,
+            color: c.surfaceAlt,
+            child: Image.network(
+              url,
+              fit: BoxFit.contain,
+              loadingBuilder: (context, child, progress) => progress == null
+                  ? child
+                  : const SizedBox(
+                      height: 180,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+              errorBuilder: (context, error, stack) => SizedBox(
+                height: 120,
+                child: Center(
+                  child: Icon(
+                    Symbols.broken_image_rounded,
+                    size: 32,
+                    color: c.textTertiary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
