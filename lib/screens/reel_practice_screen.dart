@@ -11,6 +11,7 @@ import 'package:record/record.dart';
 import '../models/course_reel.dart';
 import '../services/api_service.dart';
 import '../services/course_reels_service.dart';
+import '../services/practice_sounds.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_notify.dart';
 import '../widgets/reel_progress_markers.dart';
@@ -22,6 +23,7 @@ String _typeLabel(ReelExerciseType type) => switch (type) {
   ReelExerciseType.multipleChoice => 'Choose the answer',
   ReelExerciseType.transformSentence => 'Rewrite the sentence',
   ReelExerciseType.chooseGaps => 'Choose for each gap',
+  ReelExerciseType.chooseSynonyms => 'Synonyms',
   ReelExerciseType.writingAi => 'Writing',
   ReelExerciseType.speakingAi => 'Speaking',
   ReelExerciseType.unknown => 'More practice',
@@ -34,6 +36,7 @@ IconData _typeIcon(ReelExerciseType type) => switch (type) {
   ReelExerciseType.multipleChoice => Symbols.checklist_rounded,
   ReelExerciseType.transformSentence => Symbols.change_circle_rounded,
   ReelExerciseType.chooseGaps => Symbols.format_list_bulleted_rounded,
+  ReelExerciseType.chooseSynonyms => Symbols.join_inner_rounded,
   ReelExerciseType.writingAi => Symbols.edit_document_rounded,
   ReelExerciseType.speakingAi => Symbols.mic_rounded,
   ReelExerciseType.unknown => Symbols.quiz_rounded,
@@ -70,9 +73,11 @@ class PracticePart {
   ];
 }
 
-/// The practice for one lesson. The page lists its parts collapsed, so the
-/// student sees how much there is; tapping one opens it full screen
-/// ([PracticePartScreen]) and walks its questions one at a time.
+/// The practice for one lesson. The page lists its parts as collapsible
+/// cards, so the student sees how much there is; expanding one lists its
+/// questions, and picking a question (or Start / Continue / Redo) opens the
+/// part full screen ([PracticePartScreen]) to walk them one at a time.
+/// Solved questions can always be done again.
 ///
 /// Answers are checked by the server, which also marks the lesson's practice
 /// complete (the green marker) once every required question is solved. The
@@ -93,6 +98,9 @@ class ReelPracticeScreen extends StatefulWidget {
 
 class _ReelPracticeScreenState extends State<ReelPracticeScreen> {
   List<PracticePart> _parts = const [];
+
+  /// The one expanded part card (accordion), or null when all are collapsed.
+  int? _expanded;
   bool _loading = true;
   bool _failed = false;
 
@@ -109,6 +117,7 @@ class _ReelPracticeScreenState extends State<ReelPracticeScreen> {
 
   void _apply(ReelPractice practice) {
     _parts = PracticePart.split(practice.exercises);
+    _expanded = _nextPart;
     widget.lesson.progress = practice.progress;
     _loading = false;
     _failed = false;
@@ -141,7 +150,9 @@ class _ReelPracticeScreenState extends State<ReelPracticeScreen> {
     return i < 0 ? null : i;
   }
 
-  Future<void> _openPart(int i) async {
+  /// Opens part [i] full screen; at question [at] when one was picked from
+  /// the expanded card (a redo from there, solved or not).
+  Future<void> _openPart(int i, {int? at}) async {
     final goNext = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -151,12 +162,15 @@ class _ReelPracticeScreenState extends State<ReelPracticeScreen> {
           part: _parts[i],
           number: i + 1,
           hasNext: i + 1 < _parts.length,
+          startAt: at,
         ),
       ),
     );
     if (!mounted) return;
-    setState(() {}); // solved counts and markers changed on the way
-    if (goNext == true && i + 1 < _parts.length) _openPart(i + 1);
+    final next = goNext == true && i + 1 < _parts.length;
+    // Solved counts and markers changed on the way.
+    setState(() => _expanded = next ? i + 1 : i);
+    if (next) _openPart(i + 1);
   }
 
   @override
@@ -211,7 +225,11 @@ class _ReelPracticeScreenState extends State<ReelPracticeScreen> {
             number: i + 1,
             part: part,
             suggested: i == next,
-            onTap: () => _openPart(i),
+            expanded: i == _expanded,
+            onToggle: () =>
+                setState(() => _expanded = _expanded == i ? null : i),
+            onStart: () => _openPart(i),
+            onQuestion: (q) => _openPart(i, at: q),
           ),
           const SizedBox(height: 12),
         ],
@@ -274,7 +292,8 @@ class _ReelPracticeScreenState extends State<ReelPracticeScreen> {
                 Text(
                   allSolved
                       ? progress.watched
-                            ? 'This lesson is now green on your map.'
+                            ? 'This lesson is green on your map. Pick any '
+                                  'question to do it again.'
                             : 'Finish the video to turn this lesson green.'
                       : '$solved of $total solved · open a part to start',
                   style: TextStyle(
@@ -308,22 +327,34 @@ class _ReelPracticeScreenState extends State<ReelPracticeScreen> {
   }
 }
 
-/// A collapsed part: number, which questions it holds, what kinds, and how
-/// far the student got. Tapping it opens the part full screen.
+/// A part as a collapsible card. Collapsed: number, which questions it
+/// holds, what kinds, and how far the student got. Expanded: every question
+/// as a square box to pick and do (solved ones again too), plus Start / Continue /
+/// Redo for the whole part.
 class _PartCard extends StatelessWidget {
   const _PartCard({
     required this.number,
     required this.part,
     required this.suggested,
-    required this.onTap,
+    required this.expanded,
+    required this.onToggle,
+    required this.onStart,
+    required this.onQuestion,
   });
 
   final int number;
   final PracticePart part;
 
-  /// The first part with work left — outlined and labelled Start/Continue.
+  /// The first part with work left — outlined in green.
   final bool suggested;
-  final VoidCallback onTap;
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  /// Walk the part from its first unsolved question (all of them once done).
+  final VoidCallback onStart;
+
+  /// Open the part at this question index.
+  final ValueChanged<int> onQuestion;
 
   @override
   Widget build(BuildContext context) {
@@ -332,144 +363,263 @@ class _PartCard extends StatelessWidget {
     final solved = part.solved;
     final count = part.questions.length;
     final action = done
-        ? 'Review'
+        ? 'Redo part'
         : solved > 0
         ? 'Continue'
         : 'Start';
-    return Material(
-      color: c.surface,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: c.surface,
         borderRadius: BorderRadius.circular(18),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: suggested ? c.success : c.border,
-              width: suggested ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: done ? c.success : c.surfaceAlt,
-                  shape: BoxShape.circle,
-                ),
-                child: done
-                    ? const Icon(
-                        Symbols.check_rounded,
-                        size: 26,
-                        weight: 700,
-                        color: Colors.white,
-                      )
-                    : Text(
-                        '$number',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: c.textPrimary,
-                        ),
-                      ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        border: Border.all(
+          color: suggested ? c.success : c.border,
+          width: suggested ? 2 : 1,
+        ),
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            InkWell(
+              onTap: onToggle,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          'PART $number',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            letterSpacing: 1,
-                            fontWeight: FontWeight.w800,
-                            color: c.textTertiary,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Wrap(
-                            spacing: 4,
+                    Container(
+                      width: 46,
+                      height: 46,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: done ? c.success : c.surfaceAlt,
+                        shape: BoxShape.circle,
+                      ),
+                      child: done
+                          ? const Icon(
+                              Symbols.check_rounded,
+                              size: 26,
+                              weight: 700,
+                              color: Colors.white,
+                            )
+                          : Text(
+                              '$number',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: c.textPrimary,
+                              ),
+                            ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              for (final type in part.types)
-                                Icon(
-                                  _typeIcon(type),
-                                  size: 15,
+                              Text(
+                                'PART $number',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  letterSpacing: 1,
+                                  fontWeight: FontWeight.w800,
                                   color: c.textTertiary,
                                 ),
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Wrap(
+                                  spacing: 4,
+                                  children: [
+                                    for (final type in part.types)
+                                      Icon(
+                                        _typeIcon(type),
+                                        size: 15,
+                                        color: c.textTertiary,
+                                      ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      count == 1
-                          ? 'Question ${part.first}'
-                          : 'Questions ${part.first}–${part.last}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: c.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(3),
-                            child: LinearProgressIndicator(
-                              value: solved / count,
-                              minHeight: 6,
-                              backgroundColor: c.surfaceAlt,
-                              color: c.success,
+                          const SizedBox(height: 2),
+                          Text(
+                            count == 1
+                                ? 'Question ${part.first}'
+                                : 'Questions ${part.first}–${part.last}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: c.textPrimary,
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          '$solved/$count',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: done ? c.success : c.textSecondary,
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(3),
+                                  child: LinearProgressIndicator(
+                                    value: solved / count,
+                                    minHeight: 6,
+                                    backgroundColor: c.surfaceAlt,
+                                    color: c.success,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                '$solved/$count',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: done ? c.success : c.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    AnimatedRotation(
+                      turns: expanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        Symbols.expand_more_rounded,
+                        color: c.textSecondary,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              if (suggested)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
+            ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: expanded
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Divider(height: 1, color: c.border),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
+                          child: GridView.count(
+                            crossAxisCount: 4,
+                            mainAxisSpacing: 8,
+                            crossAxisSpacing: 8,
+                            shrinkWrap: true,
+                            // The page scrolls; the grid just lays out.
+                            physics: const NeverScrollableScrollPhysics(),
+                            padding: EdgeInsets.zero,
+                            children: [
+                              for (final (i, q) in part.questions.indexed)
+                                _QuestionBox(
+                                  number: part.first + i,
+                                  question: q,
+                                  onTap: () => onQuestion(i),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                          child: done
+                              ? _SecondaryButton(
+                                  label: action,
+                                  onPressed: onStart,
+                                )
+                              : _PrimaryButton(
+                                  label: action,
+                                  onPressed: onStart,
+                                ),
+                        ),
+                      ],
+                    )
+                  : const SizedBox(width: double.infinity),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One question inside an expanded part, as a square box: its kind and
+/// "Question N", green with a check once solved. Tapping it opens the part
+/// at that question.
+class _QuestionBox extends StatelessWidget {
+  const _QuestionBox({
+    required this.number,
+    required this.question,
+    required this.onTap,
+  });
+
+  final int number;
+  final ReelExercise question;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final solved = question.solved;
+    return Material(
+      color: solved ? c.successBg : c.surfaceAlt,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: solved ? c.success : c.border,
+              width: solved ? 1.5 : 1,
+            ),
+          ),
+          child: Stack(
+            children: [
+              if (solved)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Icon(
+                    Symbols.check_circle_rounded,
+                    fill: 1,
+                    size: 14,
                     color: c.success,
-                    borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
-                    action,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
+                ),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _typeIcon(question.type),
+                        size: 20,
+                        color: solved ? c.success : c.textSecondary,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Question $number',
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          height: 1.15,
+                          color: c.textPrimary,
+                        ),
+                      ),
+                    ],
                   ),
-                )
-              else
-                Icon(Symbols.chevron_right_rounded, color: c.textSecondary),
+                ),
+              ),
             ],
           ),
         ),
@@ -480,9 +630,11 @@ class _PartCard extends StatelessWidget {
 
 /// One part, full screen, one question at a time: answer, Check, see the
 /// result, Continue. Wrong answers can be retried or skipped. Walks only the
-/// part's unsolved questions (all of them when the part is already done, as
-/// a review), then shows a summary. Pops `true` when the student asks for the
-/// next part.
+/// part's unsolved questions, then shows a summary. Redo mode — the part was
+/// already done, or the student picked a question ([startAt]) — walks every
+/// question from there with solved ones answerable again; solved stays
+/// solved on the server, the round is just scored. Pops `true` when the
+/// student asks for the next part.
 class PracticePartScreen extends StatefulWidget {
   const PracticePartScreen({
     super.key,
@@ -490,12 +642,16 @@ class PracticePartScreen extends StatefulWidget {
     required this.part,
     required this.number,
     required this.hasNext,
+    this.startAt,
   });
 
   final ReelLesson lesson;
   final PracticePart part;
   final int number;
   final bool hasNext;
+
+  /// Index of the question picked from the part card; opens in redo mode.
+  final int? startAt;
 
   @override
   State<PracticePartScreen> createState() => _PracticePartScreenState();
@@ -504,9 +660,9 @@ class PracticePartScreen extends StatefulWidget {
 class _PracticePartScreenState extends State<PracticePartScreen> {
   List<ReelExercise> get _questions => widget.part.questions;
 
-  /// Review mode: the part was already done when opened, so every question
-  /// is shown; otherwise solved ones are passed over.
-  late final bool _review = widget.part.done;
+  /// Redo mode: every question is shown and answerable, solved or not;
+  /// otherwise solved ones are passed over.
+  late bool _redo = widget.part.done || widget.startAt != null;
 
   late int _index;
   bool _finished = false;
@@ -515,13 +671,21 @@ class _PracticePartScreenState extends State<PracticePartScreen> {
   ReelAnswerResult? _result;
   bool _checking = false;
 
-  /// Checked wrong at least once this visit and not solved yet (red segment).
+  /// Checked wrong this round and not right since (red segment).
   final Set<int> _missed = {};
+
+  /// Checked right this round (green segment in redo mode).
+  final Set<int> _right = {};
 
   @override
   void initState() {
     super.initState();
-    _index = _review ? 0 : _nextFrom(0) ?? 0;
+    final at = widget.startAt;
+    _index = at != null
+        ? at.clamp(0, _questions.length - 1)
+        : _redo
+        ? 0
+        : _nextFrom(0) ?? 0;
   }
 
   ReelExercise get _question => _questions[_index];
@@ -529,7 +693,7 @@ class _PracticePartScreenState extends State<PracticePartScreen> {
   /// The first question at or after [from] to walk through, or null.
   int? _nextFrom(int from) {
     for (var i = from; i < _questions.length; i++) {
-      if (_review || !_questions[i].solved) return i;
+      if (_redo || !_questions[i].solved) return i;
     }
     return null;
   }
@@ -552,7 +716,17 @@ class _PracticePartScreenState extends State<PracticePartScreen> {
   /// From the summary: back through whatever is still unsolved.
   void _retryUnsolved() {
     final i = _questions.indexWhere((q) => !q.solved);
-    if (i >= 0) _goTo(i);
+    if (i < 0) return;
+    _redo = false;
+    _goTo(i);
+  }
+
+  /// From the summary: the whole part again, from question 1.
+  void _redoPart() {
+    _redo = true;
+    _missed.clear();
+    _right.clear();
+    _goTo(0);
   }
 
   Future<void> _check() async {
@@ -569,6 +743,7 @@ class _PracticePartScreenState extends State<PracticePartScreen> {
           : await CourseReelsService.submitAnswer(question.id, answer);
       if (!mounted) return;
       HapticFeedback.mediumImpact();
+      result.correct ? PracticeSounds.correct() : PracticeSounds.wrong();
       setState(() {
         _result = result;
         question
@@ -576,10 +751,13 @@ class _PracticePartScreenState extends State<PracticePartScreen> {
           ..attempts = result.attempts
           ..expected = result.expected
           ..sampleAnswer = result.sampleAnswer;
-        if (result.solved) {
+        // `correct` is this attempt; `solved` stays true once ever right.
+        if (result.correct) {
           _missed.remove(question.id);
+          _right.add(question.id);
         } else {
           _missed.add(question.id);
+          _right.remove(question.id);
         }
         widget.lesson.progress = result.lessonProgress;
       });
@@ -626,11 +804,13 @@ class _PracticePartScreenState extends State<PracticePartScreen> {
                         key: const ValueKey('summary'),
                         number: widget.number,
                         part: widget.part,
+                        right: _redo ? _right.length : null,
                       )
                     : _QuestionView(
-                        // A fresh answer widget per question.
-                        key: ValueKey(_question.id),
+                        // A fresh answer widget per question (and per redo).
+                        key: ValueKey((_question.id, _redo)),
                         question: _question,
+                        redo: _redo,
                         result: _result,
                         onChanged: (a) => setState(() => _answer = a),
                       ),
@@ -665,7 +845,7 @@ class _PracticePartScreenState extends State<PracticePartScreen> {
                       duration: const Duration(milliseconds: 200),
                       height: 8,
                       decoration: BoxDecoration(
-                        color: q.solved
+                        color: _right.contains(q.id) || (q.solved && !_redo)
                             ? c.success
                             : _missed.contains(q.id)
                             ? c.error
@@ -704,13 +884,14 @@ class _PracticePartScreenState extends State<PracticePartScreen> {
       content = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (unsolved > 0) ...[
+          if (unsolved > 0)
             _SecondaryButton(
               label: 'Retry $unsolved unsolved',
               onPressed: _retryUnsolved,
-            ),
-            const SizedBox(height: 10),
-          ],
+            )
+          else
+            _SecondaryButton(label: 'Redo part', onPressed: _redoPart),
+          const SizedBox(height: 10),
           _PrimaryButton(
             label: widget.hasNext ? 'Next part' : 'Back to parts',
             onPressed: () => Navigator.pop(context, widget.hasNext),
@@ -721,7 +902,7 @@ class _PracticePartScreenState extends State<PracticePartScreen> {
       final r = _result;
       final q = _question;
       // Solved on an earlier visit: nothing to answer, just move on.
-      final passed = (r?.correct ?? false) || (q.solved && r == null);
+      final passed = (r?.correct ?? false) || (q.solved && r == null && !_redo);
       if (passed || q.type == ReelExerciseType.unknown) {
         content = _PrimaryButton(label: 'Continue', onPressed: _next);
       } else if (r != null) {
@@ -874,11 +1055,15 @@ class _QuestionView extends StatelessWidget {
   const _QuestionView({
     super.key,
     required this.question,
+    required this.redo,
     required this.result,
     required this.onChanged,
   });
 
   final ReelExercise question;
+
+  /// Answer it again even when solved, instead of showing the answer.
+  final bool redo;
   final ReelAnswerResult? result;
   final ValueChanged<Object?> onChanged;
 
@@ -886,7 +1071,7 @@ class _QuestionView extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final r = result;
-    final solvedBefore = question.solved && r == null;
+    final solvedBefore = question.solved && r == null && !redo;
     final locked = r?.correct ?? false;
 
     return SingleChildScrollView(
@@ -970,7 +1155,8 @@ class _QuestionView extends StatelessWidget {
             )
           else ...[
             switch (question.type) {
-              ReelExerciseType.sentenceBuilding => SentenceBuildingTask(
+              ReelExerciseType.sentenceBuilding ||
+              ReelExerciseType.chooseSynonyms => SentenceBuildingTask(
                 exercise: question,
                 locked: locked,
                 onChanged: onChanged,
@@ -1031,10 +1217,18 @@ class _QuestionView extends StatelessWidget {
 
 /// End of a part: how it went.
 class _Summary extends StatelessWidget {
-  const _Summary({super.key, required this.number, required this.part});
+  const _Summary({
+    super.key,
+    required this.number,
+    required this.part,
+    this.right,
+  });
 
   final int number;
   final PracticePart part;
+
+  /// Answered right this round, in redo mode.
+  final int? right;
 
   @override
   Widget build(BuildContext context) {
@@ -1074,7 +1268,10 @@ class _Summary extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              done
+              right != null
+                  ? '$right right this round · $solved of $count solved '
+                        'overall.'
+                  : done
                   ? 'All $count questions solved.'
                   : '$solved of $count solved — try the rest again or '
                         'come back later.',
@@ -1149,7 +1346,11 @@ class _Feedback extends StatelessWidget {
               style: TextStyle(fontSize: 14, color: c.textPrimary),
             ),
           ],
-          if (sample != null && sample.isNotEmpty) ...[
+          // On a closed question the sample is the "after you solve it" note
+          // (often a well-done message), so only a right answer shows it. The
+          // server also sends it on a redo of a solved question or after
+          // several tries, where a free-text example still helps.
+          if (sample != null && sample.isNotEmpty && (correct || freeText)) ...[
             const SizedBox(height: 6),
             Text(
               freeText ? 'Example: $sample' : sample,
@@ -1165,7 +1366,9 @@ class _Feedback extends StatelessWidget {
 // --- Task widgets -----------------------------------------------------------
 
 /// Tap word tiles to build the sentence; tap a placed tile to take it back.
-/// Reports the tiles in order, or null until every tile is placed.
+/// Reports the tiles in order, or null while none is placed (distractors may
+/// stay in the bank). Choose the synonyms uses the same tiles under the word
+/// to match; the server ignores the order there.
 class SentenceBuildingTask extends StatefulWidget {
   const SentenceBuildingTask({
     super.key,
@@ -1199,11 +1402,34 @@ class _SentenceBuildingTaskState extends State<SentenceBuildingTask> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final tiles = widget.exercise.tiles;
+    final synonyms = widget.exercise.type == ReelExerciseType.chooseSynonyms;
+    final word = widget.exercise.prompt;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (synonyms && word.isNotEmpty) ...[
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+              decoration: BoxDecoration(
+                color: c.surfaceAlt,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(
+                word,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: c.textPrimary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         Container(
-          constraints: const BoxConstraints(minHeight: 120),
+          constraints: BoxConstraints(minHeight: synonyms ? 90 : 120),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
@@ -1215,7 +1441,9 @@ class _SentenceBuildingTaskState extends State<SentenceBuildingTask> {
           child: _placed.isEmpty
               ? Center(
                   child: Text(
-                    'Tap the words below',
+                    synonyms
+                        ? 'Tap every synonym below'
+                        : 'Tap the words below',
                     style: TextStyle(color: c.textTertiary),
                   ),
                 )

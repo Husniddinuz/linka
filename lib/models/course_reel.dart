@@ -92,6 +92,13 @@ const reelAudioLanguageNames = {
 String reelAudioLanguageName(String code) =>
     reelAudioLanguageNames[code] ?? code.toUpperCase();
 
+/// Flag image standing for each spoken language, or null when there's none.
+/// English is IELTS's British English, hence the UK flag.
+String? reelAudioLanguageFlag(String code) =>
+    reelAudioLanguageNames.containsKey(code)
+    ? 'assets/images/flags/$code.png'
+    : null;
+
 /// A lesson's video in one spoken language: the original recording, or a
 /// dub the server muxed onto the same picture. Every track is a complete
 /// video with its own signed link, so switching language just swaps the URL.
@@ -260,8 +267,8 @@ class ReelSection {
   /// Material Symbols name; see `courseIcon`.
   final String icon;
 
-  /// Every unit is open: the student subscribes (or bought this section
-  /// before the subscription), or Course Reels are free right now.
+  /// Every unit is open: the student subscribes to this course (or bought
+  /// this section before subscriptions), or the course is free right now.
   final bool owned;
 
   /// How many units the section will have once fully uploaded.
@@ -364,9 +371,9 @@ class ReelCourse {
       .toList();
 }
 
-/// The one Course Reels subscription (every section of every course, price
-/// from the admin panel) and whether the student has it. Prepaid: paying
-/// again while it runs adds another period; nothing renews on its own.
+/// One course's subscription (every section of that course only, price from
+/// the admin panel) and whether the student has it. Prepaid: paying again
+/// while it runs adds another period; nothing renews on its own.
 class ReelSubscription {
   const ReelSubscription({
     required this.priceUzs,
@@ -380,7 +387,7 @@ class ReelSubscription {
   final int priceUzs;
   final int durationDays;
 
-  /// Course Reels cost nothing right now; everything is open.
+  /// This course costs nothing right now; all of it is open.
   final bool isFree;
   final bool active;
 
@@ -430,6 +437,10 @@ enum ReelExerciseType {
   multipleChoice,
   transformSentence,
   chooseGaps,
+
+  /// The sentence-building tiles used for vocab: tap every synonym of
+  /// [ReelExercise.prompt], in any order.
+  chooseSynonyms,
   writingAi,
   speakingAi,
   unknown;
@@ -445,6 +456,7 @@ ReelExerciseType _exerciseType(String? raw) => switch (raw) {
   'multiple_choice' => ReelExerciseType.multipleChoice,
   'transform_sentence' => ReelExerciseType.transformSentence,
   'choose_gaps' => ReelExerciseType.chooseGaps,
+  'choose_synonyms' => ReelExerciseType.chooseSynonyms,
   'writing_ai' => ReelExerciseType.writingAi,
   'speaking_ai' => ReelExerciseType.speakingAi,
   _ => ReelExerciseType.unknown,
@@ -532,6 +544,7 @@ class ReelExercise {
       ReelExerciseType.multipleChoice => 'Choose the correct answer',
       ReelExerciseType.transformSentence => 'Rewrite the sentence',
       ReelExerciseType.chooseGaps => 'Choose the right word for each gap',
+      ReelExerciseType.chooseSynonyms => 'Choose all the synonyms',
       ReelExerciseType.writingAi => 'Write your answer',
       ReelExerciseType.speakingAi => 'Record your answer',
       ReelExerciseType.unknown => 'Practice',

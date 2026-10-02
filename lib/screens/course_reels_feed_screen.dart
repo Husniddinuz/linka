@@ -746,19 +746,14 @@ class _TopBar extends StatelessWidget {
               ),
             ),
             if (onAudio != null) ...[
-              TextButton.icon(
+              IconButton(
                 onPressed: onAudio,
-                style: TextButton.styleFrom(
+                tooltip: 'Video language',
+                style: IconButton.styleFrom(
                   foregroundColor: Colors.white,
                   backgroundColor: Colors.white.withValues(alpha: 0.16),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  shape: const StadiumBorder(),
                 ),
-                icon: const Icon(Symbols.translate_rounded, size: 18),
-                label: Text(
-                  (audioLanguage ?? '').toUpperCase(),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
+                icon: _LanguageFlag(code: audioLanguage ?? '', width: 26),
               ),
               const SizedBox(width: 6),
             ],
@@ -779,6 +774,33 @@ class _TopBar extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A language's flag as a small rounded 3:2 card; a translate glyph for a
+/// language without one.
+class _LanguageFlag extends StatelessWidget {
+  const _LanguageFlag({required this.code, required this.width});
+
+  final String code;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = reelAudioLanguageFlag(code);
+    final height = width * 2 / 3;
+    if (asset == null) {
+      return Icon(Symbols.translate_rounded, size: height + 2);
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(width / 7),
+      child: Image.asset(
+        asset,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
       ),
     );
   }
@@ -838,6 +860,10 @@ class _LanguageSheet extends StatelessWidget {
                   return ListTile(
                     enabled: track != null,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                    leading: Opacity(
+                      opacity: track == null ? 0.4 : 1,
+                      child: _LanguageFlag(code: code, width: 32),
+                    ),
                     title: Text(
                       reelAudioLanguageName(code),
                       style: TextStyle(
@@ -902,19 +928,21 @@ class _ReelPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = controller;
-    return Column(
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        // The frame always spans the full width: black bars above and below
-        // when it's shorter than the space between the header and the
-        // footer, trimmed top and bottom when it's taller.
-        Expanded(
+        // The frame fits the whole page under the header, so a portrait
+        // video spans the full width and nothing is cropped; it starts right
+        // under the header and the footer floats over its lower part.
+        Positioned.fill(
           child: Stack(
             fit: StackFit.expand,
             children: [
               if (lesson.posterUrl != null)
                 Image.network(
                   lesson.posterUrl!,
-                  fit: BoxFit.fitWidth,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.topCenter,
                   errorBuilder: (_, _, _) => const SizedBox.shrink(),
                 ),
               if (c != null)
@@ -937,7 +965,12 @@ class _ReelPage extends StatelessWidget {
                       color: Colors.black,
                       child: ClipRect(
                         child: FittedBox(
-                          fit: BoxFit.fitWidth,
+                          fit: BoxFit.contain,
+                          // Portrait frames hug the header so the spare
+                          // space ends up under the footer, not above.
+                          alignment: size.aspectRatio < 1
+                              ? Alignment.topCenter
+                              : Alignment.center,
                           child: SizedBox.fromSize(
                             size: size,
                             child: VideoPlayer(c),
@@ -989,51 +1022,77 @@ class _ReelPage extends StatelessWidget {
             ],
           ),
         ),
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Scrubber right under the frame; the same height either
-                // way so the footer doesn't jump when the video loads.
-                SizedBox(
-                  height: 16,
-                  child: c == null
-                      ? null
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(2),
-                          child: VideoProgressIndicator(
-                            c,
-                            allowScrubbing: true,
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            colors: VideoProgressColors(
-                              playedColor: Colors.white,
-                              bufferedColor: Colors.white.withValues(
-                                alpha: 0.35,
-                              ),
-                              backgroundColor: Colors.white.withValues(
-                                alpha: 0.15,
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0),
+                  Colors.black.withValues(alpha: 0.55),
+                  Colors.black.withValues(alpha: 0.8),
+                ],
+                stops: const [0, 0.35, 1],
+              ),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Scrubber on top of the footer; the same height either
+                    // way so the footer doesn't jump when the video loads.
+                    SizedBox(
+                      height: 16,
+                      child: c == null
+                          ? null
+                          : ClipRRect(
+                              borderRadius: BorderRadius.circular(2),
+                              // Keyed by player: it listens to the one it
+                              // was built with, and switching the dub swaps
+                              // in a new player.
+                              child: VideoProgressIndicator(
+                                key: ObjectKey(c),
+                                c,
+                                allowScrubbing: true,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 6,
+                                ),
+                                colors: VideoProgressColors(
+                                  playedColor: Colors.white,
+                                  bufferedColor: Colors.white.withValues(
+                                    alpha: 0.35,
+                                  ),
+                                  backgroundColor: Colors.white.withValues(
+                                    alpha: 0.15,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        ),
+                    ),
+                    const SizedBox(height: 4),
+                    _Caption(
+                      lesson: lesson,
+                      number: number,
+                      actions: _ActionRail(
+                        lesson: lesson,
+                        onLike: onLike,
+                        onComment: onComment,
+                        onSave: onSave,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _PracticeButton(lesson: lesson, onTap: onPractice),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                _Caption(
-                  lesson: lesson,
-                  number: number,
-                  actions: _ActionRail(
-                    lesson: lesson,
-                    onLike: onLike,
-                    onComment: onComment,
-                    onSave: onSave,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _PracticeButton(lesson: lesson, onTap: onPractice),
-              ],
+              ),
             ),
           ),
         ),
@@ -1090,10 +1149,10 @@ class _Caption extends StatelessWidget {
             actions,
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         Text(
           lesson.title,
-          maxLines: 2,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             color: Colors.white,
@@ -1103,10 +1162,10 @@ class _Caption extends StatelessWidget {
           ),
         ),
         if (lesson.description.isNotEmpty) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             lesson.description,
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.85),
@@ -1240,7 +1299,7 @@ class _PracticeButton extends StatelessWidget {
               '${lesson.exerciseCount == 1 ? 'task' : 'tasks'}';
     return SizedBox(
       width: double.infinity,
-      height: 50,
+      height: 44,
       child: FilledButton.icon(
         onPressed: onTap,
         style: FilledButton.styleFrom(

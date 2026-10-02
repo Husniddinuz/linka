@@ -180,6 +180,27 @@ void main() {
     expect(answer, ['I', 'like', 'tea']);
   });
 
+  testWidgets('choose synonyms shows the word over the same tiles', (tester) async {
+    final ex = ReelExercise.fromJson({
+      'id': 9,
+      'type': 'choose_synonyms',
+      'prompt': 'big',
+      'tiles': ['tiny', 'large', 'huge'],
+    });
+    expect(ex.type, ReelExerciseType.chooseSynonyms);
+    expect(ex.displayInstruction, 'Choose all the synonyms');
+    List<String>? answer;
+    await tester.pumpWidget(_app(Scaffold(
+      body: SentenceBuildingTask(exercise: ex, locked: false, onChanged: (a) => answer = a),
+    )));
+    expect(find.text('big'), findsOneWidget);
+    expect(find.text('Tap every synonym below'), findsOneWidget);
+    await tester.tap(find.text('huge'));
+    await tester.tap(find.text('large'));
+    await tester.pump();
+    expect(answer, ['huge', 'large']);
+  });
+
   testWidgets('fill gaps waits for every gap', (tester) async {
     final ex = ReelExercise.fromJson({
       'id': 2,
@@ -362,7 +383,7 @@ void main() {
       expect(parts[1].solved, 0);
     });
 
-    testWidgets('parts start collapsed; a part opens full screen, one question at a time', (tester) async {
+    testWidgets('the next part starts expanded; Continue opens it full screen, one question at a time', (tester) async {
       tester.view.physicalSize = const Size(1170, 2532);
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.reset);
@@ -373,9 +394,19 @@ void main() {
       expect(find.text('1 part · 4 questions'), findsOneWidget);
       expect(find.text('Questions 1–4'), findsOneWidget);
       expect(find.text('Continue'), findsOneWidget); // 1 of 4 solved
+      for (var i = 1; i <= 4; i++) {
+        expect(find.text('Question $i'), findsOneWidget); // the boxes
+      }
       expect(find.text('a3'), findsNothing);
 
+      // The header collapses and expands the card.
       await tester.tap(find.text('Questions 1–4'));
+      await tester.pumpAndSettle();
+      expect(find.text('Continue'), findsNothing);
+      await tester.tap(find.text('Questions 1–4'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
       // Q1 was solved earlier, so the runner starts at Q2.
       expect(find.text('2/4'), findsOneWidget);
@@ -398,6 +429,51 @@ void main() {
       await tester.tap(find.text('Back to parts'));
       await tester.pumpAndSettle();
       expect(find.text('1 part · 4 questions'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a finished part lets any question be done again', (tester) async {
+      tester.view.physicalSize = const Size(1170, 2532);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(_app(ReelPracticeScreen(
+        lesson: ReelLesson.fromJson(_lessonJson(9)),
+        practice: ReelPractice.fromJson({
+          'exercises': [
+            for (var i = 1; i <= 3; i++) q(i, 'sentence_building', solved: true),
+          ],
+          'progress': {'watched': true},
+        }),
+      )));
+      expect(find.text('Practice complete!'), findsOneWidget);
+      expect(find.text('Question 2'), findsNothing); // collapsed
+
+      await tester.tap(find.text('Questions 1–3'));
+      await tester.pumpAndSettle();
+      expect(find.text('Question 2'), findsOneWidget);
+      expect(find.text('Redo part'), findsOneWidget);
+
+      await tester.tap(find.text('Question 2'));
+      await tester.pumpAndSettle();
+      // Q2, answerable again: its tiles, not the stored answer.
+      expect(find.text('2/3'), findsOneWidget);
+      expect(find.text('a2'), findsOneWidget);
+      expect(find.text('answer 2'), findsNothing);
+      expect(find.text('Check'), findsOneWidget);
+
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
+      expect(find.text('3/3'), findsOneWidget);
+      expect(find.text('a3'), findsOneWidget);
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
+      expect(find.text('Part 1 complete!'), findsOneWidget);
+      expect(find.textContaining('0 right this round'), findsOneWidget);
+
+      await tester.tap(find.text('Redo part'));
+      await tester.pumpAndSettle();
+      expect(find.text('1/3'), findsOneWidget);
+      expect(find.text('a1'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });

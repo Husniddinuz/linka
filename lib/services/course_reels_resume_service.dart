@@ -63,6 +63,7 @@ class CourseReelsResumeService {
 
   static const _key = 'course_reels_resume_v1';
   static const _introsKey = 'course_reels_intros_seen_v1';
+  static const _sectionsKey = 'course_reels_last_section_v1';
 
   /// How often a playing video reports its position to the server.
   static const syncInterval = Duration(seconds: 6);
@@ -79,6 +80,9 @@ class CourseReelsResumeService {
 
   /// Course sections whose intro this student has been through.
   static final Set<int> _introsSeen = {};
+
+  /// The section the student last worked in, per sectioned course.
+  static final Map<int, int> _lastSections = {};
 
   static Timer? _syncTimer;
   static Future<void>? _flushing;
@@ -99,6 +103,19 @@ class CourseReelsResumeService {
             .map(int.tryParse)
             .whereType<int>(),
       );
+      final sections = _prefs?.getString(_sectionsKey);
+      if (sections != null && sections.isNotEmpty) {
+        final decoded = jsonDecode(sections);
+        if (decoded is Map) {
+          for (final e in decoded.entries) {
+            final course = int.tryParse('${e.key}');
+            final section = (e.value as num?)?.toInt();
+            if (course != null && section != null) {
+              _lastSections[course] = section;
+            }
+          }
+        }
+      }
       final raw = _prefs?.getString(_key);
       if (raw == null || raw.isEmpty) return;
       final decoded = jsonDecode(raw);
@@ -130,6 +147,20 @@ class CourseReelsResumeService {
     await _prefs?.setStringList(_introsKey, [
       for (final id in _introsSeen) '$id',
     ]);
+  }
+
+  /// The section of [courseId] the student last opened a unit in or picked,
+  /// on this device. Call [load] first.
+  static int? lastSectionIn(int courseId) => _lastSections[courseId];
+
+  static Future<void> markSection(int courseId, int sectionId) async {
+    await load();
+    if (_lastSections[courseId] == sectionId) return;
+    _lastSections[courseId] = sectionId;
+    await _prefs?.setString(
+      _sectionsKey,
+      jsonEncode({for (final e in _lastSections.entries) '${e.key}': e.value}),
+    );
   }
 
   /// Where to start [lessonId]: this device's position while it is still
@@ -236,8 +267,10 @@ class CourseReelsResumeService {
     _pending.clear();
     _pendingCompleted.clear();
     _introsSeen.clear();
+    _lastSections.clear();
     await _prefs?.remove(_key);
     await _prefs?.remove(_introsKey);
+    await _prefs?.remove(_sectionsKey);
     revision.value++;
   }
 }

@@ -33,13 +33,16 @@ class CourseReelsService {
         await ApiService.getList('/course-reels/courses/?with_sections=1'),
       );
 
-  /// Pays one period of the Course Reels subscription from the wallet; a
-  /// running one is extended. Throws [ReelInsufficientBalance] (nothing
-  /// charged) when the balance is short.
-  static Future<ReelSubscription> subscribe() async {
+  /// Pays one period of [courseId]'s subscription from the wallet; a
+  /// running one is extended. It opens that course only. Throws
+  /// [ReelInsufficientBalance] (nothing charged) when the balance is short.
+  static Future<ReelSubscription> subscribe(int courseId) async {
     try {
       return ReelSubscription.fromJson(
-        await ApiService.post('/course-reels/subscription/', const {}),
+        await ApiService.post(
+          '/course-reels/courses/$courseId/subscription/',
+          const {},
+        ),
       );
     } on ApiException catch (e) {
       if (e.errorCode == 'insufficient_balance') {

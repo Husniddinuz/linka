@@ -183,6 +183,13 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
   /// in by [_layout].
   List<double> _bannerFromBottom = const [];
 
+  /// Every stop on the path as last laid out, for scrolling to a unit.
+  List<_Node> _nodes = const [];
+
+  /// The path opens on the student's current unit once, on first load;
+  /// reloads after watching keep wherever they scrolled.
+  bool _scrolledToCurrent = false;
+
   @override
   void initState() {
     super.initState();
@@ -215,6 +222,12 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
         _loading = false;
         _selected = _selected.clamp(0, parts.length);
       });
+      if (!_scrolledToCurrent) {
+        _scrolledToCurrent = true;
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _scrollToCurrent(course),
+        );
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -306,7 +319,7 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
     required bool afterTopUp,
   }) async {
     try {
-      final paid = await CourseReelsService.subscribe();
+      final paid = await CourseReelsService.subscribe(widget.courseId);
       WalletService.getBalance().ignore(); // refresh the cached balance
       if (!mounted) return;
       final until = paid.endsAt;
@@ -332,8 +345,9 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
           builder: (_) => PaymentTopUpScreen(
             initialAmount: short.shortfallUzs,
             purpose:
-                'Add ${_formatUzs(short.shortfallUzs)} to subscribe to Course '
-                'Reels (${_subscriptionPrice(subscription)}). Every unit opens '
+                'Add ${_formatUzs(short.shortfallUzs)} to subscribe to '
+                '${_course?.title ?? 'this course'} '
+                '(${_subscriptionPrice(subscription)}). Every unit opens '
                 'as soon as the payment goes through.',
           ),
         ),
@@ -345,6 +359,44 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
     } catch (_) {
       if (mounted) _snack("Couldn't complete the payment. Try again.");
     }
+  }
+
+  /// The section the student is working in: the one they last opened a unit
+  /// in on this device, else the one holding the server's last-watched
+  /// lesson, else the first one still unfinished.
+  IeltsPart _activePart(ReelCourse course) {
+    final saved = CourseReelsResumeService.lastSectionIn(course.id);
+    final lastLesson =
+        CourseReelsResumeService.unsyncedLessonIn(course.id) ??
+        course.lastLessonId;
+    return _parts.where((p) => p.id == saved).firstOrNull ??
+        _parts
+            .where((p) => p.lessons.any((l) => l.id == lastLesson))
+            .firstOrNull ??
+        _parts.where((p) => p.completed < p.unitCount).firstOrNull ??
+        _parts.first;
+  }
+
+  /// Centres the active section's current unit (its intro when not started,
+  /// its last unit when finished).
+  void _scrollToCurrent(ReelCourse course) {
+    if (!mounted || !_scroll.hasClients || _parts.isEmpty) return;
+    final part = _activePart(course);
+    final units = [
+      for (final n in _nodes)
+        if (n.kind == _NodeKind.unit && n.part == part) n,
+    ];
+    if (units.isEmpty) return;
+    final node =
+        units
+            .where((n) => _state(part, n.index) == _UnitState.current)
+            .firstOrNull ??
+        units.last;
+    // Reversed list: the offset is how far the viewport's bottom edge sits
+    // above the content's bottom.
+    final target = node.fromBottom - _scroll.position.viewportDimension / 2;
+    _scroll.jumpTo(target.clamp(0, _scroll.position.maxScrollExtent));
+    setState(() => _selected = part.index);
   }
 
   /// Keeps the dropdown label on whichever section fills the middle of the
@@ -367,6 +419,9 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
 
   Future<void> _jumpTo(int stop) async {
     setState(() => _selected = stop);
+    if (stop < _parts.length) {
+      CourseReelsResumeService.markSection(widget.courseId, _parts[stop].id);
+    }
     if (!_scroll.hasClients || _bannerFromBottom.isEmpty) return;
     // A banner sits just above the bottom edge, its units climbing above it;
     // the certificate is at the very top, which the clamp lands on.
@@ -437,6 +492,7 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
 
   void _openUnit(IeltsPart part, int i) {
     if (i < 0) {
+      CourseReelsResumeService.markSection(widget.courseId, part.id);
       _openIntro(part);
       return;
     }
@@ -464,6 +520,7 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
       );
       return;
     }
+    CourseReelsResumeService.markSection(widget.courseId, part.id);
     _openLesson(part.lessons[i]);
   }
 
@@ -639,6 +696,7 @@ class _IeltsCourseViewState extends State<IeltsCourseView>
               // The bottom nav already clears the home indicator.
               final layout = _layout(width, 0);
               _bannerFromBottom = layout.banners;
+              _nodes = layout.nodes;
               final h = layout.height;
               double top(_Node n) => h - n.fromBottom; // y from the content top
 
@@ -1797,7 +1855,8 @@ class _SubscribeSheet extends StatelessWidget {
             const SizedBox(height: 22),
             perk(
               Symbols.lock_open_rounded,
-              'Every section of $courseTitle and all other courses',
+              'Every section of $courseTitle — other courses are '
+              'subscribed separately',
             ),
             perk(
               Symbols.event_available_rounded,
