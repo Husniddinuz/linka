@@ -114,8 +114,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       // reverts rather than leaving a wrong write behind.
       _profile = profile.copyWith(
         isFollowing: next,
-        followersCount:
-            (profile.followersCount + (next ? 1 : -1)).clamp(0, 1 << 30),
+        followersCount: (profile.followersCount + (next ? 1 : -1)).clamp(
+          0,
+          1 << 30,
+        ),
       );
     });
 
@@ -157,33 +159,37 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     final profile = _profile;
     if (profile == null || _stories.isEmpty) return;
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => StoryViewerScreen(
-          tutors: [
-            StoryTutor(
-              tutorId: 0,
-              userId: profile.userId,
-              name: profile.displayName,
-              image: profile.profileImage,
-              isEnrollable: false,
-              stories: _stories
-                  .map((s) => StoryData(
-                        id: s.id,
-                        mediaFile: s.mediaFile,
-                        mediaType: s.mediaType,
-                        description: s.description,
-                        source: s.source,
-                      ))
-                  .toList(),
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => StoryViewerScreen(
+              tutors: [
+                StoryTutor(
+                  tutorId: 0,
+                  userId: profile.userId,
+                  name: profile.displayName,
+                  image: profile.profileImage,
+                  isEnrollable: false,
+                  stories: _stories
+                      .map(
+                        (s) => StoryData(
+                          id: s.id,
+                          mediaFile: s.mediaFile,
+                          mediaType: s.mediaType,
+                          description: s.description,
+                          source: s.source,
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
+              initialTutorIndex: 0,
             ),
-          ],
-          initialTutorIndex: 0,
-        ),
-      ),
-    ).then((_) {
-      if (mounted) _load();
-    });
+          ),
+        )
+        .then((_) {
+          if (mounted) _load();
+        });
   }
 
   @override
@@ -206,41 +212,30 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             fontWeight: FontWeight.w800,
           ),
         ),
-        actions: [
-          // Placed where the chat header keeps it. A call is student-to-
-          // student, so it appears on exactly the profiles that offer the
-          // Message button below — never on your own, never on a tutor's.
-          if (profile != null && !profile.isMe && !profile.isTutor)
-            IconButton(
-              icon: PhoneCallIcon(size: 24, color: colors.textPrimary),
-              tooltip: 'Video call',
-              onPressed: _placingCall ? null : _startVideoCall,
-            ),
-        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _missing || profile == null
-              ? _EmptyState(
-                  icon: Symbols.person_off_rounded,
-                  title: 'Profile unavailable',
-                  body: 'This account no longer exists.',
-                )
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-                    children: [
-                      _header(profile),
-                      const SizedBox(height: 20),
-                      _storiesSection(profile),
-                      const SizedBox(height: 24),
-                      _people('Followers', _followers, profile.followersCount),
-                      const SizedBox(height: 20),
-                      _people('Following', _following, profile.followingCount),
-                    ],
-                  ),
-                ),
+          ? _EmptyState(
+              icon: Symbols.person_off_rounded,
+              title: 'Profile unavailable',
+              body: 'This account no longer exists.',
+            )
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                children: [
+                  _header(profile),
+                  const SizedBox(height: 20),
+                  _storiesSection(profile),
+                  const SizedBox(height: 24),
+                  _people('Followers', _followers, profile.followersCount),
+                  const SizedBox(height: 20),
+                  _people('Following', _following, profile.followingCount),
+                ],
+              ),
+            ),
     );
   }
 
@@ -286,7 +281,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: colors.surfaceAlt,
                           borderRadius: BorderRadius.circular(999),
@@ -362,26 +359,76 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
               onTap: _toggleFollow,
             ),
           ),
-          // Private threads are student-to-student: a tutor's profile keeps
-          // its booking path and does not offer one.
+          // Private threads and calls are student-to-student: a tutor's
+          // profile keeps its booking path and offers neither.
           if (!profile.isTutor) ...[
             const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => openDirectConversation(
-                  context,
-                  userId: profile.userId,
-                ),
-                icon: const Icon(Symbols.chat_bubble_rounded, size: 18),
-                label: const Text('Message'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: colors.textPrimary,
-                  side: BorderSide(color: colors.border),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
-                  ),
+            // One outlined pill split in two — Message, then a call segment
+            // on the right — so the call reads as part of the same control.
+            Container(
+              height: 50,
+              decoration: BoxDecoration(
+                border: Border.all(color: colors.border),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Material(
+                type: MaterialType.transparency,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => openDirectConversation(
+                          context,
+                          userId: profile.userId,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Symbols.chat_bubble_rounded,
+                              size: 18,
+                              color: colors.textPrimary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Message',
+                              style: TextStyle(
+                                color: colors.textPrimary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Container(width: 1, height: 24, color: colors.border),
+                    Tooltip(
+                      message: 'Video call',
+                      child: InkWell(
+                        onTap: _placingCall ? null : _startVideoCall,
+                        child: SizedBox(
+                          width: 64,
+                          height: 50,
+                          child: Center(
+                            child: _placingCall
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : PhoneCallIcon(
+                                    size: 20,
+                                    color: colors.textPrimary,
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -472,8 +519,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 width: 84,
                 color: colors.surfaceAlt,
                 child: story.isVideo
-                    ? Icon(Symbols.play_circle_rounded,
-                        color: colors.textTertiary)
+                    ? Icon(
+                        Symbols.play_circle_rounded,
+                        color: colors.textTertiary,
+                      )
                     : Image.network(story.mediaFile, fit: BoxFit.cover),
               ),
             );
@@ -512,26 +561,25 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
               onTap: person.userId == UserService.current?.id
                   ? null
                   : () => Navigator.of(context)
-                      .push(
-                        MaterialPageRoute(
-                          builder: (_) => PublicProfileScreen(
-                            userId: person.userId,
-                            initialName: person.displayName,
-                            initialImage: person.profileImage,
+                        .push(
+                          MaterialPageRoute(
+                            builder: (_) => PublicProfileScreen(
+                              userId: person.userId,
+                              initialName: person.displayName,
+                              initialImage: person.profileImage,
+                            ),
                           ),
-                        ),
-                      )
-                      .then((_) {
-                        if (mounted) _load();
-                      }),
-              onMessage: person.isTutor ||
+                        )
+                        .then((_) {
+                          if (mounted) _load();
+                        }),
+              onMessage:
+                  person.isTutor ||
                       person.userId == UserService.current?.id ||
                       (UserService.current?.isTeacher ?? false)
                   ? null
-                  : () => openDirectConversation(
-                        context,
-                        userId: person.userId,
-                      ),
+                  : () =>
+                        openDirectConversation(context, userId: person.userId),
             ),
           ),
       ],
@@ -562,9 +610,7 @@ class _FollowButton extends StatelessWidget {
         foregroundColor: following ? colors.textPrimary : colors.onBrand,
         elevation: 0,
         padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(999),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
       ),
       child: Text(
         following ? 'Following' : 'Follow',

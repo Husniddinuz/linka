@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../models/course_reel.dart';
+import '../screens/public_profile_screen.dart';
+import '../screens/tutor_profile_screen.dart';
 import '../services/course_reels_service.dart';
 import '../theme/app_colors.dart';
 import 'app_notify.dart';
@@ -682,19 +684,24 @@ class _ReelCommentsSheetState extends State<_ReelCommentsSheet> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: avatar,
-              backgroundColor: c.surfaceAlt,
-              backgroundImage: comment.authorImage != null
-                  ? NetworkImage(comment.authorImage!)
+            GestureDetector(
+              onTap: _canOpenProfile(comment)
+                  ? () => _openProfile(comment)
                   : null,
-              child: comment.authorImage == null
-                  ? Icon(
-                      Symbols.person_rounded,
-                      size: avatar * 1.1,
-                      color: c.textSecondary,
-                    )
-                  : null,
+              child: CircleAvatar(
+                radius: avatar,
+                backgroundColor: c.surfaceAlt,
+                backgroundImage: comment.authorImage != null
+                    ? NetworkImage(comment.authorImage!)
+                    : null,
+                child: comment.authorImage == null
+                    ? Icon(
+                        Symbols.person_rounded,
+                        size: avatar * 1.1,
+                        color: c.textSecondary,
+                      )
+                    : null,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -704,13 +711,18 @@ class _ReelCommentsSheetState extends State<_ReelCommentsSheet> {
                   Row(
                     children: [
                       Flexible(
-                        child: Text(
-                          _name(comment),
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: c.textPrimary,
+                        child: GestureDetector(
+                          onTap: _canOpenProfile(comment)
+                              ? () => _openProfile(comment)
+                              : null,
+                          child: Text(
+                            _name(comment),
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: c.textPrimary,
+                            ),
                           ),
                         ),
                       ),
@@ -795,6 +807,28 @@ class _ReelCommentsSheetState extends State<_ReelCommentsSheet> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(0, 6, 14, 6),
         child: Text(label, style: style),
+      ),
+    );
+  }
+
+  static bool _canOpenProfile(ReelComment comment) =>
+      !comment.isMine &&
+      (comment.authorTutorId != null || comment.authorId > 0);
+
+  /// Opens whoever wrote [comment], over the sheet so Back returns to the
+  /// comments. A tutor goes to their bookable profile, anyone else to their
+  /// public profile — the same split as chat messages.
+  void _openProfile(ReelComment comment) {
+    final tutorId = comment.authorTutorId;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => tutorId != null
+            ? TutorProfileScreen(tutorId: tutorId)
+            : PublicProfileScreen(
+                userId: comment.authorId,
+                initialName: _name(comment),
+                initialImage: comment.authorImage,
+              ),
       ),
     );
   }

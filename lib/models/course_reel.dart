@@ -704,6 +704,8 @@ class ReelComment {
     required this.id,
     required this.parentId,
     required this.text,
+    required this.authorId,
+    required this.authorTutorId,
     required this.authorName,
     required this.authorImage,
     required this.isMine,
@@ -719,6 +721,13 @@ class ReelComment {
   /// The root comment this replies to; null for a top-level comment.
   final int? parentId;
   String text;
+
+  /// The author's user id (their public profile); 0 when the server didn't
+  /// send one.
+  final int authorId;
+
+  /// The author's tutor profile id when they're a tutor (bookable profile).
+  final int? authorTutorId;
   final String authorName;
   final String? authorImage;
   final bool isMine;
@@ -732,6 +741,8 @@ class ReelComment {
     id: _asInt(json['id']),
     parentId: (json['parent'] as num?)?.toInt(),
     text: json['text']?.toString() ?? '',
+    authorId: _asInt(json['author_id']),
+    authorTutorId: (json['author_tutor_id'] as num?)?.toInt(),
     authorName: json['author_name']?.toString() ?? '',
     authorImage: _nonEmpty(json['author_image']),
     isMine: json['is_mine'] as bool? ?? false,
